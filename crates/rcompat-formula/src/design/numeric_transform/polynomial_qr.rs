@@ -2,14 +2,36 @@
 //! This operation does not change the rank policy used by model fitting.
 use super::reduction::axpy;
 use super::reduction::{dot, norm};
+use crate::errors::Error;
+use crate::matrix::try_alloc_matrix;
+
+pub(in crate::design) fn try_columns(
+    rows: usize,
+    width: usize,
+    value: impl Fn(usize, usize) -> f64,
+) -> Result<Vec<Vec<f64>>, Error> {
+    let mut columns = try_alloc_matrix(width, 1, "polynomial QR columns")?;
+    for column in 0..width {
+        let mut values = try_alloc_matrix(rows, 1, "polynomial QR column values")?;
+        values.extend((0..rows).map(|row| value(row, column)));
+        columns.push(values);
+    }
+    Ok(columns)
+}
 
 // Caller supplies a finite, nonempty column-major problem with width <= rows.
-pub(in crate::design) fn basis(mut columns: Vec<Vec<f64>>) -> (Vec<Vec<f64>>, usize) {
-    let mut tails = columns.iter().map(|c| norm(c)).collect::<Vec<_>>();
-    let mut original = tails.clone();
+pub(in crate::design) fn visit_basis(
+    mut columns: Vec<Vec<f64>>,
+    mut visit: impl FnMut(usize, &[f64]),
+) -> Result<usize, Error> {
     let n = columns[0].len();
     let width = columns.len();
-    let mut reflectors = vec![0.0; width];
+    let mut tails = try_alloc_matrix(width, 1, "polynomial QR column norms")?;
+    tails.extend(columns.iter().map(|c| norm(c)));
+    let mut original = try_alloc_matrix(width, 1, "polynomial QR original norms")?;
+    original.extend_from_slice(&tails);
+    let mut reflectors = try_alloc_matrix(width, 1, "polynomial QR reflectors")?;
+    reflectors.resize(width, 0.0);
     let mut active = width;
     for step in 0..width {
         while step < active && tails[step] < original[step] * 1e-7 {
@@ -69,9 +91,10 @@ pub(in crate::design) fn basis(mut columns: Vec<Vec<f64>>) -> (Vec<Vec<f64>>, us
         columns[step][step] = -signed;
     }
     let reflections = active.min(n - 1);
-    let mut output = Vec::with_capacity(width);
+    let mut q = try_alloc_matrix(n, 1, "polynomial QR basis column")?;
+    q.resize(n, 0.0);
     for column in 0..width {
-        let mut q = vec![0.0; n];
+        q.fill(0.0);
         q[column] = columns[column][column];
         for step in (0..reflections).rev() {
             if reflectors[step] == 0.0 {
@@ -92,7 +115,7 @@ pub(in crate::design) fn basis(mut columns: Vec<Vec<f64>>) -> (Vec<Vec<f64>>, us
             }
             columns[step][step] = diagonal;
         }
-        output.push(q);
+        visit(column, &q);
     }
-    (output, active)
+    Ok(active)
 }

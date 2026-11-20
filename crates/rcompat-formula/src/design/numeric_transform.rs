@@ -3,9 +3,9 @@
 //! Inputs are already evaluated finite covariates in sample order. These
 //! routines do not alter fitting rank thresholds or dispatch to a frontend.
 use crate::errors::Error;
-use crate::errors::invalid_options;
 use crate::errors::{ErrorKind, missing_prerequisite};
-use crate::matrix::{MatrixView, RowMajorMatrix};
+use crate::errors::{invalid_dimensions, invalid_options};
+use crate::matrix::{MatrixView, RowMajorMatrix, try_alloc_matrix};
 use crate::numeric::profile::{r_linux_arm64, r_linux_x86};
 
 pub(in crate::design) mod binary128;
@@ -116,11 +116,17 @@ pub(super) fn scale_expression(
             ));
         }
     }
-    let mut values = vec![0.0; rows * columns];
-    let mut centers =
-        (!matches!(center, ScalePolicy::Disabled)).then(|| Vec::with_capacity(columns));
-    let mut divisors =
-        (!matches!(scale, ScalePolicy::Disabled)).then(|| Vec::with_capacity(columns));
+    if rows == 0 {
+        return Err(invalid_dimensions("row-major matrix rows", 1, 0));
+    }
+    let mut values = try_alloc_matrix(rows, columns, "scaled covariates")?;
+    values.resize(rows * columns, 0.0);
+    let mut centers = (!matches!(center, ScalePolicy::Disabled))
+        .then(|| try_alloc_matrix(columns, 1, "scale centers"))
+        .transpose()?;
+    let mut divisors = (!matches!(scale, ScalePolicy::Disabled))
+        .then(|| try_alloc_matrix(columns, 1, "scale divisors"))
+        .transpose()?;
     for column in 0..columns {
         // R's column mean is a single reduction; poly's scalar mean has a
         // correction pass. They are different operations, not frontend modes.
@@ -243,5 +249,23 @@ pub(super) fn column_sum(values: impl Iterator<Item = f64>) -> f64 {
         extended::sum(values).value()
     } else {
         values.sum()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::matrix::MatrixOrder;
+
+    #[test]
+    fn scaling_rejects_empty_views_before_allocating_column_metadata() {
+        let empty = MatrixView::new(0, usize::MAX, &[], MatrixOrder::ColumnMajor).unwrap();
+        let error =
+            scale_expression(empty, ScalePolicy::Automatic, ScalePolicy::Automatic).unwrap_err();
+        std::assert_matches!(
+            error,
+            Error::InvalidDimensions { context, expected: 1, actual: 0 }
+                if context == "row-major matrix rows"
+        );
     }
 }

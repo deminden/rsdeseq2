@@ -1,7 +1,10 @@
 use super::{column_sum, invalid_options, polynomial_qr, scalar_mean};
 use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::numeric::math::ProfileMath;
-use crate::{errors::Error, matrix::RowMajorMatrix};
+use crate::{
+    errors::Error,
+    matrix::{RowMajorMatrix, try_alloc_matrix},
+};
 
 /// Recurrence metadata for evaluating the same polynomial basis on new values.
 #[derive(Clone, Debug, PartialEq)]
@@ -75,7 +78,8 @@ pub(in crate::design) fn polynomial_expression(
             "polynomial degree must be less than the number of unique values",
         ));
     }
-    let mut output = vec![0.0; size];
+    let mut output = try_alloc_matrix(input.len(), degree, "polynomial basis values")?;
+    output.resize(size, 0.0);
     if raw {
         for (row, &x) in input.iter().enumerate() {
             for column in 0..degree {
@@ -110,47 +114,47 @@ pub(in crate::design) fn polynomial_expression(
         }
         return finish(input.len(), degree, output, Some(coefs.clone()));
     }
-    let mut unique = input.to_vec();
-    unique.sort_unstable_by(f64::total_cmp);
-    unique.dedup_by(|a, b| *a == *b);
-    if degree >= unique.len() {
+    let mut centered = try_alloc_matrix(input.len(), 1, "polynomial input workspace")?;
+    centered.extend_from_slice(input);
+    centered.sort_unstable_by(f64::total_cmp);
+    centered.dedup_by(|a, b| *a == *b);
+    if degree >= centered.len() {
         return Err(invalid_options(
             "polynomial degree must be less than the number of unique values",
         ));
     }
     let mean = scalar_mean(input);
-    let centered = input.iter().map(|x| x - mean).collect::<Vec<_>>();
-    let columns = (0..width)
-        .map(|d| centered.iter().map(|&x| power(x, d)).collect::<Vec<_>>())
-        .collect::<Vec<_>>();
+    centered.clear();
+    centered.extend(input.iter().map(|x| x - mean));
+    let columns = polynomial_qr::try_columns(input.len(), width, |row, column| {
+        power(centered[row], column)
+    })?;
     if columns.iter().flatten().any(|v| !v.is_finite()) {
         return Err(invalid_options(
             "polynomial powers produced non-finite values",
         ));
     }
-    let (columns, rank) = polynomial_qr::basis(columns);
+    let mut alpha = try_alloc_matrix(degree, 1, "polynomial recurrence centers")?;
+    let mut norm2 = try_alloc_matrix(width + 1, 1, "polynomial recurrence squared norms")?;
+    norm2.push(1.0);
+    let rank = polynomial_qr::visit_basis(columns, |column, basis| {
+        let norm = column_sum(basis.iter().map(|x| x * x));
+        norm2.push(norm);
+        if column < degree {
+            let weighted = centered.iter().zip(basis).map(|(x, z)| x * (z * z));
+            alpha.push(column_sum(weighted) / norm + mean);
+        }
+        if column > 0 {
+            let divisor = norm.sqrt();
+            for (row, &value) in basis.iter().enumerate() {
+                output[row * degree + column - 1] = value / divisor;
+            }
+        }
+    })?;
     if rank < degree {
         return Err(invalid_options(
             "polynomial degree is too high for the numerical rank",
         ));
-    }
-    let norms = columns
-        .iter()
-        .map(|c| column_sum(c.iter().map(|x| x * x)))
-        .collect::<Vec<_>>();
-    let alpha = (0..degree)
-        .map(|c| {
-            column_sum(centered.iter().zip(&columns[c]).map(|(x, z)| x * (z * z))) / norms[c] + mean
-        })
-        .collect();
-    let mut norm2 = Vec::with_capacity(width + 1);
-    norm2.push(1.0);
-    norm2.extend_from_slice(&norms);
-    for column in 1..width {
-        let divisor = norms[column].sqrt();
-        for row in 0..input.len() {
-            output[row * degree + column - 1] = columns[column][row] / divisor;
-        }
     }
     finish(
         input.len(),

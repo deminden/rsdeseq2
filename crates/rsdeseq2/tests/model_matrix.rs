@@ -110,16 +110,25 @@ fn model_matrix_rejects_invalid_shapes_codes_names_and_contrasts() {
             problem: ModelMatrixResponseProblem::NonNumeric,
         }
     );
-    let custom = ModelMatrixVariable::Factor {
-        name: "f",
-        codes: &codes,
-        levels: &levels,
-        coding: FactorCoding::Matrix {
-            values: matrix,
-            names: None,
-        },
-    };
-    assert!(ModelMatrixPlan::new(3, &[custom], &[vec![1]], true).is_err());
+    let empty = MatrixView::new(0, usize::MAX, &[], MatrixOrder::RowMajor).unwrap();
+    for values in [matrix, empty] {
+        let custom = ModelMatrixVariable::Factor {
+            name: "f",
+            codes: &codes,
+            levels: &levels,
+            coding: FactorCoding::Matrix {
+                values,
+                names: None,
+            },
+        };
+        let error = ModelMatrixPlan::new(3, &[custom], &[vec![1]], true)
+            .err()
+            .unwrap();
+        assert_eq!(
+            error.to_string(),
+            "invalid options: explicit factor contrasts must be a finite level-by-column matrix"
+        );
+    }
 }
 
 #[test]

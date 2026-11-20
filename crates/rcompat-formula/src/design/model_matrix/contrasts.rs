@@ -1,6 +1,7 @@
 use super::{FactorCoding, invalid_options};
 use crate::errors::Error;
 use crate::errors::{ErrorKind, missing_prerequisite};
+use crate::matrix::try_alloc_matrix;
 
 pub(super) struct CodingMatrix {
     pub names: Vec<String>,
@@ -34,16 +35,31 @@ impl CodingMatrix {
                 treatment_base: Some(base),
             });
         }
+        if matches!(coding, FactorCoding::Polynomial) && n > 95 {
+            return Err(missing_prerequisite(
+                ErrorKind::Options,
+                "an orthogonal polynomial contrast",
+                "at most 95 levels",
+            ));
+        }
+        if let FactorCoding::Matrix { values, .. } = coding
+            && (values.n_rows() != n || values.as_slice().iter().any(|v| !v.is_finite()))
+        {
+            return Err(invalid_options(
+                "explicit factor contrasts must be a finite level-by-column matrix",
+            ));
+        }
         let width = match coding {
             FactorCoding::Matrix { values, .. } => values.n_cols(),
             _ => n - 1,
         };
-        let mut names = (1..=width).map(|n| n.to_string()).collect::<Vec<_>>();
-        let mut values = vec![
-            0.0;
-            n.checked_mul(width)
-                .ok_or_else(|| invalid_options("factor coding shape overflow"))?
-        ];
+        let cells = n
+            .checked_mul(width)
+            .ok_or_else(|| invalid_options("factor coding shape overflow"))?;
+        let mut names = try_alloc_matrix(width, 1, "factor contrast names")?;
+        names.extend((1..=width).map(|n| n.to_string()));
+        let mut values = try_alloc_matrix(n, width, "factor coding matrix")?;
+        values.resize(cells, 0.0);
         match coding {
             FactorCoding::Treatment { .. } => {
                 return Err(crate::errors::invariant(
@@ -65,14 +81,7 @@ impl CodingMatrix {
                 }
             }
             FactorCoding::Polynomial => {
-                if n > 95 {
-                    return Err(missing_prerequisite(
-                        ErrorKind::Options,
-                        "an orthogonal polynomial contrast",
-                        "at most 95 levels",
-                    ));
-                }
-                values = super::polynomial::contrasts(n);
+                super::polynomial::contrasts(n, &mut values)?;
                 for (column, name) in names.iter_mut().enumerate() {
                     *name = match column {
                         0 => ".L".into(),
@@ -86,11 +95,6 @@ impl CodingMatrix {
                 values: matrix,
                 names: supplied,
             } => {
-                if matrix.n_rows() != n || matrix.as_slice().iter().any(|v| !v.is_finite()) {
-                    return Err(invalid_options(
-                        "explicit factor contrasts must be a finite level-by-column matrix",
-                    ));
-                }
                 if let Some(supplied) = supplied {
                     if supplied.len() != width {
                         return Err(invalid_options(

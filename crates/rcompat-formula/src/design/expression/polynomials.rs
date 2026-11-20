@@ -2,6 +2,7 @@ use super::{Data, Evaluator, Value, invalid_options};
 use crate::design::numeric_transform::{PolynomialCoefficients, polynomial_expression};
 use crate::errors::Error;
 use crate::errors::{ErrorKind, missing_prerequisite};
+use crate::matrix::try_alloc_matrix;
 impl Evaluator<'_> {
     pub(super) fn polynomial(&self, args: &[(Option<String>, Value)]) -> Result<Value, Error> {
         // Only x precedes `...`; controls after it require exact names. A lone
@@ -119,14 +120,14 @@ impl Evaluator<'_> {
             usize::try_from(count - 1).map_err(|_| invalid_options("polynomial size overflow"))?;
         super::checked_elements(rows.checked_mul(count))?;
         super::checked_elements(nd.checked_mul(count))?;
-        let mut exponents = Vec::with_capacity(count);
+        let mut exponents = try_alloc_matrix(count, nd, "polynomial exponent grid")?;
         let mut powers = vec![0; nd];
-        fn grid(axis: usize, remaining: usize, powers: &mut [usize], out: &mut Vec<Vec<usize>>) {
+        fn grid(axis: usize, remaining: usize, powers: &mut [usize], out: &mut Vec<usize>) {
             for power in 0..=remaining {
                 powers[axis] = power;
                 if axis == 0 {
                     if powers.iter().any(|p| *p != 0) {
-                        out.push(powers.to_vec());
+                        out.extend_from_slice(powers);
                     }
                 } else {
                     grid(axis - 1, remaining - power, powers, out);
@@ -154,8 +155,9 @@ impl Evaluator<'_> {
             }
             basis.push(evaluated.numeric()?);
         }
-        let mut values = vec![0.0; rows * count];
-        for (c, powers) in exponents.iter().enumerate() {
+        let mut values = try_alloc_matrix(rows, count, "multivariate polynomial basis")?;
+        values.resize(rows * count, 0.0);
+        for (c, powers) in exponents.chunks_exact(nd).enumerate() {
             for r in 0..rows {
                 let term = |i: usize| {
                     if powers[i] == 0 {
@@ -181,7 +183,7 @@ impl Evaluator<'_> {
             },
             Some(
                 exponents
-                    .iter()
+                    .chunks_exact(nd)
                     .map(|p| p.iter().map(usize::to_string).collect::<Vec<_>>().join("."))
                     .collect(),
             ),
@@ -196,7 +198,7 @@ impl Evaluator<'_> {
         }
         result.dimname_names[1] = Some(
             exponents
-                .iter()
+                .chunks_exact(nd)
                 .map(|p| {
                     let index = p
                         .iter()
@@ -214,7 +216,7 @@ impl Evaluator<'_> {
                 "degree",
                 Value::numbers(
                     exponents
-                        .iter()
+                        .chunks_exact(nd)
                         .map(|p| p.iter().sum::<usize>() as f64)
                         .collect(),
                 ),

@@ -1716,6 +1716,24 @@ and optimizer diagnostics. Each arithmetic profile passed 18 focused
 integration checks and matched all 8,032 golden fields. Three mixture unit
 tests, shrinkage library Clippy and the module dependency check also passed.
 
+### Checked formula transform buffers
+
+Scaling, polynomial basis construction and factor contrasts now reserve
+their matrix buffers through the shared allocator. Invalid explicit
+contrast shapes are rejected before reserving column names or values.
+Polynomial QR emits one basis column at a time into the final output.
+Multivariate polynomials store their exponent grid in one checked buffer.
+
+Five alternating-order pairs against `1ba9fbe` on macOS arm64 used
+200,000 samples and degree 12 under portable arithmetic. Median peak
+RSS fell from 64.91 to 44.88 MiB. Median basis construction time rose
+from 67.37 to 69.83 ms. All output and recurrence coefficient hashes
+matched across all ten runs.
+
+The focused run passed 87 R-host integration checks and four portable
+checks. Both profiles matched all 8,032 golden fields. The zero-row
+scaling unit regression, formula library Clippy and module validation passed.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |
