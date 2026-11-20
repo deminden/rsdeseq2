@@ -501,6 +501,25 @@ A 60-digit Newton step for the two remaining portable dispersion fits,
 with the final Gamma regression rows fixed, increased the maximum
 deviations from the independent DESeq2 references.
 
+### Shared offsets and narrow QR projection
+
+In `b8c5811`, weighted and expanded beta-prior fits pass shared size
+factors through to IRLS. The intercept shortcut normalizes one row at
+a time. Frozen rlog builds its gene-specific factor matrix directly
+from the input offsets and intercepts. Focused integration checks
+passed 90 host-profile and 34 portable-profile tests.
+
+The detached one-column QR projection matched both 8,032-field golden
+manifests and all eleven GTEx result TSVs. It improved throughput by
+7.55% and 4.08% in two paired runs, with peak RSS changes of −8.11 and
++3.69 MiB. A 32-sample rlog fixture was 4.6% slower with the one-column
+projection. In `b9b550e`, designs with up to four coefficients use the
+one-column projection and wider designs use the batched projection.
+The integrated version passed 31 IRLS unit tests, 72 host-profile
+integration tests and 10 portable-profile integration tests. The next
+milestone includes the combined release and performance checks for
+these two commits.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
