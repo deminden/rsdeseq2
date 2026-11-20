@@ -1,14 +1,14 @@
 //! Direction-based active-set and floored EM policy used by original mixSQP.
 //! Algorithm reference: mixsqp 0.3-54, Kim/Carbonetto/Stephens/Anitescu (MIT).
 //! See MIXSQP-LICENSE for the original copyright and permission notice.
-use super::{DMatrix, DVector, ERROR_SCOPE, Error, Problem};
+use super::{DMatrix, DVector, ERROR_SCOPE, Error, Problem, try_mixture_matrix};
 use crate::errors::scoped_invalid_options;
 use crate::shrinkage::MixtureSqpOptions;
 
 impl Problem {
-    pub(super) fn ashr_hessian(&self, weights: &[f64]) -> DMatrix<f64> {
+    pub(super) fn ashr_hessian_into(&self, weights: &[f64], hessian: &mut DMatrix<f64>) {
         let k = self.components;
-        let mut hessian = DMatrix::zeros(k, k);
+        hessian.fill(0.0);
         for i in 0..k {
             if self.prior_counts[i] > 0.0 {
                 let mass = self.prior_counts[i] / self.mass;
@@ -34,7 +34,6 @@ impl Problem {
                 }
             }
         }
-        hessian
     }
     pub(super) fn ashr_expectation_step(&self, weights: &[f64]) -> Result<Vec<f64>, Error> {
         const FLOOR: f64 = 1e-15;
@@ -117,9 +116,10 @@ pub(super) fn quadratic(
                 y[i] = 0.0;
             }
         }
-        let reduced = DMatrix::from_fn(indices.len(), indices.len(), |i, j| {
+        let n = indices.len();
+        let reduced = try_mixture_matrix(n, n, "mixture SQP active Hessian", |i, j| {
             h[(indices[i], indices[j])]
-        });
+        })?;
         let current = DVector::from_iterator(indices.len(), indices.iter().map(|&i| y[i]));
         let rhs = -(DVector::from_iterator(indices.len(), indices.iter().map(|&i| c[i]))
             + &reduced * current);
@@ -174,7 +174,8 @@ fn search_direction(
     rhs: &DVector<f64>,
     ridge_multiplier: f64,
 ) -> Result<DVector<f64>, Error> {
-    let minimum = h.diagonal().iter().copied().fold(f64::INFINITY, f64::min);
+    let n = h.nrows();
+    let minimum = (0..n).map(|i| h[(i, i)]).fold(f64::INFINITY, f64::min);
     let mut ridge = if minimum > 1e-15 {
         0.0
     } else {
@@ -185,29 +186,33 @@ fn search_direction(
         if ridge * ridge_multiplier > 1e15 {
             break;
         }
-        let mut corrected = h.clone();
-        for i in 0..h.nrows() {
+        let mut corrected =
+            try_mixture_matrix(n, n, "mixture SQP ridge Hessian", |i, j| h[(i, j)])?;
+        for i in 0..n {
             corrected[(i, i)] += ridge;
         }
-        if let Some(cholesky) = corrected.clone().cholesky() {
+        let factors = try_mixture_matrix(n, n, "mixture SQP Cholesky", |i, j| corrected[(i, j)])?;
+        if let Some(cholesky) = factors.cholesky() {
             let norm = |m: &DMatrix<f64>| {
                 m.column_iter()
                     .map(|c| c.iter().map(|x| x.abs()).sum::<f64>())
                     .fold(0.0_f64, f64::max)
             };
-            let reciprocal = 1.0 / (norm(&corrected) * norm(&cholesky.inverse()));
+            let mut inverse = try_mixture_matrix(n, n, "mixture SQP Hessian inverse", |i, j| {
+                if i == j { 1.0 } else { 0.0 }
+            })?;
+            cholesky.solve_mut(&mut inverse);
+            let reciprocal = 1.0 / (norm(&corrected) * norm(&inverse));
+            drop(inverse);
             solved = Some(if reciprocal < f64::EPSILON || !reciprocal.is_finite() {
-                let svd = nalgebra::linalg::SVD::try_new(
-                    corrected.clone(),
-                    true,
-                    true,
-                    f64::EPSILON,
-                    1000,
-                )
-                .ok_or_else(|| {
-                    scoped_invalid_options(ERROR_SCOPE, "quadratic direction SVD did not converge")
-                })?;
-                let cutoff = corrected.nrows() as f64 * f64::EPSILON * svd.singular_values[0];
+                let svd = nalgebra::linalg::SVD::try_new(corrected, true, true, f64::EPSILON, 1000)
+                    .ok_or_else(|| {
+                        scoped_invalid_options(
+                            ERROR_SCOPE,
+                            "quadratic direction SVD did not converge",
+                        )
+                    })?;
+                let cutoff = n as f64 * f64::EPSILON * svd.singular_values[0];
                 svd.solve(rhs, cutoff).map_err(|e| {
                     scoped_invalid_options(ERROR_SCOPE, format!("quadratic direction SVD: {e}"))
                 })?

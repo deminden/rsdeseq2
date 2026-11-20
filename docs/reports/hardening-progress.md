@@ -912,6 +912,20 @@ The QR comparison includes a subnormal pivot and a successful retry. Each
 profile passed 85 focused tests, including the independent covariance
 reference, and matched all 8,032 golden fields. Workspace Clippy passed.
 
+### Mixture optimizer allocation
+
+The mixture fitter normalizes each likelihood row in its final buffer.
+SQP allocates its first Hessian when needed and reuses it across iterations.
+Both SQP policies check the allocation of their active Hessians and
+factorization inputs. The interior-point path scales the Hessian in place.
+The optional low-rank approximation builds the augmented likelihood
+directly in column-major storage and reserves its reconstructed output
+after rank selection.
+
+Each numeric profile passed three mixture unit tests and 15 targeted
+integration tests, including the SQP and advanced optimizer references.
+Workspace Clippy passed and both golden manifests matched all 8,032 fields.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

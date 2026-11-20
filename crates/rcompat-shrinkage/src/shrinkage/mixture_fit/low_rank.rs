@@ -1,7 +1,8 @@
 //! Optional deterministic spectral approximation of the augmented likelihood.
-use super::{DMatrix, ERROR_SCOPE, Problem};
+use super::{ERROR_SCOPE, Problem, try_mixture_matrix};
 use crate::Error;
 use crate::errors::scoped_invalid_options;
+use crate::matrix::try_alloc_matrix;
 impl Problem {
     pub(super) fn truncated(&self, tolerance: f64) -> Result<Option<Self>, Error> {
         let k = self.components;
@@ -22,22 +23,15 @@ impl Problem {
             .ok_or_else(|| {
                 scoped_invalid_options(ERROR_SCOPE, "augmented likelihood row count overflows")
             })?;
-        let cells = rows.checked_mul(k).ok_or_else(|| {
-            scoped_invalid_options(ERROR_SCOPE, "augmented likelihood size overflows")
-        })?;
-        let mut values = Vec::new();
-        values.try_reserve_exact(cells).map_err(|_| {
-            scoped_invalid_options(
-                ERROR_SCOPE,
-                "unable to reserve augmented likelihood storage",
-            )
-        })?;
-        let mut weights = Vec::with_capacity(rows);
+        let dimension = rows.min(k);
+        if dimension <= 2 {
+            return Ok(None);
+        }
+        let mut matrix = try_mixture_matrix(rows, k, "mixture augmented likelihood", |_, _| 0.0)?;
+        let mut weights = try_alloc_matrix(rows, 1, "mixture augmented weights")?;
         for (j, &count) in self.prior_counts.iter().enumerate() {
             if count > 0.0 {
-                let start = values.len();
-                values.resize(start + k, 0.0);
-                values[start + j] = 1.0;
+                matrix[(weights.len(), j)] = 1.0;
                 weights.push(count);
             }
         }
@@ -47,16 +41,12 @@ impl Problem {
             .zip(&self.observation_weights)
         {
             if weight > 0.0 {
-                values.extend_from_slice(row);
+                for (j, &value) in row.iter().enumerate() {
+                    matrix[(weights.len(), j)] = value;
+                }
                 weights.push(weight);
             }
         }
-        let rows = weights.len();
-        let dimension = rows.min(k);
-        if dimension <= 2 {
-            return Ok(None);
-        }
-        let matrix = DMatrix::from_row_slice(rows, k, &values);
         let svd = nalgebra::linalg::SVD::try_new(matrix, true, true, f64::EPSILON, 1000)
             .ok_or_else(|| {
                 scoped_invalid_options(ERROR_SCOPE, "likelihood SVD did not converge")
@@ -90,6 +80,7 @@ impl Problem {
         let vt = svd.v_t.ok_or_else(|| {
             scoped_invalid_options(ERROR_SCOPE, "missing right likelihood singular vectors")
         })?;
+        let mut values = try_alloc_matrix(rows, k, "mixture truncated likelihood")?;
         let mut minimum = 0.0_f64;
         for i in 0..rows {
             for j in 0..k {
@@ -102,7 +93,7 @@ impl Problem {
                         "nonfinite truncated likelihood",
                     ));
                 }
-                values[i * k + j] = value;
+                values.push(value);
                 minimum = minimum.min(value);
             }
         }

@@ -1,4 +1,4 @@
-use super::{DMatrix, DVector, ERROR_SCOPE, Error, MixtureFitOptions, Problem};
+use super::{DMatrix, DVector, ERROR_SCOPE, Error, MixtureFitOptions, Problem, try_mixture_matrix};
 use crate::errors::scoped_invalid_options;
 mod compatibility;
 
@@ -35,9 +35,9 @@ impl Problem {
         }
         Ok(next)
     }
-    pub(super) fn hessian(&self, weights: &[f64]) -> DMatrix<f64> {
+    pub(super) fn hessian_into(&self, weights: &[f64], h: &mut DMatrix<f64>) {
         let k = self.components;
-        let mut h = DMatrix::zeros(k, k);
+        h.fill(0.0);
         for (row, &a) in self
             .likelihoods
             .chunks_exact(k)
@@ -59,7 +59,6 @@ impl Problem {
                     (self.prior_counts[i] / self.mass) / (weights[i] + self.offset).powi(2);
             }
         }
-        h
     }
     pub(super) fn solve(
         &self,
@@ -77,6 +76,7 @@ impl Problem {
             weights = em(&weights)?;
         }
         let mut evaluations = 0;
+        let mut hessian = DMatrix::default();
         for _ in 0..options.max_iterations {
             weights = em(&weights)?;
             for (w, &prior) in weights.iter_mut().zip(&self.prior_counts) {
@@ -109,11 +109,15 @@ impl Problem {
                     "SQP dual convergence reached".into(),
                 ));
             }
-            let hessian = if options.sqp.ashr_compatibility {
-                self.ashr_hessian(&weights)
+            if hessian.nrows() == 0 {
+                let k = self.components;
+                hessian = try_mixture_matrix(k, k, "mixture SQP Hessian", |_, _| 0.0)?;
+            }
+            if options.sqp.ashr_compatibility {
+                self.ashr_hessian_into(&weights, &mut hessian);
             } else {
-                self.hessian(&weights)
-            };
+                self.hessian_into(&weights, &mut hessian);
+            }
             if hessian.iter().any(|v| !v.is_finite()) {
                 return Err(scoped_invalid_options(
                     ERROR_SCOPE,
@@ -235,15 +239,17 @@ fn nonnegative_quadratic(
             free[i] = true;
             continue;
         }
-        let mut reduced = DMatrix::from_fn(indices.len(), indices.len(), |i, j| {
+        let n = indices.len();
+        let mut reduced = try_mixture_matrix(n, n, "mixture SQP active Hessian", |i, j| {
             h[(indices[i], indices[j])]
-        });
+        })?;
         let rhs = DVector::from_iterator(indices.len(), indices.iter().map(|&i| -c[i]));
         let scale = reduced.diagonal().iter().copied().fold(1.0, f64::max);
         let mut ridge = 0.0;
         let mut solved = None;
         for _ in 0..20 {
-            if let Some(cholesky) = reduced.clone().cholesky() {
+            let factors = try_mixture_matrix(n, n, "mixture SQP Cholesky", |i, j| reduced[(i, j)])?;
+            if let Some(cholesky) = factors.cholesky() {
                 solved = Some(cholesky.solve(&rhs));
                 break;
             }

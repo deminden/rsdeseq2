@@ -119,6 +119,10 @@ versions live in [docs/releases](docs/releases/).
   A failed numerical solve still follows the existing refit rules.
   Covariance inversion and the exceptional QR solve reuse existing scratch.
 
+- The mixture optimizer checks allocation sizes for likelihoods, Hessians
+  and dense SQP workspaces. SQP reuses its main Hessian, and the interior
+  point solver scales its Hessian in place.
+
 - Size-factor estimation filters unusable geometric means once, reuses one
   log-ratio buffer across samples and selects the median in place.
 

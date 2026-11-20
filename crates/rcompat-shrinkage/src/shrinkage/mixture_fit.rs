@@ -1,8 +1,25 @@
 use crate::errors::{CalculationLocation, ErrorKind, invalid_calculation, scoped_invalid_options};
 use crate::numeric::math::ProfileMath;
 pub(super) const ERROR_SCOPE: &str = "mixture prior fit";
-use crate::{Error, errors::invalid_dimensions, matrix::MatrixView};
+use crate::{
+    Error,
+    errors::invalid_dimensions,
+    matrix::{MatrixView, try_alloc_matrix},
+};
 use nalgebra::{DMatrix, DVector};
+
+fn try_mixture_matrix(
+    rows: usize,
+    columns: usize,
+    context: &str,
+    mut entry: impl FnMut(usize, usize) -> f64,
+) -> Result<DMatrix<f64>, Error> {
+    let mut values = try_alloc_matrix(rows, columns, context)?;
+    for column in 0..columns {
+        values.extend((0..rows).map(|row| entry(row, column)));
+    }
+    Ok(DMatrix::from_vec(rows, columns, values))
+}
 
 fn invalid_mixture_value(
     operation: &'static str,
@@ -313,15 +330,14 @@ pub fn fit_mixture_proportions(
             "positive finite data or prior mass is required",
         ));
     }
-    let mut likelihoods = Vec::with_capacity(
-        n.checked_mul(k)
-            .ok_or_else(|| scoped_invalid_options(ERROR_SCOPE, "matrix size overflow"))?,
-    );
-    let mut row_maxima = Vec::with_capacity(n);
+    let mut likelihoods = try_alloc_matrix(n, k, "mixture likelihoods")?;
+    let mut row_maxima = try_alloc_matrix(n, 1, "mixture likelihood row maxima")?;
     for (i, &weight) in a.iter().enumerate() {
-        let row = (0..k)
-            .map(|j| log_likelihoods.get(i, j).copied())
-            .collect::<Result<Vec<_>, _>>()?;
+        let start = likelihoods.len();
+        for j in 0..k {
+            likelihoods.push(*log_likelihoods.get(i, j)?);
+        }
+        let row = &mut likelihoods[start..];
         if let Some((component, &value)) = row
             .iter()
             .enumerate()
@@ -347,13 +363,13 @@ pub fn fit_mixture_proportions(
             ));
         }
         row_maxima.push(if weight == 0.0 { 0.0 } else { max });
-        likelihoods.extend(row.into_iter().map(|l| {
-            if weight == 0.0 {
-                0.0
-            } else {
-                (l - max).exp_p()
+        if weight == 0.0 {
+            row.fill(0.0);
+        } else {
+            for value in row {
+                *value = (*value - max).exp_p();
             }
-        }));
+        }
     }
     let mut start = if let Some(initial) = initial_weights {
         if initial.len() != k {
