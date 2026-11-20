@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build checked .crate archives with their locked registry dependencies."""
+"""Build and test checked .crate archives with their locked dependencies."""
 import hashlib
 import json
 from pathlib import Path
@@ -39,12 +39,13 @@ def main():
             )
 
         for archive in packages:
-            subprocess.run(
-                ["cargo", "build", "--locked", "--offline", "--all-features",
-                 "--manifest-path", str(vendor / archive.stem / "Cargo.toml"),
-                 "--config", str(config), "--target-dir", str(work / "target")],
-                cwd=work, check=True,
-            )
+            options = [
+                "--locked", "--offline", "--all-features",
+                "--manifest-path", str(vendor / archive.stem / "Cargo.toml"),
+                "--config", str(config), "--target-dir", str(work / "target"),
+            ]
+            subprocess.run(["cargo", "build", *options], cwd=work, check=True)
+            subprocess.run(["cargo", "test", "--lib", *options], cwd=work, check=True)
 
 
 if __name__ == "__main__":

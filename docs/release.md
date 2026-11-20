@@ -54,8 +54,9 @@ also runs its release-profile numerical/CLI panel.
 
 CI uploads the R source tarball it checked and the verified crate archives with
 a manifest binding their hashes to the revision. The archive check builds the
-unpacked crates against locked vendored dependencies, including the sibling
-release archives. Publishing verifies the manifest and tag/version agreement.
+unpacked crates and runs their library tests against locked vendored dependencies,
+including the sibling release archives. Publishing verifies the manifest and
+tag/version agreement.
 Crate publication stages version-pinned
 README links and requires repackaging to reproduce the checked archive bytes.
 Binary provenance records compiler, commit and executable/archive hashes.

@@ -198,7 +198,7 @@ mod tests {
     #[test]
     fn analytic_likelihood_and_score_match_independent_original_apeglm() {
         let reference: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../rsdeseq2/tests/data/beta_binomial_posterior_r462.json"
+            "../../../tests/data/beta_binomial_analytic_leaves_r462.json"
         ))
         .unwrap();
         let mut failures = vec![];

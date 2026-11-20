@@ -5,6 +5,8 @@ import fnmatch
 import unittest
 from pathlib import Path
 
+from scripts.references.stage_shrinkage_unit_fixtures import UNIT_DATA, fixture_contents
+
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "crates/rsdeseq2/tests/data"
 MANIFEST = ROOT / "scripts/references/MANIFEST.tsv"
@@ -16,7 +18,12 @@ def load_rows():
 
 
 def data_files():
-    return sorted(p.relative_to(DATA).as_posix() for p in DATA.rglob("*") if p.is_file())
+    return sorted(
+        p.relative_to(ROOT).as_posix()
+        for directory in (DATA, UNIT_DATA)
+        for p in directory.rglob("*")
+        if p.is_file()
+    )
 
 
 class ReferenceManifestTest(unittest.TestCase):
@@ -37,6 +44,11 @@ class ReferenceManifestTest(unittest.TestCase):
                     self.assertTrue(row["note"], "a missing generator needs a note")
                 else:
                     self.assertTrue((ROOT / row["generator"]).is_file(), row["generator"])
+
+    def test_shrinkage_leaves_match_the_independent_fixtures(self):
+        for name, contents in fixture_contents():
+            with self.subTest(fixture=name):
+                self.assertEqual((UNIT_DATA / name).read_text(), contents)
 
 
 if __name__ == "__main__":
