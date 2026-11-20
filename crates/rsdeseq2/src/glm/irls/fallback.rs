@@ -20,6 +20,13 @@ pub(super) fn refit_optim_fallback_rows<const SELECTED: bool>(
 ) -> Result<(), DeseqError> {
     let p = input.x.ncols();
     let n = input.x.nrows();
+    let lower = -input.options.max_beta_abs;
+    let upper = input.options.max_beta_abs;
+    let control = optim_fallback_control(p, input.options.optim_maxit, input.options.optim_tol);
+    let mut objective_scratch = BetaObjectiveScratch::new(p)?;
+    let mut stencil = try_filled_vec(p, 0.0, "IRLS refit stencil coefficients")?;
+    let mut inference_mu = try_filled_vec(n, 0.0, "IRLS refit inference means")?;
+    let mut working_weights = try_alloc_matrix(n, 1, "IRLS refit working weights")?;
     let mut covariance_scratch = CovarianceScratch::default();
     for gene in rows.iter().copied() {
         let source_gene = input.rows.source(gene);
@@ -42,34 +49,36 @@ pub(super) fn refit_optim_fallback_rows<const SELECTED: bool>(
             weights: weight_row,
             ridge_lambda: input.ridge_lambda,
         };
+        let mut objective = objective_scratch.for_row(beta_input);
         let start_objective = if input.options.r_optim_compat {
             beta_log2_r_objective(&beta_input, &beta_start)?
         } else {
-            beta_log2_objective(&beta_input, &beta_start)?
+            objective.value(&beta_start)?
         };
-        let output = optimize_beta_log2(beta_input, &beta_start, input.options)?;
-        let (_, final_gradient, _) =
-            beta_log2_objective_gradient_hessian(&beta_input, &output.parameters)?;
-        let final_gradient_norm = projected_gradient_norm(
-            &output.parameters,
-            &final_gradient,
-            -input.options.max_beta_abs,
-            input.options.max_beta_abs,
-        )
-        .unwrap_or(f64::NAN);
+        let output = minimize_beta_log2(
+            &mut objective,
+            &beta_start,
+            (lower, upper),
+            &control,
+            input.options.r_optim_compat,
+            &mut stencil,
+        )?;
+        let final_gradient = objective.gradient(&output.parameters)?;
+        let final_gradient_norm =
+            projected_gradient_norm(&output.parameters, final_gradient, lower, upper)
+                .unwrap_or(f64::NAN);
 
-        let mu_unfloored = fitted_mu_log2_unfloored(input.x, &output.parameters, nf)?;
-        let mu_for_inference = mu_unfloored
-            .iter()
-            .copied()
-            .map(|value| value.max(input.options.min_mu))
-            .collect::<Vec<_>>();
-        let w = working_weights(&mu_for_inference, dispersion, weight_row)?;
+        let mu_row = &mut mu_values[gene * n..(gene + 1) * n];
+        fitted_mu_log2_unfloored_into(input.x, &output.parameters, nf, mu_row)?;
+        for (value, mu) in inference_mu.iter_mut().zip(mu_row.iter().copied()) {
+            *value = mu.max(input.options.min_mu);
+        }
+        working_weights_into(&inference_mu, dispersion, weight_row, &mut working_weights)?;
         // Fallback preserves the IRLS leverage for Cook's distance.
         let Some(beta_covariance) = covariance_and_hat_diagonal(
             &mut covariance_scratch,
             input.x,
-            &w,
+            &working_weights,
             input.ridge_lambda,
             None,
             input.max_design,
@@ -107,9 +116,6 @@ pub(super) fn refit_optim_fallback_rows<const SELECTED: bool>(
                 "optim fallback beta covariance log2 scale",
             )?;
         }
-        for (sample, value) in mu_unfloored.iter().copied().enumerate() {
-            mu_values[gene * n + sample] = value;
-        }
         // DESeq2 updates beta, SE, mu, and log-likelihood after L-BFGS-B
         // fallback, but preserves the original IRLS hat diagonals returned by
         // fitBetaWrapper. Cook's replacement relies on that pre-optim leverage.
@@ -120,7 +126,7 @@ pub(super) fn refit_optim_fallback_rows<const SELECTED: bool>(
         beta_optim_gradient_norm[gene] = final_gradient_norm;
         optim_log_like[gene] = Some(nbinom_log_likelihood_weighted(
             counts_row,
-            &mu_for_inference,
+            &inference_mu,
             dispersion,
             weight_row,
         )?);
@@ -165,22 +171,7 @@ pub(super) struct BetaOptimInput<'a> {
     pub(super) ridge_lambda: &'a [f64],
 }
 
-pub(super) fn optimize_beta_log2(
-    input: BetaOptimInput<'_>,
-    start: &[f64],
-    options: &IrlsOptions,
-) -> Result<BoundedOptimizationOutput, DeseqError> {
-    minimize_beta_log2_lbfgsb(
-        input,
-        start,
-        -options.max_beta_abs,
-        options.max_beta_abs,
-        options.optim_maxit,
-        options.optim_tol,
-        options.r_optim_compat,
-    )
-}
-
+#[cfg(test)]
 pub(super) fn minimize_beta_log2_lbfgsb(
     input: BetaOptimInput<'_>,
     start: &[f64],
@@ -190,6 +181,28 @@ pub(super) fn minimize_beta_log2_lbfgsb(
     gradient_tol: f64,
     r_optim_compat: bool,
 ) -> Result<BoundedOptimizationOutput, DeseqError> {
+    let mut scratch = BetaObjectiveScratch::new(input.x.ncols())?;
+    let mut stencil = vec![0.0; start.len()];
+    minimize_beta_log2(
+        &mut scratch.for_row(input),
+        start,
+        (lower, upper),
+        &optim_fallback_control(start.len(), maxit, gradient_tol),
+        r_optim_compat,
+        &mut stencil,
+    )
+}
+
+fn minimize_beta_log2(
+    evaluation: &mut BetaObjective<'_, '_>,
+    start: &[f64],
+    (lower, upper): (f64, f64),
+    control: &OptimControl,
+    r_optim_compat: bool,
+    stencil: &mut [f64],
+) -> Result<BoundedOptimizationOutput, DeseqError> {
+    let input = evaluation.input;
+    let mut evaluator = RefCell::new(evaluation);
     let parameters = start
         .iter()
         .copied()
@@ -200,7 +213,7 @@ pub(super) fn minimize_beta_log2_lbfgsb(
     let mut objective = |beta: &[f64]| match if r_optim_compat {
         beta_log2_r_objective(&input, beta)
     } else {
-        beta_log2_objective(&input, beta)
+        evaluator.borrow_mut().value(beta)
     } {
         Ok(value) => value,
         Err(error) => {
@@ -211,21 +224,21 @@ pub(super) fn minimize_beta_log2_lbfgsb(
     let start_value = if r_optim_compat {
         beta_log2_r_objective(&input, &parameters)?
     } else {
-        beta_log2_objective(&input, &parameters)?
+        evaluator.borrow_mut().value(&parameters)?
     };
     let bounds = Bounds::new(vec![lower; parameters.len()], vec![upper; parameters.len()])
         .map_err(|error| DeseqError::UnsupportedFeature {
             feature: format!("optim fallback L-BFGS-B bounds failed: {error}"),
         })?;
-    let control = optim_fallback_control(parameters.len(), maxit, gradient_tol);
     let solution = if r_optim_compat {
         let numeric_fit = if crate::numeric_profile() == crate::NumericProfile::Portable {
-            let mut gradient = |beta: &[f64]| match beta_log2_r_centered_gradient(
+            let mut gradient = |beta: &[f64]| match beta_log2_r_centered_gradient_into(
                 &input,
                 beta,
                 lower,
                 upper,
                 &control.ndeps,
+                stencil,
             ) {
                 Ok(gradient) => gradient,
                 Err(error) => {
@@ -258,10 +271,12 @@ pub(super) fn minimize_beta_log2_lbfgsb(
         };
         let mut chosen = numeric;
         let mut analytic_objective =
-            |beta: &[f64]| beta_log2_objective(&input, beta).unwrap_or(1.0e300);
+            |beta: &[f64]| evaluator.borrow_mut().value(beta).unwrap_or(1.0e300);
         let mut analytic_gradient = |beta: &[f64]| {
-            beta_log2_value_gradient(&input, beta)
-                .map(|(_, gradient)| gradient)
+            evaluator
+                .borrow_mut()
+                .gradient(beta)
+                .map(<[f64]>::to_vec)
                 .unwrap_or_else(|_| vec![0.0; beta.len()])
         };
         if let Ok(mut analytic) = optim_lbfgsb_with_gradient(
@@ -271,8 +286,8 @@ pub(super) fn minimize_beta_log2_lbfgsb(
             &mut analytic_gradient,
             control.clone(),
         ) {
-            let numeric_reduced = beta_log2_objective(&input, &chosen.par)?;
-            let analytic_reduced = beta_log2_objective(&input, &analytic.par)?;
+            let numeric_reduced = evaluator.borrow_mut().value(&chosen.par)?;
+            let analytic_reduced = evaluator.borrow_mut().value(&analytic.par)?;
             if analytic.is_success()
                 && !r_optim_candidate_within_analytic_tolerance(
                     numeric_reduced,
@@ -292,14 +307,20 @@ pub(super) fn minimize_beta_log2_lbfgsb(
         }
         Ok(chosen)
     } else {
-        let mut gradient = |beta: &[f64]| match beta_log2_value_gradient(&input, beta) {
-            Ok((_, gradient)) => gradient,
+        let mut gradient = |beta: &[f64]| match evaluator.borrow_mut().gradient(beta) {
+            Ok(gradient) => gradient.to_vec(),
             Err(error) => {
                 deferred_error.borrow_mut().get_or_insert(error);
                 vec![0.0; beta.len()]
             }
         };
-        optim_lbfgsb_with_gradient(parameters, bounds, &mut objective, &mut gradient, control)
+        optim_lbfgsb_with_gradient(
+            parameters,
+            bounds,
+            &mut objective,
+            &mut gradient,
+            control.clone(),
+        )
     }
     .map_err(|error| DeseqError::UnsupportedFeature {
         feature: format!("optim fallback L-BFGS-B failed: {error}"),
@@ -307,10 +328,10 @@ pub(super) fn minimize_beta_log2_lbfgsb(
     if let Some(error) = deferred_error.into_inner() {
         return Err(error);
     }
-    let (_, final_gradient) = beta_log2_value_gradient(&input, &solution.par)?;
-    let final_gradient_norm = projected_gradient_norm(&solution.par, &final_gradient, lower, upper);
+    let final_gradient = evaluator.get_mut().gradient(&solution.par)?;
+    let final_gradient_norm = projected_gradient_norm(&solution.par, final_gradient, lower, upper);
     let converged_by_gradient = final_gradient_norm
-        .is_some_and(|norm| norm <= gradient_tol.max(1.0e-4) && solution.value.is_finite());
+        .is_some_and(|norm| norm <= control.pgtol.max(1.0e-4) && solution.value.is_finite());
     let converged = solution.is_success() || converged_by_gradient;
     let iterations = solution.gradient_count();
     if !converged && final_gradient_norm.is_some_and(|norm| norm > 0.1) {

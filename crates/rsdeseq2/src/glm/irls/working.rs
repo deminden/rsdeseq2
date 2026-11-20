@@ -2,6 +2,7 @@ use super::*;
 use crate::numeric::math::ProfileMath;
 // Working weights and responses.
 
+#[cfg(test)]
 pub(super) fn working_weights(
     mu: &[f64],
     dispersion: f64,

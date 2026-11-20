@@ -2,18 +2,82 @@ use super::*;
 use crate::numeric::math::ProfileMath;
 // Optimizer objectives, gradients and Hessians.
 
-pub(super) fn beta_log2_value_gradient(
-    input: &BetaOptimInput<'_>,
-    beta: &[f64],
-) -> Result<(f64, Vec<f64>), DeseqError> {
-    let (value, gradient, _) = beta_log2_objective_gradient_hessian(input, beta)?;
-    Ok((value, gradient))
+pub(super) struct BetaObjectiveScratch {
+    last_beta: Vec<f64>,
+    gradient: Vec<f64>,
+    hessian: DMatrix<f64>,
 }
 
+impl BetaObjectiveScratch {
+    pub(super) fn new(coefficients: usize) -> Result<Self, DeseqError> {
+        Ok(Self {
+            last_beta: try_filled_vec(coefficients, 0.0, "IRLS refit objective coefficients")?,
+            gradient: try_filled_vec(coefficients, 0.0, "IRLS refit gradient")?,
+            hessian: try_zero_dmatrix(coefficients, coefficients, "IRLS refit Hessian")?,
+        })
+    }
+
+    pub(super) fn for_row<'row>(&mut self, input: BetaOptimInput<'row>) -> BetaObjective<'row, '_> {
+        BetaObjective {
+            input,
+            scratch: self,
+            cached_value: None,
+        }
+    }
+}
+
+/// The objective and gradient callbacks share an evaluation for a single gene.
+pub(super) struct BetaObjective<'row, 'scratch> {
+    pub(super) input: BetaOptimInput<'row>,
+    scratch: &'scratch mut BetaObjectiveScratch,
+    cached_value: Option<f64>,
+}
+
+impl BetaObjective<'_, '_> {
+    pub(super) fn value(&mut self, beta: &[f64]) -> Result<f64, DeseqError> {
+        if let Some(value) = self.cached_value
+            && beta.len() == self.scratch.last_beta.len()
+            && beta
+                .iter()
+                .zip(&self.scratch.last_beta)
+                .all(|(left, right)| left.to_bits() == right.to_bits())
+        {
+            return Ok(value);
+        }
+        self.cached_value = None;
+        let value = evaluate_beta_log2(
+            &self.input,
+            beta,
+            &mut self.scratch.gradient,
+            &mut self.scratch.hessian,
+        )?;
+        self.scratch.last_beta.copy_from_slice(beta);
+        self.cached_value = Some(value);
+        Ok(value)
+    }
+
+    pub(super) fn gradient(&mut self, beta: &[f64]) -> Result<&[f64], DeseqError> {
+        self.value(beta)?;
+        Ok(&self.scratch.gradient)
+    }
+}
+
+#[cfg(test)]
 pub(super) fn beta_log2_objective_gradient_hessian(
     input: &BetaOptimInput<'_>,
     beta: &[f64],
 ) -> Result<(f64, Vec<f64>, DMatrix<f64>), DeseqError> {
+    let mut scratch = BetaObjectiveScratch::new(input.x.ncols())?;
+    let value = scratch.for_row(*input).value(beta)?;
+    Ok((value, scratch.gradient, scratch.hessian))
+}
+
+fn evaluate_beta_log2(
+    input: &BetaOptimInput<'_>,
+    beta: &[f64],
+    gradient: &mut [f64],
+    hessian: &mut DMatrix<f64>,
+) -> Result<f64, DeseqError> {
     let p = input.x.ncols();
     if beta.len() != p {
         return Err(invalid_dimensions("optim beta coefficients", p, beta.len()));
@@ -44,8 +108,8 @@ pub(super) fn beta_log2_objective_gradient_hessian(
     validate_positive_finite(input.dispersion, "dispersion", 0)?;
 
     let mut objective = 0.0;
-    let mut gradient = try_filled_vec(p, 0.0, "IRLS refit gradient")?;
-    let mut hessian = try_zero_dmatrix(p, p, "IRLS refit Hessian")?;
+    gradient.fill(0.0);
+    hessian.fill(0.0);
     let ln2 = std::f64::consts::LN_2;
     let ln2_squared = ln2 * ln2;
     for sample in 0..input.x.nrows() {
@@ -165,7 +229,7 @@ pub(super) fn beta_log2_objective_gradient_hessian(
         gradient[col] = next_gradient;
         hessian[(col, col)] = next_hessian;
     }
-    Ok((objective, gradient, hessian))
+    Ok(objective)
 }
 
 pub(super) fn beta_log2_nb_objective_term(count: u32, mu: f64, dispersion: f64) -> Option<f64> {
@@ -184,18 +248,16 @@ pub(super) fn beta_log2_nb_objective_term(count: u32, mu: f64, dispersion: f64) 
     checked::add(checked::add(first, -second)?, -third)
 }
 
-fn beta_optim_penalty(
-    mut gradient: Vec<f64>,
-    mut hessian: DMatrix<f64>,
-) -> (f64, Vec<f64>, DMatrix<f64>) {
+fn beta_optim_penalty(gradient: &mut [f64], hessian: &mut DMatrix<f64>) -> f64 {
     gradient.fill(0.0);
     hessian.fill(0.0);
     for diagonal in 0..hessian.nrows() {
         hessian[(diagonal, diagonal)] = 1.0;
     }
-    (1.0e300, gradient, hessian)
+    1.0e300
 }
 
+#[cfg(test)]
 pub(super) fn beta_log2_objective(
     input: &BetaOptimInput<'_>,
     beta: &[f64],
@@ -231,6 +293,7 @@ pub(super) fn beta_log2_r_objective(
     Ok(-(ll + lp))
 }
 
+#[cfg(test)]
 pub(super) fn beta_log2_r_centered_gradient(
     input: &BetaOptimInput<'_>,
     beta: &[f64],
@@ -238,10 +301,22 @@ pub(super) fn beta_log2_r_centered_gradient(
     upper: f64,
     ndeps: &[f64],
 ) -> Result<Vec<f64>, DeseqError> {
+    let mut candidate = vec![0.0; beta.len()];
+    beta_log2_r_centered_gradient_into(input, beta, lower, upper, ndeps, &mut candidate)
+}
+
+pub(super) fn beta_log2_r_centered_gradient_into(
+    input: &BetaOptimInput<'_>,
+    beta: &[f64],
+    lower: f64,
+    upper: f64,
+    ndeps: &[f64],
+    candidate: &mut [f64],
+) -> Result<Vec<f64>, DeseqError> {
     let ln2 = std::f64::consts::LN_2;
     let size = input.dispersion.recip();
-    let mut candidate = beta.to_vec();
-    let mut gradient = vec![0.0; beta.len()];
+    candidate.copy_from_slice(beta);
+    let mut gradient = try_filled_vec(beta.len(), 0.0, "IRLS refit centered gradient")?;
     for (col, value) in gradient.iter_mut().enumerate() {
         let forward_step = ndeps[col].min(upper - beta[col]);
         let backward_step = ndeps[col].min(beta[col] - lower);
@@ -265,7 +340,7 @@ pub(super) fn beta_log2_r_centered_gradient(
             .try_fold(0.0, |difference, sample| {
                 let term = beta_log2_sample_loss_change(
                     input,
-                    &candidate,
+                    candidate,
                     col,
                     sample,
                     size,
@@ -285,9 +360,9 @@ pub(super) fn beta_log2_r_centered_gradient(
             None => {
                 // Keep the R objective's behaviour when a stencil leaves the
                 // ordinary floating-point range.
-                let before = beta_log2_r_objective(input, &candidate)?;
+                let before = beta_log2_r_objective(input, candidate)?;
                 candidate[col] = forward;
-                beta_log2_r_objective(input, &candidate)? - before
+                beta_log2_r_objective(input, candidate)? - before
             }
         };
         candidate[col] = beta[col];

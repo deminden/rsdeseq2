@@ -1349,3 +1349,21 @@ under both macOS profiles and under the portable profile on Linux
 arm64 and Linux x86_64 under QEMU, with zero significance flips at
 both cutoffs in each pipeline run. Native Intel macOS and Windows
 runtime validation remains open.
+
+### IRLS optimizer fallback scratch
+
+The bounded fallback reuses its analytic gradient and Hessian across
+genes. Within one gene, the objective and gradient callbacks reuse
+an evaluation at identical coefficient bits. The portable finite
+difference stencil, inference means and working weights reuse storage
+across rows. Unfloored means go directly into the output row.
+
+One paired macOS arm64 allocation probe forced fallback on all 384 rows
+of a 61-sample, four-coefficient design. The portable profile made
+71,028 allocation or reallocation calls versus 84,097 at `8617b33`.
+The host R profile made 73,362 versus 84,751. Numerical output and
+optimizer-diagnostic checksums matched for both pairs.
+
+The 104 focused tests passed under each profile, including the
+GTEx optimizer reference and a scratch reuse check across genes.
+Both 8,032-field golden manifests matched. Clippy and formatting passed.

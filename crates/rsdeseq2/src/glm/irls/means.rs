@@ -101,11 +101,23 @@ pub(super) fn fitted_mu(
     fitted_mu_impl(x, beta, nf, Some(min_mu))
 }
 
+#[cfg(test)]
 pub(super) fn fitted_mu_log2_unfloored(
     x: &DMatrix<f64>,
     beta: &[f64],
     nf: &[f64],
 ) -> Result<Vec<f64>, DeseqError> {
+    let mut output = vec![0.0; x.nrows()];
+    fitted_mu_log2_unfloored_into(x, beta, nf, &mut output)?;
+    Ok(output)
+}
+
+pub(super) fn fitted_mu_log2_unfloored_into(
+    x: &DMatrix<f64>,
+    beta: &[f64],
+    nf: &[f64],
+    output: &mut [f64],
+) -> Result<(), DeseqError> {
     if beta.len() != x.ncols() {
         return Err(invalid_dimensions(
             "log2 beta coefficients",
@@ -113,22 +125,21 @@ pub(super) fn fitted_mu_log2_unfloored(
             beta.len(),
         ));
     }
-    (0..x.nrows())
-        .map(|sample| {
-            validate_positive_finite(nf[sample], "normalization factor", sample)?;
-            let eta = checked_row_dot_slice(x, sample, beta)
-                .nonfinite_at("optim fallback linear predictor", Some(sample))?;
-            let mu = nf[sample] * 2.0_f64.powf_p(eta);
-            if !mu.is_finite() || mu <= 0.0 {
-                return Err(DeseqError::NonFiniteValue {
-                    context: "optim fallback fitted mean".to_string(),
-                    index: Some(sample),
-                    value: mu,
-                });
-            }
-            Ok(mu)
-        })
-        .collect()
+    for (sample, value) in output.iter_mut().enumerate() {
+        validate_positive_finite(nf[sample], "normalization factor", sample)?;
+        let eta = checked_row_dot_slice(x, sample, beta)
+            .nonfinite_at("optim fallback linear predictor", Some(sample))?;
+        let mu = nf[sample] * 2.0_f64.powf_p(eta);
+        if !mu.is_finite() || mu <= 0.0 {
+            return Err(DeseqError::NonFiniteValue {
+                context: "optim fallback fitted mean".to_string(),
+                index: Some(sample),
+                value: mu,
+            });
+        }
+        *value = mu;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -366,6 +366,43 @@ fn selected_glm_fits_match_compacted_rows_with_offsets_and_weights() {
 }
 
 #[test]
+fn beta_objective_rebuilds_cached_values_for_each_row() {
+    let x = DMatrix::from_row_slice(2, 1, &[1.0, 1.0]);
+    let first = BetaOptimInput {
+        x: &x,
+        counts: &[4, 9],
+        nf: &[1.0, 2.0],
+        dispersion: 0.15,
+        weights: None,
+        ridge_lambda: &[0.001],
+    };
+    let second = BetaOptimInput {
+        counts: &[16, 24],
+        ..first
+    };
+    let beta = [2.0];
+    let (first_value, first_gradient, _) =
+        beta_log2_objective_gradient_hessian(&first, &beta).unwrap();
+    let (second_value, second_gradient, _) =
+        beta_log2_objective_gradient_hessian(&second, &beta).unwrap();
+    assert_ne!(first_value, second_value);
+    assert_ne!(first_gradient, second_gradient);
+
+    let mut scratch = BetaObjectiveScratch::new(beta.len()).unwrap();
+    {
+        let mut row = scratch.for_row(first);
+        assert_eq!(row.value(&beta).unwrap(), first_value);
+        assert_eq!(row.gradient(&beta).unwrap(), first_gradient);
+        assert_eq!(row.gradient(&[f64::INFINITY]).unwrap(), &[0.0]);
+        assert_eq!(row.value(&beta).unwrap(), first_value);
+        assert_eq!(row.gradient(&beta).unwrap(), first_gradient);
+    }
+    let mut row = scratch.for_row(second);
+    assert_eq!(row.value(&beta).unwrap(), second_value);
+    assert_eq!(row.gradient(&beta).unwrap(), second_gradient);
+}
+
+#[test]
 fn log2_output_scaling_rejects_nonfinite_values() {
     assert!(matches!(
         checked_log2_scale(f64::MAX, 0, "test beta scale"),
