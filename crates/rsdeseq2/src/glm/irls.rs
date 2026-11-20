@@ -13,9 +13,7 @@ use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::NbinomGlmFit;
 use crate::glm::beta::{GlmInput, fit_intercept_only_glm};
 use crate::glm::fallback::requires_optim_fallback;
-use crate::glm::nb::{
-    FixedDispersionLikelihood, nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted,
-};
+use crate::glm::nb::{FixedDispersionLikelihood, nbinom_log_likelihood_weighted};
 use crate::glm::r_arithmetic::{nbinom_log, normal_log};
 use crate::math::optim::BoundedOptimizationOutput;
 use crate::matrix::CountMatrix;
@@ -370,14 +368,78 @@ pub(crate) fn fit_offsets_irls_for_output(
     options: IrlsOptions,
     requirements: OutputRequirements,
 ) -> Result<NbinomGlmFit, DeseqError> {
-    validate_nf_irls_inputs(
+    let input = GlmInput {
         counts,
-        design,
-        normalization_factors,
+        offsets: normalization_factors,
         dispersions,
         weights,
-        &options,
-    )?;
+    };
+    fit_irls_rows(
+        IrlsRows {
+            input,
+            selection: None,
+        },
+        design,
+        options,
+        requirements,
+    )
+}
+
+pub(crate) fn fit_selected_irls_means(
+    input: GlmInput<'_>,
+    design: &DesignMatrix,
+    options: IrlsOptions,
+    genes: &[usize],
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    if let Offsets::PerSample(factors) = input.offsets {
+        validate_size_factor_offsets(input.counts, factors)?;
+    }
+    fit_irls_rows(
+        IrlsRows {
+            input,
+            selection: Some(genes),
+        },
+        design,
+        options,
+        OutputRequirements::Means,
+    )
+    .map(|fit| fit.mu)
+}
+
+#[derive(Clone, Copy)]
+struct IrlsRows<'a> {
+    input: GlmInput<'a>,
+    /// Source gene indices in fit order. Output and error positions are compact.
+    selection: Option<&'a [usize]>,
+}
+
+impl<'a> IrlsRows<'a> {
+    fn len(self) -> usize {
+        self.selection
+            .map_or(self.input.counts.n_genes(), <[usize]>::len)
+    }
+
+    fn source(self, gene: usize) -> usize {
+        self.selection.map_or(gene, |indices| indices[gene])
+    }
+
+    fn weights(self, source_gene: usize) -> Result<Option<&'a [f64]>, DeseqError> {
+        self.input
+            .weights
+            .map(|matrix| matrix.row(source_gene))
+            .transpose()
+    }
+}
+
+fn fit_irls_rows(
+    rows: IrlsRows<'_>,
+    design: &DesignMatrix,
+    options: IrlsOptions,
+    requirements: OutputRequirements,
+) -> Result<NbinomGlmFit, DeseqError> {
+    validate_nf_irls_inputs(rows, design, &options)?;
+    let samples = rows.input.counts.n_samples();
+    let genes = rows.len();
 
     let x = DMatrix::from_row_slice(
         design.n_samples(),
@@ -386,7 +448,7 @@ pub(crate) fn fit_offsets_irls_for_output(
     );
     let initial_lu = (x.transpose() * &x).lu();
     let initial_beta = InitialBeta::for_design(design)?;
-    let shared_log_offsets = match normalization_factors {
+    let shared_log_offsets = match rows.input.offsets {
         Offsets::PerSample(factors) => {
             Some(factors.iter().copied().map(f64::ln_p).collect::<Vec<_>>())
         }
@@ -394,14 +456,14 @@ pub(crate) fn fit_offsets_irls_for_output(
     };
     let p = design.n_coefficients();
     let ridge_lambda = options.ridge_lambdas_for_coefficients(p)?;
-    let n_beta = checked_output_elements(counts.n_genes(), p)?;
+    let n_beta = checked_output_elements(genes, p)?;
     let covariance_columns = checked_output_elements(p, p)?;
     let n_covariance = if requirements.covariance() {
-        checked_output_elements(counts.n_genes(), covariance_columns)?
+        checked_output_elements(genes, covariance_columns)?
     } else {
         0
     };
-    let n_means = checked_output_elements(counts.n_genes(), counts.n_samples())?;
+    let n_means = checked_output_elements(genes, samples)?;
     // The sizes are checked above; these report a failed allocation as an
     // error instead of aborting.
     let mut beta_values = try_alloc_matrix(n_beta, 1, "IRLS output")?;
@@ -416,14 +478,13 @@ pub(crate) fn fit_offsets_irls_for_output(
     mu_values.resize(n_means, 0.0);
     let mut hat_values = try_alloc_matrix(n_means, 1, "IRLS output")?;
     hat_values.resize(n_means, f64::NAN);
-    let mut beta_iter = Vec::with_capacity(counts.n_genes());
-    let mut beta_converged = Vec::with_capacity(counts.n_genes());
-    let mut beta_optim_iter = vec![f64::NAN; counts.n_genes()];
-    let mut beta_optim_start_objective = vec![f64::NAN; counts.n_genes()];
-    let mut beta_optim_objective = vec![f64::NAN; counts.n_genes()];
-    let mut beta_optim_gradient_norm = vec![f64::NAN; counts.n_genes()];
+    let mut beta_iter = Vec::with_capacity(genes);
+    let mut beta_converged = Vec::with_capacity(genes);
+    let mut beta_optim_iter = vec![f64::NAN; genes];
+    let mut beta_optim_start_objective = vec![f64::NAN; genes];
+    let mut beta_optim_objective = vec![f64::NAN; genes];
+    let mut beta_optim_gradient_norm = vec![f64::NAN; genes];
 
-    let samples = counts.n_samples();
     let covariance_rows = if requirements.covariance() {
         rayon::iter::Either::Left(
             beta_covariance_values
@@ -431,7 +492,7 @@ pub(crate) fn fit_offsets_irls_for_output(
                 .map(Some),
         )
     } else {
-        rayon::iter::Either::Right((0..counts.n_genes()).into_par_iter().map(|_| None))
+        rayon::iter::Either::Right((0..genes).into_par_iter().map(|_| None))
     };
     let row_statuses = (
         beta_values.par_chunks_mut(p),
@@ -450,13 +511,10 @@ pub(crate) fn fit_offsets_irls_for_output(
                     IrlsRowInput {
                         gene,
                         shared_log_offsets: shared_log_offsets.as_deref(),
-                        counts,
+                        rows,
                         x: &x,
                         initial_lu: &initial_lu,
                         initial_beta,
-                        normalization_factors,
-                        dispersions,
-                        weights,
                         ridge_lambda: &ridge_lambda,
                         options: &options,
                     },
@@ -482,7 +540,7 @@ pub(crate) fn fit_offsets_irls_for_output(
         }
     }
 
-    let mut optim_log_like = vec![None; counts.n_genes()];
+    let mut optim_log_like = vec![None; genes];
     if !fallback_rows.is_empty() {
         refit_optim_fallback_rows(
             &fallback_rows,
@@ -498,37 +556,37 @@ pub(crate) fn fit_offsets_irls_for_output(
             &mut beta_optim_objective,
             &mut beta_optim_gradient_norm,
             OptimFallbackInput {
-                counts,
+                rows,
                 x: &x,
-                normalization_factors,
-                dispersions,
-                weights,
                 ridge_lambda: &ridge_lambda,
                 options: &options,
             },
         )?;
     }
-    let beta = RowMajorMatrix::from_row_major(counts.n_genes(), p, beta_values)?;
-    let beta_se = RowMajorMatrix::from_row_major(counts.n_genes(), p, beta_var_values)?;
-    let beta_optim_start =
-        RowMajorMatrix::from_row_major(counts.n_genes(), p, beta_optim_start_values)?;
+    let beta = RowMajorMatrix::from_row_major(genes, p, beta_values)?;
+    let beta_se = RowMajorMatrix::from_row_major(genes, p, beta_var_values)?;
+    let beta_optim_start = RowMajorMatrix::from_row_major(genes, p, beta_optim_start_values)?;
     let beta_covariance = if requirements.covariance() {
         Some(RowMajorMatrix::from_row_major(
-            counts.n_genes(),
+            genes,
             p * p,
             beta_covariance_values,
         )?)
     } else {
         None
     };
-    let mu = RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), mu_values)?;
-    let hat_diagonal =
-        RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), hat_values)?;
-    let mut log_like = nbinom_log_likelihood_matrix(counts, &mu, dispersions, weights)?;
-    for (gene, row_log_like) in optim_log_like.into_iter().enumerate() {
-        if let Some(row_log_like) = row_log_like {
-            log_like[gene] = row_log_like;
-        }
+    let mu = RowMajorMatrix::from_row_major(genes, samples, mu_values)?;
+    let hat_diagonal = RowMajorMatrix::from_row_major(genes, samples, hat_values)?;
+    let mut log_like = Vec::with_capacity(genes);
+    for (gene, optimized) in optim_log_like.into_iter().enumerate() {
+        let source_gene = rows.source(gene);
+        let raw = nbinom_log_likelihood_weighted(
+            rows.input.counts.row(source_gene)?,
+            mu.row(gene)?,
+            rows.input.dispersions[source_gene],
+            rows.weights(source_gene)?,
+        )?;
+        log_like.push(optimized.unwrap_or(raw));
     }
 
     Ok(NbinomGlmFit {
@@ -561,11 +619,8 @@ fn checked_output_elements(rows: usize, columns: usize) -> Result<usize, DeseqEr
 }
 
 struct OptimFallbackInput<'a> {
-    counts: &'a CountMatrix,
+    rows: IrlsRows<'a>,
     x: &'a DMatrix<f64>,
-    normalization_factors: Offsets<'a>,
-    dispersions: &'a [f64],
-    weights: Option<&'a RowMajorMatrix<f64>>,
     ridge_lambda: &'a [f64],
     options: &'a IrlsOptions,
 }
@@ -574,13 +629,10 @@ struct IrlsRowInput<'a> {
     gene: usize,
     /// `ln` of the size factors when every gene shares them.
     shared_log_offsets: Option<&'a [f64]>,
-    counts: &'a CountMatrix,
+    rows: IrlsRows<'a>,
     x: &'a DMatrix<f64>,
     initial_lu: &'a LU<f64, Dyn, Dyn>,
     initial_beta: InitialBeta,
-    normalization_factors: Offsets<'a>,
-    dispersions: &'a [f64],
-    weights: Option<&'a RowMajorMatrix<f64>>,
     ridge_lambda: &'a [f64],
     options: &'a IrlsOptions,
 }

@@ -4,13 +4,12 @@ pub(super) use nalgebra::DMatrix;
 
 pub(super) use crate::design::DesignMatrix;
 pub(super) use crate::errors::{DeseqError, invalid_dimensions};
-pub(super) use crate::glm::IrlsOptions;
-pub(super) use crate::glm::irls::{
-    OutputRequirements, fit_nf_irls_for_output, fit_sf_irls_for_output,
-};
+pub(super) use crate::glm::irls::fit_selected_irls_means;
+pub(super) use crate::glm::{GlmInput, IrlsOptions};
 pub(super) use crate::math::trigamma;
 pub(super) use crate::matrix::CountMatrix;
 pub(super) use crate::matrix::RowMajorMatrix;
+pub(super) use crate::normalization::Offsets;
 
 /// Options for the initial gene-wise dispersion estimator.
 #[derive(Clone, Copy, Debug, PartialEq)]

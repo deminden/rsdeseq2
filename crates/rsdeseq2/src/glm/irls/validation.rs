@@ -47,13 +47,16 @@ pub(in crate::glm) fn validate_size_factor_offsets(
 }
 
 pub(super) fn validate_nf_irls_inputs(
-    counts: &CountMatrix,
+    fit_rows: IrlsRows<'_>,
     design: &DesignMatrix,
-    normalization_factors: Offsets<'_>,
-    dispersions: &[f64],
-    weights: Option<&RowMajorMatrix<f64>>,
     options: &IrlsOptions,
 ) -> Result<(), DeseqError> {
+    let GlmInput {
+        counts,
+        offsets,
+        dispersions,
+        weights,
+    } = fit_rows.input;
     if design.n_samples() != counts.n_samples() {
         return Err(invalid_dimensions(
             "design rows",
@@ -61,7 +64,7 @@ pub(super) fn validate_nf_irls_inputs(
             design.n_samples(),
         ));
     }
-    let (rows, cols, len) = match normalization_factors {
+    let (rows, cols, len) = match offsets {
         // Size factors stand for the genes x samples matrix they used to fill.
         Offsets::PerSample(factors) => (
             counts.n_genes(),
@@ -84,8 +87,16 @@ pub(super) fn validate_nf_irls_inputs(
             dispersions.len(),
         ));
     }
-    for (idx, dispersion) in dispersions.iter().copied().enumerate() {
-        validate_positive_finite(dispersion, "dispersion", idx)?;
+    for gene in 0..fit_rows.len() {
+        let source_gene = fit_rows.source(gene);
+        let dispersion = *dispersions.get(source_gene).ok_or_else(|| {
+            invalid_dimensions(
+                "IRLS gene index",
+                dispersions.len(),
+                source_gene.saturating_add(1),
+            )
+        })?;
+        validate_positive_finite(dispersion, "dispersion", gene)?;
     }
     if let Some(weights) = weights {
         if weights.n_rows() != counts.n_genes() || weights.n_cols() != counts.n_samples() {
@@ -95,8 +106,11 @@ pub(super) fn validate_nf_irls_inputs(
                 actual: weights.len(),
             });
         }
-        for (idx, weight) in weights.as_slice().iter().copied().enumerate() {
-            validate_nonnegative_finite(weight, "weight", idx)?;
+        for gene in 0..fit_rows.len() {
+            let row = weights.row(fit_rows.source(gene))?;
+            for (sample, &weight) in row.iter().enumerate() {
+                validate_nonnegative_finite(weight, "weight", gene * weights.n_cols() + sample)?;
+            }
         }
     }
     if !options.beta_tol.is_finite()
@@ -116,10 +130,23 @@ pub(super) fn validate_nf_irls_inputs(
             feature: "invalid IRLS options".to_string(),
         });
     }
-    match normalization_factors {
+    match offsets {
         // Already checked finite and positive by validate_size_factor_offsets.
         Offsets::PerSample(_) => {}
-        Offsets::PerCell(matrix) => matrix.validate_finite("normalization factors")?,
+        Offsets::PerCell(matrix) => {
+            for gene in 0..fit_rows.len() {
+                let row = matrix.row(fit_rows.source(gene))?;
+                for (sample, &value) in row.iter().enumerate() {
+                    if !value.is_finite() {
+                        return Err(DeseqError::NonFiniteValue {
+                            context: "normalization factors".into(),
+                            index: Some(gene * matrix.n_cols() + sample),
+                            value,
+                        });
+                    }
+                }
+            }
+        }
     }
     Ok(())
 }

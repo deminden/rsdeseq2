@@ -19,7 +19,9 @@ pub(super) fn fit_fixed_dispersion_irls_row(
 ) -> Result<IrlsRowStatus, DeseqError> {
     let gene = input.gene;
     let p = input.x.ncols();
-    if input.counts.is_all_zero_gene(gene)? {
+    let source_gene = input.rows.source(gene);
+    let count_row = input.rows.input.counts.row(source_gene)?;
+    if count_row.iter().all(|&count| count == 0) {
         return Err(DeseqError::InvalidCounts {
             reason: format!("gene {gene} is all zero; DESeq2 GLM fitting excludes allZero rows"),
         });
@@ -32,10 +34,9 @@ pub(super) fn fit_fixed_dispersion_irls_row(
         response: z,
         covariance: transient_covariance,
     } = scratch;
-    let count_row = input.counts.row(gene)?;
     y.clear();
     y.extend(count_row.iter().copied().map(f64::from));
-    let nf = input.normalization_factors.row(gene)?;
+    let nf = input.rows.input.offsets.row(source_gene)?;
     let log_nf = match input.shared_log_offsets {
         Some(shared) => shared,
         None => {
@@ -44,8 +45,8 @@ pub(super) fn fit_fixed_dispersion_irls_row(
             log_offsets.as_slice()
         }
     };
-    let weight_row = input.weights.map(|matrix| matrix.row(gene)).transpose()?;
-    let dispersion = input.dispersions[gene];
+    let weight_row = input.rows.weights(source_gene)?;
+    let dispersion = input.rows.input.dispersions[source_gene];
     let mut beta =
         initial_beta_for_rule(input.x, y, nf, Some(input.initial_lu), input.initial_beta)?;
     fitted_mu_into(

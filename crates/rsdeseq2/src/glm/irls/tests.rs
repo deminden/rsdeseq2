@@ -67,6 +67,80 @@ fn transient_covariance_preserves_all_retained_fields_and_fallbacks() {
 }
 
 #[test]
+fn selected_irls_means_match_compacted_rows_with_offsets_and_weights() {
+    let first = [4, 7, 5, 11, 13, 9];
+    let last = [1, 0, 2, 90, 105, 87];
+    let counts = CountMatrix::from_row_major_u32(3, 6, [first, [0; 6], last].concat()).unwrap();
+    let compact_counts = CountMatrix::from_row_major_u32(2, 6, [first, last].concat()).unwrap();
+    let design = DesignMatrix::from_row_major(
+        6,
+        2,
+        vec![1., 0., 1., 0., 1., 0., 1., 1., 1., 1., 1., 1.],
+        None,
+    )
+    .unwrap();
+    let factors = [0.8, 1.0, 1.2, 0.9, 1.1, 1.0];
+    let other_factors = [1.2, 1.1, 0.8, 1.0, 1.0, 0.9];
+    let weights_first = [1., 0.4, 0.8, 1., 1., 0.9];
+    let weights_last = [0.1, 1., 1., 1., 0.5, 1.];
+    let per_cell =
+        RowMajorMatrix::from_row_major(3, 6, [factors, [f64::NAN; 6], other_factors].concat())
+            .unwrap();
+    let compact_factors =
+        RowMajorMatrix::from_row_major(2, 6, [factors, other_factors].concat()).unwrap();
+    let weights =
+        RowMajorMatrix::from_row_major(3, 6, [weights_first, [f64::NAN; 6], weights_last].concat())
+            .unwrap();
+    let compact_weights =
+        RowMajorMatrix::from_row_major(2, 6, [weights_first, weights_last].concat()).unwrap();
+    let options = IrlsOptions {
+        force_optim: true,
+        ..IrlsOptions::default()
+    };
+
+    // Reverse the selected rows. The fit must return compact output in request
+    // order while drawing every input field from the same source row.
+    for (selected_offsets, compact_offsets) in [
+        (Offsets::PerSample(&factors), Offsets::PerSample(&factors)),
+        (
+            Offsets::PerCell(&per_cell),
+            Offsets::PerCell(&compact_factors),
+        ),
+    ] {
+        let compact = fit_fixed_dispersion_glm(
+            GlmInput::new(&compact_counts, compact_offsets, &[0.1, 0.3]).weights(&compact_weights),
+            &design,
+            options.clone(),
+        )
+        .unwrap();
+        let selected = fit_selected_irls_means(
+            GlmInput::new(&counts, selected_offsets, &[0.1, f64::NAN, 0.3]).weights(&weights),
+            &design,
+            options.clone(),
+            &[2, 0],
+        )
+        .unwrap();
+        for (row, source) in [1, 0].into_iter().enumerate() {
+            assert_eq!(
+                selected
+                    .row(row)
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.to_bits())
+                    .collect::<Vec<_>>(),
+                compact
+                    .mu
+                    .row(source)
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.to_bits())
+                    .collect::<Vec<_>>(),
+            );
+        }
+    }
+}
+
+#[test]
 fn log2_output_scaling_rejects_nonfinite_values() {
     assert!(matches!(
         checked_log2_scale(f64::MAX, 0, "test beta scale"),

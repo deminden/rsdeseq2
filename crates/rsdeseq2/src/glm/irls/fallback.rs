@@ -20,10 +20,11 @@ pub(super) fn refit_optim_fallback_rows(
     let p = input.x.ncols();
     let n = input.x.nrows();
     for gene in rows.iter().copied() {
-        let counts_row = input.counts.row(gene)?;
-        let nf = input.normalization_factors.row(gene)?;
-        let weight_row = input.weights.map(|matrix| matrix.row(gene)).transpose()?;
-        let dispersion = input.dispersions[gene];
+        let source_gene = input.rows.source(gene);
+        let counts_row = input.rows.input.counts.row(source_gene)?;
+        let nf = input.rows.input.offsets.row(source_gene)?;
+        let weight_row = input.rows.weights(source_gene)?;
+        let dispersion = input.rows.input.dispersions[source_gene];
         let beta_start = optim_start_beta_log2(
             &beta_values[gene * p..(gene + 1) * p],
             input.x,

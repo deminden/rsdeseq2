@@ -222,39 +222,26 @@ pub(super) fn estimate_gene_wise_dispersions_with_mean_fit(
             break;
         }
 
-        let compact_counts = compact_counts_rows(input.counts, &fit_genes)?;
-        let compact_disp = compact_gene_values(&alpha_hat, &fit_genes)?;
-        let compact_weights = input
-            .observation_weights
-            .map(|weights| compact_matrix_rows(weights, &fit_genes))
-            .transpose()?;
+        let irls_means;
         let fit_mu = if let Some(means) = &linear_means {
-            compact_matrix_rows(means, &fit_genes)?
+            means
         } else {
-            let fit = match input.normalization_factors {
-                Some(normalization_factors) => {
-                    let compact_factors = compact_matrix_rows(normalization_factors, &fit_genes)?;
-                    fit_nf_irls_for_output(
-                        &compact_counts,
-                        input.design,
-                        &compact_factors,
-                        &compact_disp,
-                        compact_weights.as_ref(),
-                        mean_options.clone(),
-                        OutputRequirements::Means,
-                    )?
-                }
-                None => fit_sf_irls_for_output(
-                    &compact_counts,
-                    input.design,
-                    input.size_factors,
-                    &compact_disp,
-                    compact_weights.as_ref(),
-                    mean_options.clone(),
-                    OutputRequirements::Means,
-                )?,
+            let offsets = match input.normalization_factors {
+                Some(factors) => Offsets::PerCell(factors),
+                None => Offsets::PerSample(input.size_factors),
             };
-            fit.mu
+            irls_means = fit_selected_irls_means(
+                GlmInput {
+                    counts: input.counts,
+                    offsets,
+                    dispersions: &alpha_hat,
+                    weights: input.observation_weights,
+                },
+                input.design,
+                mean_options.clone(),
+                &fit_genes,
+            )?;
+            &irls_means
         };
 
         let updates = fit_genes
@@ -266,7 +253,8 @@ pub(super) fn estimate_gene_wise_dispersions_with_mean_fit(
                     (usize, Vec<f64>, GeneDispersionFitDiagnostics),
                     DeseqError,
                 > {
-                    let fit_mu_raw = fit_mu.row(compact_row)?;
+                    let mean_row = if linear_means.is_some() { gene } else { compact_row };
+                    let fit_mu_raw = fit_mu.row(mean_row)?;
                     let fit_mu = fit_mu_raw
                         .iter()
                         .copied()

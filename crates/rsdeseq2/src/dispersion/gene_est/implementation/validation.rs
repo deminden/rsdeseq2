@@ -53,59 +53,6 @@ pub(super) fn linspace(start: f64, end: f64, len: usize) -> Result<Vec<f64>, Des
         .collect()
 }
 
-pub(super) fn compact_counts_rows(
-    counts: &CountMatrix,
-    row_indices: &[usize],
-) -> Result<CountMatrix, DeseqError> {
-    let mut values = Vec::with_capacity(row_indices.len() * counts.n_samples());
-    for row in row_indices {
-        values.extend_from_slice(counts.row(*row)?);
-    }
-    let gene_names = counts.gene_names().map(|names| {
-        row_indices
-            .iter()
-            .map(|row| names[*row].clone())
-            .collect::<Vec<_>>()
-    });
-    let sample_names = counts.sample_names().map(<[String]>::to_vec);
-    CountMatrix::from_row_major_u32_with_names(
-        row_indices.len(),
-        counts.n_samples(),
-        values,
-        gene_names,
-        sample_names,
-    )
-}
-
-pub(super) fn compact_matrix_rows(
-    matrix: &RowMajorMatrix<f64>,
-    row_indices: &[usize],
-) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    let mut values = Vec::with_capacity(row_indices.len() * matrix.n_cols());
-    for row in row_indices {
-        values.extend_from_slice(matrix.row(*row)?);
-    }
-    RowMajorMatrix::from_row_major(row_indices.len(), matrix.n_cols(), values)
-}
-
-pub(super) fn compact_gene_values(
-    values: &[f64],
-    row_indices: &[usize],
-) -> Result<Vec<f64>, DeseqError> {
-    let mut compact = Vec::with_capacity(row_indices.len());
-    for row in row_indices {
-        let Some(value) = values.get(*row).copied() else {
-            return Err(invalid_dimensions(
-                "compact gene values",
-                row + 1,
-                values.len(),
-            ));
-        };
-        compact.push(value);
-    }
-    Ok(compact)
-}
-
 pub(super) fn validate_gene_est_inputs(
     input: &GeneWiseDispersionInput<'_>,
     options: GeneWiseDispersionOptions,
