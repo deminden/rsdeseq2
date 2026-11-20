@@ -2,6 +2,7 @@
 """Build and test checked .crate archives with their locked dependencies."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import tarfile
@@ -19,6 +20,8 @@ def main():
     if not packages:
         raise ValueError("No Cargo archives to verify in target/package")
 
+    # The workspace Cargo config selects this profile for tests that use R fixtures.
+    test_env = {**os.environ, "RSDESEQ2_NUMERIC_PROFILE": "r-host"}
     with tempfile.TemporaryDirectory(prefix="rsdeseq2-release-crates-") as temporary:
         work = Path(temporary)
         vendor = work / "vendor"
@@ -45,7 +48,9 @@ def main():
                 "--config", str(config), "--target-dir", str(work / "target"),
             ]
             subprocess.run(["cargo", "build", *options], cwd=work, check=True)
-            subprocess.run(["cargo", "test", "--lib", *options], cwd=work, check=True)
+            subprocess.run(
+                ["cargo", "test", "--lib", *options], cwd=work, env=test_env, check=True,
+            )
 
 
 if __name__ == "__main__":
