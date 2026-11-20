@@ -87,7 +87,7 @@ pub struct Cli {
 }
 
 /// Size-factor, normalization-factor, weight and dispersion-trend inputs.
-#[derive(Debug, clap::Args)]
+#[derive(Clone, Debug, clap::Args)]
 pub(super) struct NormalizationArgs {
     /// Optional gene x sample normalization-factor TSV.
     #[arg(long)]
@@ -195,6 +195,201 @@ pub(super) struct DiagnosticOutputArgs {
     /// Output TSV path.
     #[arg(long)]
     pub(super) output: PathBuf,
+}
+
+/// Coefficient and numeric contrast selectors.
+#[derive(Debug, clap::Args)]
+pub(super) struct ResultTargetArgs {
+    /// Zero-based coefficient index to report. Defaults to the last column.
+    #[arg(long)]
+    pub(super) coefficient: Option<usize>,
+    /// Design coefficient name to report. Defaults to the last column when no coefficient or contrast is supplied.
+    #[arg(long)]
+    pub(super) coefficient_name: Option<String>,
+    /// Numeric contrast vector, comma-delimited in design-column order.
+    #[arg(long, value_delimiter = ',')]
+    pub(super) contrast: Option<Vec<f64>>,
+}
+
+/// Named, list and factor-level contrast selectors.
+#[derive(Debug, clap::Args)]
+pub(super) struct ContrastArgs {
+    /// Design coefficient name to report as a contrast.
+    #[arg(long)]
+    pub(super) contrast_name: Option<String>,
+    /// Comma-delimited positive coefficient names for a list contrast.
+    #[arg(long, value_delimiter = ',')]
+    pub(super) contrast_positive: Option<Vec<String>>,
+    /// Comma-delimited negative coefficient names for a list contrast.
+    #[arg(long, value_delimiter = ',')]
+    pub(super) contrast_negative: Option<Vec<String>>,
+    /// Weight applied to positive list-contrast coefficients.
+    #[arg(long, default_value_t = 1.0)]
+    pub(super) contrast_positive_weight: f64,
+    /// Weight applied to negative list-contrast coefficients.
+    #[arg(long, default_value_t = -1.0, allow_hyphen_values = true)]
+    pub(super) contrast_negative_weight: f64,
+    /// Factor or variable name for a coefficient-name factor-level contrast.
+    #[arg(long)]
+    pub(super) contrast_factor: Option<String>,
+    /// Numerator level for a coefficient-name factor-level contrast.
+    #[arg(long)]
+    pub(super) contrast_numerator: Option<String>,
+    /// Denominator level for a coefficient-name factor-level contrast.
+    #[arg(long)]
+    pub(super) contrast_denominator: Option<String>,
+    /// Optional reference level for a coefficient-name factor-level contrast.
+    #[arg(long)]
+    pub(super) contrast_reference: Option<String>,
+    /// Sample x level TSV required for DESeq2-style factor-level contrast handling.
+    #[arg(long)]
+    pub(super) contrast_sample_levels: Option<PathBuf>,
+}
+
+impl ContrastArgs {
+    pub(super) fn has_factor(&self) -> bool {
+        self.contrast_factor.is_some()
+            || self.contrast_numerator.is_some()
+            || self.contrast_denominator.is_some()
+            || self.contrast_reference.is_some()
+            || self.contrast_sample_levels.is_some()
+    }
+}
+
+/// Supplied-dispersion and expanded-design inputs for Wald beta priors.
+#[derive(Debug, clap::Args)]
+pub(super) struct BetaPriorArgs {
+    /// Expanded design matrix TSV for the supplied-dispersion beta-prior Wald workflow.
+    #[arg(long)]
+    pub(super) beta_prior_expanded_design: Option<PathBuf>,
+    /// Collapse groups for beta-prior expanded columns, e.g. `0|1,2|3`.
+    #[arg(long)]
+    pub(super) beta_prior_coefficient_groups: Option<String>,
+    /// Gene x final-dispersion TSV for the beta-prior fixed-dispersion workflow.
+    #[arg(long)]
+    pub(super) beta_prior_dispersions: Option<PathBuf>,
+    /// Gene x baseMean TSV for beta-prior result rows and prior weights.
+    #[arg(long)]
+    pub(super) beta_prior_base_mean: Option<PathBuf>,
+    /// Gene x fitted-dispersion TSV for beta-prior prior weights.
+    #[arg(long)]
+    pub(super) beta_prior_disp_fit: Option<PathBuf>,
+    /// Factor name for internally building a one-factor expanded beta-prior design.
+    #[arg(long)]
+    pub(super) beta_prior_factor: Option<String>,
+    /// Reference level for internally building a one-factor expanded beta-prior design.
+    #[arg(long)]
+    pub(super) beta_prior_reference: Option<String>,
+    /// Optional sample x level TSV for internally building a one-factor expanded beta-prior design.
+    #[arg(long)]
+    pub(super) beta_prior_sample_levels: Option<PathBuf>,
+    /// Comma-delimited factor names for internally building an additive expanded beta-prior design.
+    #[arg(long, value_delimiter = ',')]
+    pub(super) beta_prior_additive_factors: Option<Vec<String>>,
+    /// Comma-delimited reference levels for additive beta-prior factors.
+    #[arg(long, value_delimiter = ',')]
+    pub(super) beta_prior_additive_references: Option<Vec<String>>,
+    /// Comma-delimited sample x level TSV paths for additive beta-prior factors.
+    #[arg(long, value_delimiter = ',')]
+    pub(super) beta_prior_additive_sample_levels: Option<Vec<PathBuf>>,
+    /// Comma-delimited numeric covariate names for additive beta-prior designs.
+    #[arg(long, value_delimiter = ',')]
+    pub(super) beta_prior_additive_numeric: Option<Vec<String>>,
+    /// Comma-delimited sample x value TSV paths for additive beta-prior numeric covariates.
+    #[arg(long, value_delimiter = ',')]
+    pub(super) beta_prior_additive_numeric_values: Option<Vec<PathBuf>>,
+}
+
+impl BetaPriorArgs {
+    pub(super) fn supplied_count(&self) -> usize {
+        [
+            self.beta_prior_expanded_design.is_some(),
+            self.beta_prior_coefficient_groups.is_some(),
+            self.beta_prior_dispersions.is_some(),
+            self.beta_prior_base_mean.is_some(),
+            self.beta_prior_disp_fit.is_some(),
+            self.beta_prior_factor.is_some(),
+            self.beta_prior_reference.is_some(),
+            self.beta_prior_sample_levels.is_some(),
+            self.beta_prior_additive_factors.is_some(),
+            self.beta_prior_additive_references.is_some(),
+            self.beta_prior_additive_sample_levels.is_some(),
+            self.beta_prior_additive_numeric.is_some(),
+            self.beta_prior_additive_numeric_values.is_some(),
+        ]
+        .into_iter()
+        .filter(|&present| present)
+        .count()
+    }
+}
+
+/// Wald effect-size threshold and sampling-distribution options.
+#[derive(Debug, clap::Args)]
+pub(super) struct WaldTestArgs {
+    /// Non-negative log2 fold-change threshold for Wald p-values.
+    #[arg(long, default_value_t = 0.0)]
+    pub(super) lfc_threshold: f64,
+    /// Alternative hypothesis for thresholded Wald p-values.
+    #[arg(long, default_value = "greater-abs")]
+    pub(super) alternative: WaldAlternativeArg,
+    /// Use Student t Wald p-values with residual degrees of freedom.
+    #[arg(long, action = ArgAction::SetTrue)]
+    pub(super) use_t: bool,
+    /// Use Student t Wald p-values with one scalar degrees-of-freedom value.
+    #[arg(long)]
+    pub(super) t_degrees_of_freedom: Option<f64>,
+    /// Gene x degrees-of-freedom TSV for Student t Wald p-values.
+    #[arg(long)]
+    pub(super) t_degrees_of_freedom_file: Option<PathBuf>,
+}
+
+/// Arguments for the Wald command.
+#[derive(Debug, clap::Args)]
+pub(super) struct WaldArgs {
+    /// Tab-delimited count matrix with gene IDs in the first column.
+    #[arg(long)]
+    pub(super) counts: PathBuf,
+    /// Numeric design matrix TSV with sample IDs in the first column.
+    #[arg(long)]
+    pub(super) design: PathBuf,
+    #[command(flatten)]
+    pub(super) normalization: NormalizationArgs,
+    #[command(flatten)]
+    pub(super) target: ResultTargetArgs,
+    #[command(flatten)]
+    pub(super) beta_prior: BetaPriorArgs,
+    #[command(flatten)]
+    pub(super) contrast: ContrastArgs,
+    #[command(flatten)]
+    pub(super) test: WaldTestArgs,
+    #[command(flatten)]
+    pub(super) filtering: ResultFilteringArgs,
+    #[command(flatten)]
+    pub(super) outputs: DiagnosticOutputArgs,
+}
+
+/// Arguments for the LRT command.
+#[derive(Debug, clap::Args)]
+pub(super) struct LrtArgs {
+    /// Tab-delimited count matrix with gene IDs in the first column.
+    #[arg(long)]
+    pub(super) counts: PathBuf,
+    /// Full numeric design matrix TSV with sample IDs in the first column.
+    #[arg(long)]
+    pub(super) design: PathBuf,
+    /// Reduced numeric design matrix TSV with sample IDs in the first column.
+    #[arg(long)]
+    pub(super) reduced_design: PathBuf,
+    #[command(flatten)]
+    pub(super) normalization: NormalizationArgs,
+    #[command(flatten)]
+    pub(super) target: ResultTargetArgs,
+    #[command(flatten)]
+    pub(super) contrast: ContrastArgs,
+    #[command(flatten)]
+    pub(super) filtering: ResultFilteringArgs,
+    #[command(flatten)]
+    pub(super) outputs: DiagnosticOutputArgs,
 }
 
 #[derive(Debug, Subcommand)]
@@ -351,170 +546,9 @@ pub(super) enum Commands {
         output: PathBuf,
     },
     /// Run the implemented GLM-mu Wald workflow and write DESeq2-shaped results.
-    Wald {
-        /// Tab-delimited count matrix with gene IDs in the first column.
-        #[arg(long)]
-        counts: PathBuf,
-        /// Numeric design matrix TSV with sample IDs in the first column.
-        #[arg(long)]
-        design: PathBuf,
-        #[command(flatten)]
-        normalization: NormalizationArgs,
-        /// Zero-based coefficient index to report. Defaults to the last column.
-        #[arg(long)]
-        coefficient: Option<usize>,
-        /// Design coefficient name to report. Defaults to the last column when no coefficient or contrast is supplied.
-        #[arg(long)]
-        coefficient_name: Option<String>,
-        /// Numeric Wald contrast vector, comma-delimited in design-column order.
-        #[arg(long, value_delimiter = ',')]
-        contrast: Option<Vec<f64>>,
-        /// Expanded design matrix TSV for the supplied-dispersion beta-prior Wald workflow.
-        #[arg(long)]
-        beta_prior_expanded_design: Option<PathBuf>,
-        /// Collapse groups for beta-prior expanded columns, e.g. `0|1,2|3`.
-        #[arg(long)]
-        beta_prior_coefficient_groups: Option<String>,
-        /// Gene x final-dispersion TSV for the beta-prior fixed-dispersion workflow.
-        #[arg(long)]
-        beta_prior_dispersions: Option<PathBuf>,
-        /// Gene x baseMean TSV for beta-prior result rows and prior weights.
-        #[arg(long)]
-        beta_prior_base_mean: Option<PathBuf>,
-        /// Gene x fitted-dispersion TSV for beta-prior prior weights.
-        #[arg(long)]
-        beta_prior_disp_fit: Option<PathBuf>,
-        /// Factor name for internally building a one-factor expanded beta-prior design.
-        #[arg(long)]
-        beta_prior_factor: Option<String>,
-        /// Reference level for internally building a one-factor expanded beta-prior design.
-        #[arg(long)]
-        beta_prior_reference: Option<String>,
-        /// Optional sample x level TSV for internally building a one-factor expanded beta-prior design.
-        #[arg(long)]
-        beta_prior_sample_levels: Option<PathBuf>,
-        /// Comma-delimited factor names for internally building an additive expanded beta-prior design.
-        #[arg(long, value_delimiter = ',')]
-        beta_prior_additive_factors: Option<Vec<String>>,
-        /// Comma-delimited reference levels for additive beta-prior factors.
-        #[arg(long, value_delimiter = ',')]
-        beta_prior_additive_references: Option<Vec<String>>,
-        /// Comma-delimited sample x level TSV paths for additive beta-prior factors.
-        #[arg(long, value_delimiter = ',')]
-        beta_prior_additive_sample_levels: Option<Vec<PathBuf>>,
-        /// Comma-delimited numeric covariate names for additive beta-prior designs.
-        #[arg(long, value_delimiter = ',')]
-        beta_prior_additive_numeric: Option<Vec<String>>,
-        /// Comma-delimited sample x value TSV paths for additive beta-prior numeric covariates.
-        #[arg(long, value_delimiter = ',')]
-        beta_prior_additive_numeric_values: Option<Vec<PathBuf>>,
-        /// Design coefficient name to report as a Wald contrast.
-        #[arg(long)]
-        contrast_name: Option<String>,
-        /// Comma-delimited positive coefficient names for a list contrast.
-        #[arg(long, value_delimiter = ',')]
-        contrast_positive: Option<Vec<String>>,
-        /// Comma-delimited negative coefficient names for a list contrast.
-        #[arg(long, value_delimiter = ',')]
-        contrast_negative: Option<Vec<String>>,
-        /// Weight applied to positive list-contrast coefficients.
-        #[arg(long, default_value_t = 1.0)]
-        contrast_positive_weight: f64,
-        /// Weight applied to negative list-contrast coefficients.
-        #[arg(long, default_value_t = -1.0, allow_hyphen_values = true)]
-        contrast_negative_weight: f64,
-        /// Factor or variable name for a coefficient-name factor-level contrast.
-        #[arg(long)]
-        contrast_factor: Option<String>,
-        /// Numerator level for a coefficient-name factor-level contrast.
-        #[arg(long)]
-        contrast_numerator: Option<String>,
-        /// Denominator level for a coefficient-name factor-level contrast.
-        #[arg(long)]
-        contrast_denominator: Option<String>,
-        /// Optional reference level for a coefficient-name factor-level contrast.
-        #[arg(long)]
-        contrast_reference: Option<String>,
-        /// Sample x level TSV required for DESeq2-style factor-level contrast handling.
-        #[arg(long)]
-        contrast_sample_levels: Option<PathBuf>,
-        /// Non-negative log2 fold-change threshold for Wald p-values.
-        #[arg(long, default_value_t = 0.0)]
-        lfc_threshold: f64,
-        /// Alternative hypothesis for thresholded Wald p-values.
-        #[arg(long, default_value = "greater-abs")]
-        alternative: WaldAlternativeArg,
-        /// Use Student t Wald p-values with residual degrees of freedom.
-        #[arg(long, action = ArgAction::SetTrue)]
-        use_t: bool,
-        /// Use Student t Wald p-values with one scalar degrees-of-freedom value.
-        #[arg(long)]
-        t_degrees_of_freedom: Option<f64>,
-        /// Gene x degrees-of-freedom TSV for Student t Wald p-values.
-        #[arg(long)]
-        t_degrees_of_freedom_file: Option<PathBuf>,
-        #[command(flatten)]
-        filtering: ResultFilteringArgs,
-        #[command(flatten)]
-        outputs: DiagnosticOutputArgs,
-    },
+    Wald(WaldArgs),
     /// Run the implemented GLM-mu LRT workflow and write DESeq2-shaped results.
-    Lrt {
-        /// Tab-delimited count matrix with gene IDs in the first column.
-        #[arg(long)]
-        counts: PathBuf,
-        /// Full numeric design matrix TSV with sample IDs in the first column.
-        #[arg(long)]
-        design: PathBuf,
-        /// Reduced numeric design matrix TSV with sample IDs in the first column.
-        #[arg(long)]
-        reduced_design: PathBuf,
-        #[command(flatten)]
-        normalization: NormalizationArgs,
-        /// Zero-based full-design coefficient index to report. Defaults to the last column.
-        #[arg(long)]
-        coefficient: Option<usize>,
-        /// Full-design coefficient name to report.
-        #[arg(long)]
-        coefficient_name: Option<String>,
-        /// Numeric full-model contrast vector to report, comma-delimited in design-column order.
-        #[arg(long, value_delimiter = ',')]
-        contrast: Option<Vec<f64>>,
-        /// Full-design coefficient name to report as an LRT effect-size contrast.
-        #[arg(long)]
-        contrast_name: Option<String>,
-        /// Comma-delimited positive full-design coefficient names for a list contrast.
-        #[arg(long, value_delimiter = ',')]
-        contrast_positive: Option<Vec<String>>,
-        /// Comma-delimited negative full-design coefficient names for a list contrast.
-        #[arg(long, value_delimiter = ',')]
-        contrast_negative: Option<Vec<String>>,
-        /// Weight applied to positive list-contrast coefficients.
-        #[arg(long, default_value_t = 1.0)]
-        contrast_positive_weight: f64,
-        /// Weight applied to negative list-contrast coefficients.
-        #[arg(long, default_value_t = -1.0)]
-        contrast_negative_weight: f64,
-        /// Factor or variable name for a coefficient-name factor-level contrast.
-        #[arg(long)]
-        contrast_factor: Option<String>,
-        /// Numerator level for a coefficient-name factor-level contrast.
-        #[arg(long)]
-        contrast_numerator: Option<String>,
-        /// Denominator level for a coefficient-name factor-level contrast.
-        #[arg(long)]
-        contrast_denominator: Option<String>,
-        /// Optional reference level for a coefficient-name factor-level contrast.
-        #[arg(long)]
-        contrast_reference: Option<String>,
-        /// Sample x level TSV required for DESeq2-style factor-level contrast handling.
-        #[arg(long)]
-        contrast_sample_levels: Option<PathBuf>,
-        #[command(flatten)]
-        filtering: ResultFilteringArgs,
-        #[command(flatten)]
-        outputs: DiagnosticOutputArgs,
-    },
+    Lrt(LrtArgs),
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]

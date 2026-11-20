@@ -1,6 +1,66 @@
 use super::*;
 use crate::errors::{ErrorKind, missing_prerequisite};
 
+pub(super) fn write_cli_analysis_outputs(
+    outputs: DiagnosticOutputArgs,
+    counts: &crate::matrix::CountMatrix,
+    analysis: &CliAnalysisOutput,
+) -> Result<(), DeseqError> {
+    let DiagnosticOutputArgs {
+        result_column_metadata_output,
+        result_table_metadata_output,
+        independent_filter_metadata_output,
+        independent_filter_num_rej_output,
+        independent_filter_lowess_output,
+        fit_diagnostics_output,
+        refit_diagnostics_output,
+        fit_beta_output,
+        fit_beta_se_output,
+        fit_beta_optim_start_output,
+        refit_beta_output,
+        refit_beta_se_output,
+        refit_beta_optim_start_output,
+        cooks_distance_output,
+        cooks_replacement_metadata_output,
+        cooks_replacement_row_metadata_output,
+        cooks_replaced_counts_output,
+        cooks_candidate_replacement_counts_output,
+        cooks_outlier_cells_output,
+        output,
+    } = outputs;
+    let sidecars = CliCooksOutputPaths {
+        cooks_distance: cooks_distance_output,
+        replacement_metadata: cooks_replacement_metadata_output,
+        replacement_row_metadata: cooks_replacement_row_metadata_output,
+        replaced_counts: cooks_replaced_counts_output,
+        candidate_replacement_counts: cooks_candidate_replacement_counts_output,
+        outlier_cells: cooks_outlier_cells_output,
+    };
+    let result_sidecars = CliResultSidecarPaths {
+        column_metadata: result_column_metadata_output,
+        table_metadata: result_table_metadata_output,
+        independent_filter_metadata: independent_filter_metadata_output,
+        independent_filter_num_rej: independent_filter_num_rej_output,
+        independent_filter_lowess: independent_filter_lowess_output,
+        fit_diagnostics: fit_diagnostics_output,
+        refit_diagnostics: refit_diagnostics_output,
+        fit_beta: fit_beta_output,
+        fit_beta_se: fit_beta_se_output,
+        fit_beta_optim_start: fit_beta_optim_start_output,
+        refit_beta: refit_beta_output,
+        refit_beta_se: refit_beta_se_output,
+        refit_beta_optim_start: refit_beta_optim_start_output,
+    };
+    write_cli_cooks_outputs(
+        &sidecars,
+        counts.gene_names(),
+        counts.sample_names(),
+        analysis,
+    )?;
+    write_cli_result_sidecars(&result_sidecars, counts.gene_names(), analysis)?;
+    write_deseq_results_tsv(output, &analysis.results)
+}
+
 pub(super) fn write_cli_cooks_outputs(
     paths: &CliCooksOutputPaths,
     gene_names: Option<&[String]>,

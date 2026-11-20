@@ -120,6 +120,180 @@ pub(super) fn cli_additive_beta_prior_replacement_output(
     cli_expanded_beta_prior_replacement_output(output.replacement)
 }
 
+pub(super) fn run_cli_model(
+    builder: &DeseqBuilder,
+    counts: &crate::matrix::CountMatrix,
+    design: &crate::design::DesignMatrix,
+    reduced_design: Option<&crate::design::DesignMatrix>,
+    target: ResultTargetArgs,
+    contrast: ContrastArgs,
+    cutoff: Option<f64>,
+) -> Result<CliAnalysisOutput, DeseqError> {
+    let factor_contrast = contrast.has_factor();
+    let ResultTargetArgs {
+        coefficient,
+        coefficient_name,
+        contrast: numeric_contrast,
+    } = target;
+    let ContrastArgs {
+        contrast_name,
+        contrast_positive,
+        contrast_negative,
+        contrast_positive_weight,
+        contrast_negative_weight,
+        contrast_factor,
+        contrast_numerator,
+        contrast_denominator,
+        contrast_reference,
+        contrast_sample_levels,
+    } = contrast;
+    let spec;
+    let character;
+    let levels;
+    let column = if let Some(contrast) = &numeric_contrast {
+        ResultColumn::Numeric(contrast)
+    } else if let Some(contrast_name) = contrast_name {
+        spec = ContrastSpec::coefficient_name(contrast_name);
+        ResultColumn::Spec(&spec)
+    } else if contrast_positive.is_some() || contrast_negative.is_some() {
+        spec = ContrastSpec::list_with_values(
+            contrast_positive.unwrap_or_default(),
+            contrast_negative.unwrap_or_default(),
+            contrast_positive_weight,
+            contrast_negative_weight,
+        );
+        ResultColumn::Spec(&spec)
+    } else if factor_contrast {
+        let factor_inputs = usize::from(contrast_factor.is_some())
+            + usize::from(contrast_numerator.is_some())
+            + usize::from(contrast_denominator.is_some());
+        let factor = contrast_factor.ok_or_else(|| DeseqError::InvalidDimensions {
+            context: "factor-level contrast inputs".to_string(),
+            expected: 3,
+            actual: factor_inputs,
+        })?;
+        let numerator = contrast_numerator.ok_or_else(|| DeseqError::InvalidDimensions {
+            context: "factor-level contrast inputs".to_string(),
+            expected: 3,
+            actual: factor_inputs,
+        })?;
+        let denominator = contrast_denominator.ok_or_else(|| DeseqError::InvalidDimensions {
+            context: "factor-level contrast inputs".to_string(),
+            expected: 3,
+            actual: factor_inputs,
+        })?;
+        let path = contrast_sample_levels.ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "factor-level results contrast",
+                "--contrast-sample-levels",
+            )
+        })?;
+        levels = align_sample_levels_to_samples(
+            &read_sample_levels_tsv(path)?,
+            counts.sample_names().ok_or_else(|| {
+                missing_prerequisite(
+                    ErrorKind::Options,
+                    "aligning sample levels",
+                    "count sample names",
+                )
+            })?,
+        )?;
+        character = match contrast_reference {
+            Some(reference) => {
+                ResultsContrast::character_with_reference(factor, numerator, denominator, reference)
+            }
+            None => ResultsContrast::character(factor, numerator, denominator),
+        };
+        ResultColumn::Results {
+            contrast: &character,
+            sample_levels: Some(&levels),
+            model_frame: None,
+        }
+    } else {
+        ResultColumn::Coefficient(match (coefficient, coefficient_name) {
+            (Some(coefficient), None) => coefficient,
+            (None, Some(name)) => resolve_coefficient_index(design, &name)?,
+            (None, None) => default_cli_coefficient(design)?,
+            (Some(_), Some(_)) => return Err(invariant("checked above")),
+        })
+    };
+    let replacement = cutoff.map(CooksReplacementOptions::new);
+    let mut request = Analysis::new(counts, design)
+        .means(MeanModel::GlmMu)
+        .result(column);
+    if let Some(reduced_design) = reduced_design {
+        request = request.lrt(reduced_design);
+    }
+    if let Some(options) = &replacement {
+        request = request.cooks_replacement(options);
+    }
+    match (builder.run(&request)?, reduced_design.is_some()) {
+        (RunOutput::Results { fit, results }, _) => Ok(cli_fit_output((fit, results))),
+        (RunOutput::Replacement(CooksReplacementTestOutput::Wald(output)), false) => {
+            Ok(cli_wald_replacement_output(output))
+        }
+        (RunOutput::Replacement(CooksReplacementTestOutput::Lrt(output)), true) => {
+            Ok(cli_lrt_replacement_output(output))
+        }
+        (_, false) => Err(invariant("Wald CLI run should return Wald results")),
+        (_, true) => Err(invariant("LRT CLI run should return LRT results")),
+    }
+}
+
+pub(super) fn validate_cli_result_target(
+    kind: &str,
+    target: &ResultTargetArgs,
+    contrast: &ContrastArgs,
+) -> Result<(), DeseqError> {
+    let provided = usize::from(target.coefficient.is_some())
+        + usize::from(target.coefficient_name.is_some())
+        + usize::from(target.contrast.is_some())
+        + usize::from(contrast.contrast_name.is_some())
+        + usize::from(contrast.contrast_positive.is_some() || contrast.contrast_negative.is_some())
+        + usize::from(contrast.has_factor());
+    if provided > 1 {
+        return Err(DeseqError::InvalidDimensions {
+            context: format!("{kind} coefficient and contrast inputs"),
+            expected: 1,
+            actual: provided,
+        });
+    }
+    Ok(())
+}
+
+pub(super) fn configure_cli_results(
+    mut builder: DeseqBuilder,
+    counts: &crate::matrix::CountMatrix,
+    normalization: NormalizationArgs,
+    filtering: ResultFilteringArgs,
+) -> Result<DeseqBuilder, DeseqError> {
+    builder = apply_cli_result_options(
+        builder,
+        filtering.disable_cooks_cutoff,
+        filtering.cooks_cutoff,
+        filtering.disable_independent_filtering,
+        filtering.independent_filtering_alpha,
+        filtering.independent_filtering_theta,
+    )?;
+    builder = apply_cli_normalization_inputs(
+        builder,
+        counts,
+        normalization.normalization_factors,
+        normalization.size_factors,
+    )?;
+    builder = apply_cli_size_factor_controls(
+        builder,
+        counts,
+        normalization.geometric_means,
+        normalization.control_genes,
+    )?;
+    if let Some(path) = normalization.observation_weights {
+        builder = builder.observation_weights(read_cli_observation_weights(path, counts)?);
+    }
+    Ok(builder)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn cli_expanded_beta_prior_wald_analysis(
     counts: &crate::matrix::CountMatrix,
@@ -129,22 +303,25 @@ pub(super) fn cli_expanded_beta_prior_wald_analysis(
     dispersions: PathBuf,
     base_mean: PathBuf,
     disp_fit: PathBuf,
-    normalization_factors: Option<PathBuf>,
-    size_factors: Option<PathBuf>,
-    observation_weights: Option<PathBuf>,
-    method: SizeFactorMethodArg,
-    geometric_means: Option<PathBuf>,
-    control_genes: Option<Vec<usize>>,
-    coefficient: Option<usize>,
-    coefficient_name: Option<String>,
-    contrast: Option<Vec<f64>>,
-    contrast_name: Option<String>,
-    contrast_positive: Option<Vec<String>>,
-    contrast_negative: Option<Vec<String>>,
-    contrast_positive_weight: f64,
-    contrast_negative_weight: f64,
+    normalization: NormalizationArgs,
+    target: ResultTargetArgs,
+    contrast: ContrastArgs,
     cutoff: Option<f64>,
 ) -> Result<CliAnalysisOutput, DeseqError> {
+    let NormalizationArgs {
+        normalization_factors,
+        size_factors,
+        observation_weights,
+        method,
+        geometric_means,
+        control_genes,
+        ..
+    } = normalization;
+    let ResultTargetArgs {
+        coefficient,
+        coefficient_name,
+        contrast: numeric_contrast,
+    } = target;
     if normalization_factors.is_some() && size_factors.is_some() {
         return Err(cli_conflicting_normalization_inputs());
     }
@@ -168,15 +345,8 @@ pub(super) fn cli_expanded_beta_prior_wald_analysis(
     let options = BetaPriorRefitOptions::default();
     let replacement_options = cutoff.map(CooksReplacementOptions::new);
 
-    let numeric_contrast = cli_beta_prior_numeric_contrast(
-        standard_design,
-        contrast,
-        contrast_name,
-        contrast_positive,
-        contrast_negative,
-        contrast_positive_weight,
-        contrast_negative_weight,
-    )?;
+    let numeric_contrast =
+        cli_beta_prior_numeric_contrast(standard_design, numeric_contrast, contrast)?;
     let coefficient = match (coefficient, coefficient_name, numeric_contrast.is_some()) {
         (Some(coefficient), None, false) => Some(coefficient),
         (None, Some(name), false) => Some(resolve_coefficient_index(standard_design, &name)?),
@@ -298,22 +468,25 @@ pub(super) fn cli_factor_beta_prior_wald_analysis(
     dispersions: PathBuf,
     base_mean: PathBuf,
     disp_fit: PathBuf,
-    normalization_factors: Option<PathBuf>,
-    size_factors: Option<PathBuf>,
-    observation_weights: Option<PathBuf>,
-    method: SizeFactorMethodArg,
-    geometric_means: Option<PathBuf>,
-    control_genes: Option<Vec<usize>>,
-    coefficient: Option<usize>,
-    coefficient_name: Option<String>,
-    contrast: Option<Vec<f64>>,
-    contrast_name: Option<String>,
-    contrast_positive: Option<Vec<String>>,
-    contrast_negative: Option<Vec<String>>,
-    contrast_positive_weight: f64,
-    contrast_negative_weight: f64,
+    normalization: NormalizationArgs,
+    target: ResultTargetArgs,
+    contrast: ContrastArgs,
     cutoff: Option<f64>,
 ) -> Result<CliAnalysisOutput, DeseqError> {
+    let NormalizationArgs {
+        normalization_factors,
+        size_factors,
+        observation_weights,
+        method,
+        geometric_means,
+        control_genes,
+        ..
+    } = normalization;
+    let ResultTargetArgs {
+        coefficient,
+        coefficient_name,
+        contrast: numeric_contrast,
+    } = target;
     if normalization_factors.is_some() && size_factors.is_some() {
         return Err(cli_conflicting_normalization_inputs());
     }
@@ -345,12 +518,8 @@ pub(super) fn cli_factor_beta_prior_wald_analysis(
     let replacement_options = cutoff.map(CooksReplacementOptions::new);
     let numeric_contrast = cli_beta_prior_numeric_contrast(
         &generated_design.standard_design,
+        numeric_contrast,
         contrast,
-        contrast_name,
-        contrast_positive,
-        contrast_negative,
-        contrast_positive_weight,
-        contrast_negative_weight,
     )?;
     let coefficient = match (coefficient, coefficient_name, numeric_contrast.is_some()) {
         (Some(coefficient), None, false) => Some(coefficient),
@@ -479,22 +648,25 @@ pub(super) fn cli_additive_beta_prior_wald_analysis(
     dispersions: PathBuf,
     base_mean: PathBuf,
     disp_fit: PathBuf,
-    normalization_factors: Option<PathBuf>,
-    size_factors: Option<PathBuf>,
-    observation_weights: Option<PathBuf>,
-    method: SizeFactorMethodArg,
-    geometric_means: Option<PathBuf>,
-    control_genes: Option<Vec<usize>>,
-    coefficient: Option<usize>,
-    coefficient_name: Option<String>,
-    contrast: Option<Vec<f64>>,
-    contrast_name: Option<String>,
-    contrast_positive: Option<Vec<String>>,
-    contrast_negative: Option<Vec<String>>,
-    contrast_positive_weight: f64,
-    contrast_negative_weight: f64,
+    normalization: NormalizationArgs,
+    target: ResultTargetArgs,
+    contrast: ContrastArgs,
     cutoff: Option<f64>,
 ) -> Result<CliAnalysisOutput, DeseqError> {
+    let NormalizationArgs {
+        normalization_factors,
+        size_factors,
+        observation_weights,
+        method,
+        geometric_means,
+        control_genes,
+        ..
+    } = normalization;
+    let ResultTargetArgs {
+        coefficient,
+        coefficient_name,
+        contrast: numeric_contrast,
+    } = target;
     if normalization_factors.is_some() && size_factors.is_some() {
         return Err(cli_conflicting_normalization_inputs());
     }
@@ -575,12 +747,8 @@ pub(super) fn cli_additive_beta_prior_wald_analysis(
     let replacement_options = cutoff.map(CooksReplacementOptions::new);
     let numeric_contrast = cli_beta_prior_numeric_contrast(
         &generated_design.standard_design,
+        numeric_contrast,
         contrast,
-        contrast_name,
-        contrast_positive,
-        contrast_negative,
-        contrast_positive_weight,
-        contrast_negative_weight,
     )?;
     let coefficient = match (coefficient, coefficient_name, numeric_contrast.is_some()) {
         (Some(coefficient), None, false) => Some(coefficient),
@@ -704,12 +872,16 @@ pub(super) fn cli_additive_beta_prior_wald_analysis(
 pub(super) fn cli_beta_prior_numeric_contrast(
     design: &crate::design::DesignMatrix,
     contrast: Option<Vec<f64>>,
-    contrast_name: Option<String>,
-    contrast_positive: Option<Vec<String>>,
-    contrast_negative: Option<Vec<String>>,
-    contrast_positive_weight: f64,
-    contrast_negative_weight: f64,
+    options: ContrastArgs,
 ) -> Result<Option<Vec<f64>>, DeseqError> {
+    let ContrastArgs {
+        contrast_name,
+        contrast_positive,
+        contrast_negative,
+        contrast_positive_weight,
+        contrast_negative_weight,
+        ..
+    } = options;
     if let Some(contrast) = contrast {
         return Ok(Some(contrast));
     }

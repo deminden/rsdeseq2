@@ -204,8 +204,8 @@ pub(super) fn run_staged(cli: Cli) -> Result<(), DeseqError> {
                 &transformed,
             )
         }
-        command @ Commands::Wald { .. } => run_wald::run_wald(command),
-        command @ Commands::Lrt { .. } => run_lrt::run_lrt(command),
+        Commands::Wald(args) => run_wald::run_wald(args),
+        Commands::Lrt(args) => run_lrt::run_lrt(args),
     }
 }
 
