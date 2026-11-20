@@ -96,24 +96,55 @@ fn log_scale_gate_rejects_underflow_and_nonfinite_values() {
 #[test]
 fn default_pipeline_matches_deseq2_end_to_end() {
     let counts = read_count_matrix_tsv(data("counts.tsv")).unwrap();
-    let design = read_labeled_design_matrix_tsv(data("design_matrix.tsv"))
-        .unwrap()
-        .design;
+    let labeled_design = read_labeled_design_matrix_tsv(data("design_matrix.tsv")).unwrap();
+    let design = labeled_design.design;
+    assert_eq!(
+        counts.sample_names().unwrap(),
+        labeled_design.sample_names.as_slice()
+    );
     let cutoff = default_cooks_cutoff(design.n_samples(), design.n_coefficients())
         .unwrap()
         .unwrap();
+    let replacement = CooksReplacementOptions::new(cutoff);
     let output = DeseqBuilder::new()
-        .fit_with_test_results_with_cooks_replacement(
-            &counts,
-            &design,
-            &CooksReplacementOptions::new(cutoff),
-        )
+        .run(&Analysis::new(&counts, &design).cooks_replacement(&replacement))
         .unwrap();
-    let (fit, results, _) = output.into_merged_fit().unwrap();
+    let RunOutput::Replacement(output) = output else {
+        panic!("expected a Cook's replacement fit");
+    };
+    let (fit, results, refit) = output.into_merged_fit().unwrap();
+
+    let size_factors = common::read_tsv(&data("reference_size_factors.tsv"));
+    assert_eq!(size_factors.len(), counts.n_samples());
+    assert_eq!(fit.size_factors.len(), counts.n_samples());
+    for ((expected, actual), sample) in size_factors
+        .iter()
+        .zip(&fit.size_factors)
+        .zip(&labeled_design.sample_names)
+    {
+        assert_eq!(&expected["sample"], sample);
+        let target = expected["size_factor"].parse::<f64>().unwrap();
+        assert!(
+            (actual / target - 1.0).abs() < 1e-10,
+            "{sample}: size factor {actual} vs {target}"
+        );
+    }
 
     let reference = common::read_tsv(&data("reference_results.tsv"));
     assert_eq!(reference.len(), counts.n_genes());
     assert_eq!(results.rows.len(), counts.n_genes());
+    assert_eq!(refit.replacement.replace.len(), counts.n_genes());
+    assert!(results.independent_filtering.as_ref().unwrap().enabled);
+    for ((expected, row), replaced) in reference
+        .iter()
+        .zip(&results.rows)
+        .zip(&refit.replacement.replace)
+    {
+        let gene = expected["gene"].as_str();
+        assert_eq!(row.gene.as_deref(), Some(gene));
+        let expected_flag = expected["replaced"].parse::<u8>().unwrap();
+        assert_eq!(u8::from(*replaced == Some(true)), expected_flag, "{gene}");
+    }
     let column = |name: &str| -> Vec<Option<f64>> {
         reference.iter().map(|row| optional(&row[name])).collect()
     };

@@ -107,8 +107,20 @@ cargo test --locked -p rsdeseq2 --test integration gtex_real_wald_parity::full_g
 ```
 
 The fixture README records the source data, independent R generation version,
-selection policy and regeneration commands. The independent Pasilla holdout also
-has committed counts/design and Wald/LRT references; reproduce its checks with
+selection policy and regeneration commands.
+
+The 3,745-gene kidney-cortex panel exercises the full Wald pipeline with
+estimated size factors and dispersions, Cook's replacement, and default
+independent filtering. It compares labeled results, size factors and the
+replacement flags to `DESeq()` and `results()` from DESeq2 1.52.0.
+
+```sh
+RSDESEQ2_NUMERIC_PROFILE=portable cargo test --locked -p rsdeseq2 --test integration gtex_end_to_end::
+RSDESEQ2_NUMERIC_PROFILE=r-host cargo test --locked -p rsdeseq2 --test integration gtex_end_to_end::
+```
+
+The independent Pasilla holdout also has committed counts/design and
+Wald/LRT references. Reproduce its checks with
 `scripts/validation/check_pasilla_holdout.py` and its [fixture guide](../crates/rsdeseq2/tests/data/pasilla_holdout/README.md).
 
 ## Independent stage references

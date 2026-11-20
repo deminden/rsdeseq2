@@ -1598,6 +1598,41 @@ It also verifies that the public planner accepts a seed matrix
 whose values differ from the normalized counts it returns.
 All-targets Clippy, formatting and the module dependency check passed.
 
+### Batched Cook's release verification
+
+The release CLI at `c9aa13d` includes all three Cook's changes.
+The paired baseline is `67370a4`, the commit before those changes.
+Both were built with Rust 1.99.0 on macOS arm64. The eleven-contrast
+gate used the frozen reference hashes and four Rayon threads per fit.
+
+| Arithmetic profile | Dispersion gates | Minimum target reduction | Minimum global reduction | Result and diagnostic files matching baseline |
+| --- | ---: | ---: | ---: | ---: |
+| Portable | 130/130 | 236× | 414× | 22/22 |
+| R host | 130/130 | 664× | 597× | 22/22 |
+
+Both profiles had zero adjusted p-value decision flips at 0.05 and
+0.1 against DESeq2. The top 100, 500 and 2,000 genes ranked by
+p-value matched in every contrast.
+
+One alternating-order pair per contrast with four threads and the
+portable profile measured 14.657 s for the baseline and 13.681 s for
+the candidate. The 1.0714× throughput exceeded the 1.02× gate, and
+all result-only TSV hashes matched. Maximum peak RSS was 258.91 MiB
+for the baseline and 259.11 MiB for the candidate.
+
+The 3,745-gene compact end-to-end gate passed in both profiles through
+`DeseqBuilder::run`. It now checks sample and gene alignment, all 61
+estimated size factors, and all gene-level replacement flags against
+DESeq2, including the 50 genes flagged for replacement. The existing
+default-filtering, missingness, probability and decision bounds passed.
+
+The generated R source archive at `c9aa13d` has SHA-256
+`5a1f8180e9037877fbd2e02c883199da70b47e7b22abb635af6154b6f1aa9c6f`.
+It installed offline into fresh R libraries using empty Cargo homes
+and Rust 1.96.0. The R 4.5.3 and R 4.6.2 lanes each passed 150 tests
+and 2,874 expectations with zero skips or failures. Both passed the
+installed-package native smoke test.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |
@@ -1607,7 +1642,7 @@ All-targets Clippy, formatting and the module dependency check passed.
 | 3. Borrowed offsets | Sample factors stay in a sample vector through fitting. Selected dispersion, Wald, LRT, beta-prior and rlog fits borrow source rows. Where the API returns gene-by-sample factors, the matrix is created for that output. |
 | 4. Numerical profiles | The crate and CLI default to portable arithmetic. The R bridge selects its host profile. The [platform workflow](../../.github/workflows/platform-checks.yml) checks the release panel and portable golden hashes on five targets. Native Intel macOS and Windows x64 runtime results are still open. |
 | 5. One workflow entry point | The builder, CLI and R bridge use `DeseqBuilder::run(&Analysis)`. The [API migration](../design/run-entry-point.md) keeps deprecated wrappers in 0.6 and schedules removal in 0.7. |
-| 6. Real-data probability gates | The compact GTEx gate checks log-scale probability, nonfinite values, underflow and significance flips. The [full replay](#native-rlog-smoke-and-full-gtex-probability-replay) checks all 56,200 genes under both profiles, including log-scale error for p-values and adjusted p-values. |
+| 6. Real-data probability gates | The [compact GTEx end-to-end gate](../reproducibility.md#compact-and-full-gene-replay) estimates normalization and dispersions with default filtering. It checks Cook's replacement, log-scale probability, nonfinite values, underflow and significance flips. The [full replay](#native-rlog-smoke-and-full-gtex-probability-replay) checks all 56,200 genes under both profiles, including log-scale error for p-values and adjusted p-values. |
 | 7. Shared checked arithmetic | `rcompat-numeric` owns the checked arithmetic, matrix allocation and validation primitives. The [summation rules](../summation-rules.md) specify the reduction used for each R primitive. |
 | 8. Structured errors | The non-exhaustive error enum carries domains, dimensions, indices and rejected values. The [diagnostics work](#structured-design-and-glm-diagnostics) covers the early input stages, GLM, contrasts and probability calculations. [Weight errors](#observation-weight-rank-workspace-and-diagnostics) expose both gene and sample. |
 | 9. Rank and initial coefficients | `aaea914` implemented R's rank rule and `1977237` aligned rank-deficient starts. The independently generated rank reference includes scaled near-collinear designs. |
