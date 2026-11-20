@@ -101,10 +101,18 @@ exact phrase. `domain` is an `ErrorKind` limited to `Options`, `Dispersion`,
 | `AmbiguousCoefficient` | Requested names or levels and matching columns in model-matrix order | `Options` |
 | `AllZeroGene` | Zero-based fit row and original count-matrix row | `Counts` |
 | `InvalidGeneValue` | Operation, zero-based gene and optional sample, rejected value | Original domain |
+| `InvalidNegativeBinomialValue` | Likelihood stage, optional zero-based gene and sample, rejected value | `Numeric` for means and weights, `Dispersion` for the other stages |
+| `CoxReidColumnSumOverflow` | Zero-based gene, sample and design column, finite term and overflowing partial sum | `Numeric` |
 
 These variants preserve the messages of the errors they replace. An intercept
 fit reports the sample for a rejected per-sample calculation. A failed
 gene-wide reduction can have no sample.
+
+Negative-binomial matrix likelihoods and the cached IRLS likelihood retain
+the original count-matrix row. Row likelihoods have no gene index. For a
+weighted term or partial sum, the sample identifies the operation that
+overflowed. The Cox–Reid overflow's message still displays the finite term
+from the original diagnostic. Its `value` field contains the actual sum.
 
 ## Not in this step
 - `scoped_invalid_options` sites keep their `"{scope}: {reason}"` text.

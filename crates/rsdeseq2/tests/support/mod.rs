@@ -13,6 +13,17 @@ use std::path::{Path, PathBuf};
 
 pub type TsvRow = HashMap<String, String>;
 
+#[track_caller]
+pub(crate) fn assert_ordered_factor_contrast_error(error: DeseqError, factor: &str) {
+    let expected_operation = format!("factor-level contrast for ordered factor '{factor}'");
+    std::assert_matches!(
+        error,
+        DeseqError::MissingPrerequisite { domain: ErrorKind::Options, operation, prerequisite }
+            if operation == expected_operation
+                && prerequisite == "a named or numeric contrast on its polynomial columns"
+    );
+}
+
 macro_rules! json_fixture {
     ($file:literal) => {
         json_fixture!($file, serde_json::Value)

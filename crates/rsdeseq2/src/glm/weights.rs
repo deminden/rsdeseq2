@@ -90,6 +90,7 @@ pub fn preprocess_observation_weights_with_options(
                 && cox_reid_subset_full_rank(
                     row,
                     design,
+                    gene,
                     options.weight_threshold,
                     options.rank_tolerance,
                 )?
@@ -141,6 +142,7 @@ fn weighted_design_full_rank(
 fn cox_reid_subset_full_rank(
     weights: &[f64],
     design: &DesignMatrix,
+    gene: usize,
     weight_threshold: f64,
     tolerance: f64,
 ) -> Result<bool, DeseqError> {
@@ -157,21 +159,22 @@ fn cox_reid_subset_full_rank(
     let mut keep_cols = Vec::new();
     for col in 0..design.n_coefficients() {
         let mut col_sum = 0.0;
-        for sample in &kept_rows {
-            let value = design
+        for &sample in &kept_rows {
+            let term = design
                 .matrix()
-                .get(*sample, col)
+                .get(sample, col)
                 .copied()
                 .unwrap_or(0.0)
                 .abs();
-            let Some(next_sum) = checked::add(col_sum, value) else {
-                return Err(DeseqError::NonFiniteValue {
-                    context: "observation weight Cox-Reid column sum".to_string(),
-                    index: Some(col),
-                    value,
-                });
-            };
-            col_sum = next_sum;
+            col_sum = checked::try_add(col_sum, term).map_err(|failure| {
+                DeseqError::CoxReidColumnSumOverflow {
+                    gene,
+                    sample,
+                    column: col,
+                    term,
+                    value: failure.value,
+                }
+            })?;
         }
         if col_sum > 0.0 {
             keep_cols.push(col);

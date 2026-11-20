@@ -53,6 +53,36 @@ pub enum Error {
         reason: String,
     },
 
+    /// A negative-binomial likelihood input or intermediate failed validation.
+    #[error("{}", stage.error_message(*sample, *value))]
+    InvalidNegativeBinomialValue {
+        /// Input or intermediate that failed.
+        stage: NegativeBinomialStage,
+        /// Zero-based count-matrix row, when the caller supplied a matrix.
+        gene: Option<usize>,
+        /// Zero-based sample involved, when known.
+        sample: Option<usize>,
+        /// The rejected input or arithmetic result.
+        value: f64,
+    },
+
+    /// A column sum overflowed while checking the weighted Cox-Reid design.
+    #[error(
+        "out-of-range value in observation weight Cox-Reid column sum at index Some({column}): {term}"
+    )]
+    CoxReidColumnSumOverflow {
+        /// Zero-based row of the observation weights.
+        gene: usize,
+        /// Zero-based sample that caused the partial sum to overflow.
+        sample: usize,
+        /// Zero-based column of the design matrix.
+        column: usize,
+        /// The finite absolute design entry added at this sample.
+        term: f64,
+        /// The overflowing partial sum.
+        value: f64,
+    },
+
     /// Size factors failed validation or could not be estimated.
     #[error("invalid size factors: {reason}")]
     InvalidSizeFactors {
@@ -82,7 +112,7 @@ pub enum Error {
     /// (for example positive). The message names which case occurred.
     #[error(
         "{} value in {context} at index {index:?}: {value}",
-        if value.is_finite() { "out-of-range" } else { "non-finite" }
+        numeric_value_label(*value)
     )]
     NonFiniteValue {
         /// Where the value occurred.
@@ -216,6 +246,83 @@ pub enum Error {
     },
 }
 
+/// Input and arithmetic stages of a negative-binomial likelihood.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[non_exhaustive]
+pub enum NegativeBinomialStage {
+    /// Input mean.
+    Mean,
+    /// Input dispersion.
+    Dispersion,
+    /// Input observation weight.
+    Weight,
+    /// Per-sample log probability mass.
+    LogPmf,
+    /// Log probability mass scaled by the observation weight.
+    WeightedTerm,
+    /// Partial sum of the per-sample terms.
+    RowSum,
+    /// Negative twice the row log likelihood.
+    Deviance,
+}
+
+impl NegativeBinomialStage {
+    fn kind(self) -> ErrorKind {
+        match self {
+            Self::Mean | Self::Weight => ErrorKind::Numeric,
+            _ => ErrorKind::Dispersion,
+        }
+    }
+
+    fn error_message(self, sample: Option<usize>, value: f64) -> String {
+        match self {
+            Self::Mean | Self::Weight => {
+                let quantity = if self == Self::Mean { "mean" } else { "weight" };
+                format!(
+                    "{} value in negative-binomial {quantity} at index {sample:?}: {value}",
+                    numeric_value_label(value)
+                )
+            }
+            Self::Dispersion => match sample {
+                Some(sample) => format!(
+                    "invalid dispersion: dispersion at index {sample} must be finite and positive"
+                ),
+                None => "invalid dispersion: dispersion must be finite and positive".into(),
+            },
+            Self::LogPmf | Self::WeightedTerm => {
+                let quantity = if self == Self::LogPmf {
+                    "log PMF"
+                } else {
+                    "weighted log-likelihood term"
+                };
+                match sample {
+                    Some(sample) => format!(
+                        "invalid dispersion: negative-binomial {quantity} at sample {sample} must be finite"
+                    ),
+                    None => {
+                        format!("invalid dispersion: negative-binomial {quantity} must be finite")
+                    }
+                }
+            }
+            Self::RowSum => {
+                "invalid dispersion: negative-binomial row log-likelihood sum must remain finite"
+                    .into()
+            }
+            Self::Deviance => {
+                "invalid dispersion: negative-binomial deviance must remain finite".into()
+            }
+        }
+    }
+}
+
+fn numeric_value_label(value: f64) -> &'static str {
+    if value.is_finite() {
+        "out-of-range"
+    } else {
+        "non-finite"
+    }
+}
+
 fn zero_columns_suffix(columns: &[String]) -> String {
     if columns.is_empty() {
         String::new()
@@ -315,7 +422,10 @@ impl Error {
             }
             Self::InvalidDispersion { .. } => ErrorKind::Dispersion,
             Self::InvalidOptions { .. } => ErrorKind::Options,
-            Self::NonFiniteValue { .. } => ErrorKind::Numeric,
+            Self::NonFiniteValue { .. } | Self::CoxReidColumnSumOverflow { .. } => {
+                ErrorKind::Numeric
+            }
+            Self::InvalidNegativeBinomialValue { stage, .. } => stage.kind(),
             Self::UnsupportedFeature { .. } => ErrorKind::Unsupported,
             Self::Io(_) => ErrorKind::Io,
             #[cfg(feature = "csv")]

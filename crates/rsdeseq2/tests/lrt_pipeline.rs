@@ -867,8 +867,10 @@ fn fixed_dispersion_lrt_formula_ordered_contrast_requires_polynomial_selectors()
             model_frame,
         )
         .unwrap_err();
-    assert_eq!(error.kind(), rsdeseq2::errors::ErrorKind::Options);
-    assert!(error.to_string().contains("ordered factor"));
+    crate::support::assert_ordered_factor_contrast_error(
+        error,
+        r#"ordered(condition, levels = c("B", "A"))"#,
+    );
     let numeric = ResultsContrast::numeric(vec![0.0, 1.0]);
     let named = ResultsContrast::list(vec![full.coefficient_names().unwrap()[1].clone()], vec![]);
     let (_, numerical) = builder

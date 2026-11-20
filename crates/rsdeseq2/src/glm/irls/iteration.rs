@@ -60,7 +60,7 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
         Some(log_nf),
         mu,
     )?;
-    let likelihood = FixedDispersionLikelihood::new(count_row, dispersion);
+    let likelihood = FixedDispersionLikelihood::new(count_row, dispersion, source_gene);
     let mut dev_old = 0.0;
     let mut iter = 0_usize;
     let mut converged = false;

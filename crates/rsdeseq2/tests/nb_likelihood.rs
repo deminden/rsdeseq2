@@ -1,10 +1,12 @@
 use approx::assert_relative_eq;
+use rsdeseq2::errors::NegativeBinomialStage;
 use rsdeseq2::glm::nb::{
     nbinom_log_likelihood, nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted,
     nbinom_log_pmf, nbinom_negative_twice_log_likelihood,
 };
 use rsdeseq2::prelude::*;
 use statrs::function::gamma::ln_gamma;
+use std::assert_matches;
 
 #[test]
 fn nb_log_pmf_matches_hand_formula() {
@@ -157,16 +159,103 @@ fn nb_log_pmf_keeps_extreme_zero_count_product_finite() {
 fn weighted_log_likelihood_rejects_nonfinite_weighted_term() {
     let err = nbinom_log_likelihood_weighted(&[1], &[1.0], 0.3, Some(&[f64::MAX])).unwrap_err();
 
+    assert_eq!(err.kind(), ErrorKind::Dispersion);
+    assert_eq!(
+        err.to_string(),
+        "invalid dispersion: negative-binomial weighted log-likelihood term at sample 0 must be finite"
+    );
+    assert_matches!(
+        err,
+        DeseqError::InvalidNegativeBinomialValue {
+            stage: NegativeBinomialStage::WeightedTerm,
+            gene: None,
+            sample: Some(0),
+            value: f64::NEG_INFINITY,
+        }
+    );
+
+    let counts = CountMatrix::from_row_major_u32(2, 2, vec![1; 4]).unwrap();
+    let mu = RowMajorMatrix::from_elem(2, 2, 1.0).unwrap();
+    let weights = RowMajorMatrix::from_row_major(2, 2, vec![1.0, 1.0, 1.0, f64::MAX]).unwrap();
+    assert_matches!(
+        nbinom_log_likelihood_matrix(&counts, &mu, &[0.3; 2], Some(&weights)).unwrap_err(),
+        DeseqError::InvalidNegativeBinomialValue {
+            stage: NegativeBinomialStage::WeightedTerm,
+            gene: Some(1),
+            sample: Some(1),
+            value: f64::NEG_INFINITY,
+        }
+    );
+}
+
+#[test]
+fn weighted_log_likelihood_reports_the_sample_that_overflows_the_sum() {
+    let weights = [f64::MAX / 2.0; 2];
     assert!(
-        err.to_string()
-            .contains("negative-binomial weighted log-likelihood term")
+        nbinom_log_likelihood_weighted(&[1], &[1.0], 0.3, Some(&weights[..1]))
+            .unwrap()
+            .is_finite()
+    );
+    let err =
+        nbinom_log_likelihood_weighted(&[1, 1], &[1.0, 1.0], 0.3, Some(&weights)).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "invalid dispersion: negative-binomial row log-likelihood sum must remain finite"
+    );
+    assert_matches!(
+        err,
+        DeseqError::InvalidNegativeBinomialValue {
+            stage: NegativeBinomialStage::RowSum,
+            gene: None,
+            sample: Some(1),
+            value: f64::NEG_INFINITY,
+        }
     );
 }
 
 #[test]
 fn nb_likelihood_validates_inputs() {
-    assert!(nbinom_log_pmf(1, 0.0, 0.1).is_err());
-    assert!(nbinom_log_pmf(1, 1.0, 0.0).is_err());
+    let mean_error = nbinom_log_pmf(1, 0.0, 0.1).unwrap_err();
+    assert_eq!(mean_error.kind(), ErrorKind::Numeric);
+    assert_eq!(
+        mean_error.to_string(),
+        "out-of-range value in negative-binomial mean at index Some(0): 0"
+    );
+    assert_matches!(
+        mean_error,
+        DeseqError::InvalidNegativeBinomialValue {
+            stage: NegativeBinomialStage::Mean,
+            gene: None,
+            sample: Some(0),
+            value: 0.0,
+        }
+    );
+    assert_matches!(
+        nbinom_log_pmf(1, 1.0, 0.0).unwrap_err(),
+        DeseqError::InvalidNegativeBinomialValue {
+            stage: NegativeBinomialStage::Dispersion,
+            gene: None,
+            sample: Some(0),
+            value: 0.0,
+        }
+    );
+    assert_matches!(
+        nbinom_log_pmf(1, 1e-200, 1e-200).unwrap_err(),
+        DeseqError::InvalidNegativeBinomialValue {
+            stage: NegativeBinomialStage::LogPmf,
+            gene: None,
+            sample: Some(0),
+            value: f64::NEG_INFINITY,
+        }
+    );
     assert!(nbinom_log_likelihood(&[1, 2], &[1.0], 0.1).is_err());
-    assert!(nbinom_log_likelihood_weighted(&[1], &[1.0], 0.1, Some(&[-1.0])).is_err());
+    assert_matches!(
+        nbinom_log_likelihood_weighted(&[1], &[1.0], 0.1, Some(&[-1.0])).unwrap_err(),
+        DeseqError::InvalidNegativeBinomialValue {
+            stage: NegativeBinomialStage::Weight,
+            gene: None,
+            sample: Some(0),
+            value: -1.0,
+        }
+    );
 }

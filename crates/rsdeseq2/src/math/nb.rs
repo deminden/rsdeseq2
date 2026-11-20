@@ -1,21 +1,19 @@
 //! DESeq2-parameterized negative-binomial likelihoods.
 
-use crate::errors::{ErrorKind, Requirement, invalid_parameter};
+use crate::errors::{DeseqError, NegativeBinomialStage, invalid_dimensions};
+use crate::matrix::{CountMatrix, RowMajorMatrix};
+use crate::numeric::checked;
 use crate::numeric::math::ProfileMath;
 use crate::numeric::special::ln_gamma;
-
-use crate::errors::{DeseqError, invalid_dimensions};
-use crate::matrix::CountMatrix;
-use crate::matrix::RowMajorMatrix;
 
 /// Negative-binomial log PMF using DESeq2's `mu` and dispersion parameterization.
 ///
 /// This matches R's `dnbinom(x, mu = mu, size = 1 / dispersion, log = TRUE)`.
 pub fn nbinom_log_pmf(count: u32, mu: f64, dispersion: f64) -> Result<f64, DeseqError> {
-    validate_mu(mu, Some(0))?;
-    validate_dispersion(dispersion, Some(0))?;
+    validate_mu(mu, None, 0)?;
+    validate_dispersion(dispersion, None, Some(0))?;
     let term = nbinom_log_pmf_unchecked(count, mu, dispersion);
-    validate_log_pmf_term(term, Some(0))?;
+    validate_log_pmf_term(term, None, 0)?;
     Ok(term)
 }
 
@@ -35,7 +33,7 @@ pub fn nbinom_log_likelihood_weighted(
     dispersion: f64,
     weights: Option<&[f64]>,
 ) -> Result<f64, DeseqError> {
-    nbinom_log_likelihood_with_cached_gamma(counts, mu, dispersion, weights, None)
+    nbinom_log_likelihood_with_cached_gamma(counts, mu, dispersion, weights, None, None)
 }
 
 /// Invariant NB terms for repeated fitted means at fixed counts/dispersion.
@@ -43,12 +41,13 @@ pub fn nbinom_log_likelihood_weighted(
 pub(crate) struct FixedDispersionLikelihood<'a> {
     counts: &'a [u32],
     dispersion: f64,
+    gene: usize,
     size: f64,
     gamma_terms: Vec<f64>,
 }
 
 impl<'a> FixedDispersionLikelihood<'a> {
-    pub(crate) fn new(counts: &'a [u32], dispersion: f64) -> Self {
+    pub(crate) fn new(counts: &'a [u32], dispersion: f64, gene: usize) -> Self {
         let size = dispersion.recip();
         let gamma_size = ln_gamma(size);
         let gamma_one = ln_gamma(1.0);
@@ -74,6 +73,7 @@ impl<'a> FixedDispersionLikelihood<'a> {
         Self {
             counts,
             dispersion,
+            gene,
             size,
             gamma_terms,
         }
@@ -89,6 +89,7 @@ impl<'a> FixedDispersionLikelihood<'a> {
             mu,
             self.dispersion,
             weights,
+            Some(self.gene),
             Some((&self.gamma_terms, self.size)),
         )
     }
@@ -99,6 +100,7 @@ fn nbinom_log_likelihood_with_cached_gamma(
     mu: &[f64],
     dispersion: f64,
     weights: Option<&[f64]>,
+    gene: Option<usize>,
     cached_gamma: Option<(&[f64], f64)>,
 ) -> Result<f64, DeseqError> {
     if counts.len() != mu.len() {
@@ -117,13 +119,13 @@ fn nbinom_log_likelihood_with_cached_gamma(
             weights.len(),
         ));
     }
-    validate_dispersion(dispersion, None)?;
+    validate_dispersion(dispersion, gene, None)?;
     let size = dispersion.recip();
     let gamma_size = cached_gamma.is_none().then(|| ln_gamma(size));
     let gamma_one = cached_gamma.is_none().then(|| ln_gamma(1.0));
     let mut log_like = 0.0;
     for (idx, (count, mu)) in counts.iter().copied().zip(mu.iter().copied()).enumerate() {
-        validate_mu(mu, Some(idx))?;
+        validate_mu(mu, gene, idx)?;
         let term = match cached_gamma {
             Some((gamma_terms, size)) => {
                 let mu_dispersion = mu * dispersion;
@@ -151,23 +153,30 @@ fn nbinom_log_likelihood_with_cached_gamma(
                     + count_log_term(y, mu_dispersion)
             }
         };
-        validate_log_pmf_term(term, Some(idx))?;
+        validate_log_pmf_term(term, gene, idx)?;
         let weighted_term = match weights {
             Some(weights) => {
                 let weight = weights[idx];
-                validate_weight(weight, Some(idx))?;
-                checked_weighted_log_likelihood_term(weight, term).ok_or_else(|| {
-                    invalid_parameter(
-                        ErrorKind::Dispersion,
-                        format!("negative-binomial weighted log-likelihood term at sample {idx}"),
-                        Requirement::Finite,
+                validate_weight(weight, gene, idx)?;
+                checked::try_mul(weight, term).map_err(|failure| {
+                    invalid_value(
+                        NegativeBinomialStage::WeightedTerm,
+                        gene,
+                        Some(idx),
+                        failure.value,
                     )
                 })?
             }
             None => term,
         };
-        validate_weighted_log_likelihood_term(weighted_term, Some(idx))?;
-        checked_add_log_likelihood(&mut log_like, weighted_term)?;
+        log_like = checked::try_add(log_like, weighted_term).map_err(|failure| {
+            invalid_value(
+                NegativeBinomialStage::RowSum,
+                gene,
+                Some(idx),
+                failure.value,
+            )
+        })?;
     }
     Ok(log_like)
 }
@@ -220,8 +229,13 @@ pub fn nbinom_log_likelihood_matrix(
         let count_row = counts.row(gene)?;
         let mu_row = mu.row(gene)?;
         let weight_row = weights.map(|matrix| matrix.row(gene)).transpose()?;
-        out.push(nbinom_log_likelihood_weighted(
-            count_row, mu_row, dispersion, weight_row,
+        out.push(nbinom_log_likelihood_with_cached_gamma(
+            count_row,
+            mu_row,
+            dispersion,
+            weight_row,
+            Some(gene),
+            None,
         )?);
     }
     Ok(out)
@@ -254,105 +268,81 @@ fn log1p_mu_dispersion(mu: f64, dispersion: f64, mu_dispersion: f64) -> f64 {
     }
 }
 
-fn validate_mu(mu: f64, index: Option<usize>) -> Result<(), DeseqError> {
+fn invalid_value(
+    stage: NegativeBinomialStage,
+    gene: Option<usize>,
+    sample: Option<usize>,
+    value: f64,
+) -> DeseqError {
+    DeseqError::InvalidNegativeBinomialValue {
+        stage,
+        gene,
+        sample,
+        value,
+    }
+}
+
+fn validate_mu(mu: f64, gene: Option<usize>, sample: usize) -> Result<(), DeseqError> {
     if !mu.is_finite() || mu <= 0.0 {
-        return Err(DeseqError::NonFiniteValue {
-            context: "negative-binomial mean".to_string(),
-            index,
-            value: mu,
-        });
+        return Err(invalid_value(
+            NegativeBinomialStage::Mean,
+            gene,
+            Some(sample),
+            mu,
+        ));
     }
     Ok(())
 }
 
-fn validate_dispersion(dispersion: f64, index: Option<usize>) -> Result<(), DeseqError> {
-    if !dispersion.is_finite() || dispersion <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: match index {
-                Some(index) => {
-                    format!("dispersion at index {index} must be finite and positive")
-                }
-                None => "dispersion must be finite and positive".to_string(),
-            },
-        });
-    }
-    Ok(())
-}
-
-fn validate_weight(weight: f64, index: Option<usize>) -> Result<(), DeseqError> {
-    if !weight.is_finite() || weight < 0.0 {
-        return Err(DeseqError::NonFiniteValue {
-            context: "negative-binomial weight".to_string(),
-            index,
-            value: weight,
-        });
-    }
-    Ok(())
-}
-
-fn validate_log_pmf_term(term: f64, index: Option<usize>) -> Result<(), DeseqError> {
-    if !term.is_finite() {
-        return Err(DeseqError::InvalidDispersion {
-            reason: match index {
-                Some(index) => {
-                    format!("negative-binomial log PMF at sample {index} must be finite")
-                }
-                None => "negative-binomial log PMF must be finite".to_string(),
-            },
-        });
-    }
-    Ok(())
-}
-
-fn validate_weighted_log_likelihood_term(
-    term: f64,
-    index: Option<usize>,
+fn validate_dispersion(
+    dispersion: f64,
+    gene: Option<usize>,
+    sample: Option<usize>,
 ) -> Result<(), DeseqError> {
-    if !term.is_finite() {
-        return Err(DeseqError::InvalidDispersion {
-            reason: match index {
-                Some(index) => {
-                    format!(
-                        "negative-binomial weighted log-likelihood term at sample {index} must be finite"
-                    )
-                }
-                None => "negative-binomial weighted log-likelihood term must be finite".to_string(),
-            },
-        });
+    if !dispersion.is_finite() || dispersion <= 0.0 {
+        return Err(invalid_value(
+            NegativeBinomialStage::Dispersion,
+            gene,
+            sample,
+            dispersion,
+        ));
     }
     Ok(())
 }
 
-fn checked_weighted_log_likelihood_term(weight: f64, term: f64) -> Option<f64> {
-    let product = weight * term;
-    (weight.is_finite() && term.is_finite() && product.is_finite()).then_some(product)
+fn validate_weight(weight: f64, gene: Option<usize>, sample: usize) -> Result<(), DeseqError> {
+    if !weight.is_finite() || weight < 0.0 {
+        return Err(invalid_value(
+            NegativeBinomialStage::Weight,
+            gene,
+            Some(sample),
+            weight,
+        ));
+    }
+    Ok(())
 }
 
-fn checked_add_log_likelihood(total: &mut f64, term: f64) -> Result<(), DeseqError> {
-    let next = *total + term;
-    if !next.is_finite() {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "negative-binomial row log-likelihood sum must remain finite".to_string(),
-        });
+fn validate_log_pmf_term(term: f64, gene: Option<usize>, sample: usize) -> Result<(), DeseqError> {
+    if !term.is_finite() {
+        return Err(invalid_value(
+            NegativeBinomialStage::LogPmf,
+            gene,
+            Some(sample),
+            term,
+        ));
     }
-    *total = next;
     Ok(())
 }
 
 fn negative_twice_log_likelihood_from_log_like(log_like: f64) -> Result<f64, DeseqError> {
-    let deviance = -2.0 * log_like;
-    if log_like.is_finite() && deviance.is_finite() {
-        Ok(deviance)
-    } else {
-        Err(DeseqError::InvalidDispersion {
-            reason: "negative-binomial deviance must remain finite".to_string(),
-        })
-    }
+    checked::try_mul(-2.0, log_like).map_err(|failure| {
+        invalid_value(NegativeBinomialStage::Deviance, None, None, failure.value)
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::negative_twice_log_likelihood_from_log_like;
+    use super::*;
 
     #[test]
     fn negative_twice_log_likelihood_rejects_nonfinite_scaling() {
@@ -360,7 +350,20 @@ mod tests {
             negative_twice_log_likelihood_from_log_like(-2.0).unwrap(),
             4.0
         );
-        assert!(negative_twice_log_likelihood_from_log_like(f64::NAN).is_err());
-        assert!(negative_twice_log_likelihood_from_log_like(f64::MAX).is_err());
+        std::assert_matches!(
+            negative_twice_log_likelihood_from_log_like(f64::NAN).unwrap_err(),
+            DeseqError::InvalidNegativeBinomialValue {
+                stage: NegativeBinomialStage::Deviance, gene: None, sample: None, value,
+            } if value.is_nan()
+        );
+        std::assert_matches!(
+            negative_twice_log_likelihood_from_log_like(f64::MAX).unwrap_err(),
+            DeseqError::InvalidNegativeBinomialValue {
+                stage: NegativeBinomialStage::Deviance,
+                gene: None,
+                sample: None,
+                value: f64::NEG_INFINITY,
+            }
+        );
     }
 }

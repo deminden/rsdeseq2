@@ -118,8 +118,10 @@ fn fitted_wald_object_uses_stored_model_frame_for_character_contrast_results() {
             counts.gene_names(),
         )
         .unwrap_err();
-    assert_eq!(invalid.kind(), rsdeseq2::errors::ErrorKind::Options);
-    assert!(invalid.to_string().contains("ordered factor"));
+    crate::support::assert_ordered_factor_contrast_error(
+        invalid,
+        r#"ordered(condition, levels = c("B", "A"))"#,
+    );
 
     assert_eq!(
         object_ordered_results.metadata.result_name.as_deref(),
@@ -188,8 +190,10 @@ fn fitted_wald_object_uses_stored_model_frame_for_character_contrast_results() {
             ),
         )
         .unwrap_err();
-    assert_eq!(error.kind(), rsdeseq2::errors::ErrorKind::Options);
-    assert!(error.to_string().contains("ordered factor"));
+    crate::support::assert_ordered_factor_contrast_error(
+        error,
+        r#"ordered(condition, levels = c("A", "B"), labels = c("control", "treated"))"#,
+    );
 }
 
 #[test]

@@ -59,13 +59,27 @@ fn observation_weights_use_thresholded_subset_for_cox_reid_check() {
 #[test]
 fn observation_weights_reject_overflowed_cox_reid_column_sum() {
     let design = DesignMatrix::from_row_major(2, 1, vec![f64::MAX, f64::MAX], None).unwrap();
-    let weights = RowMajorMatrix::from_row_major(1, 2, vec![1.0, 1.0]).unwrap();
+    let weights = RowMajorMatrix::from_row_major(2, 2, vec![1.0, 0.0, 1.0, 1.0]).unwrap();
 
     let err = preprocess_observation_weights(&weights, &design).unwrap_err();
 
-    assert!(
-        err.to_string()
-            .contains("observation weight Cox-Reid column sum")
+    assert_eq!(err.kind(), ErrorKind::Numeric);
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "out-of-range value in observation weight Cox-Reid column sum at index Some(0): {}",
+            f64::MAX
+        )
+    );
+    std::assert_matches!(
+        err,
+        DeseqError::CoxReidColumnSumOverflow {
+            gene: 1,
+            sample: 1,
+            column: 0,
+            term: f64::MAX,
+            value: f64::INFINITY,
+        }
     );
 }
 

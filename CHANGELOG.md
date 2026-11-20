@@ -140,6 +140,11 @@ versions live in [docs/releases](docs/releases/).
   gene and sample when available. Existing messages and error kinds are
   preserved for these cases.
 
+- Negative-binomial likelihood errors expose the calculation stage, rejected
+  value and available gene and sample indices. A Cox–Reid column-sum overflow
+  exposes the gene, sample, column and overflowing sum. These errors retain
+  their existing messages and error kinds.
+
 - Missing-prerequisite errors ("Wald fitting requires MAP dispersions") are
   `DeseqError::MissingPrerequisite { domain, operation, prerequisite }`
   (119 sites). 57 of these messages were reworded into the one form

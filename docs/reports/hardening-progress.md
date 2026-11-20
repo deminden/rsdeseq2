@@ -770,6 +770,16 @@ in the affected validation paths now inspect structured fields. The
 remaining text-only diagnostics and their Rust assertions are still under
 migration.
 
+Negative-binomial likelihoods now report the stage, rejected value and
+available row and sample coordinates. Weighted term and partial-sum
+overflows identify the particular sample. Cox–Reid column-sum overflows
+report the actual sum and its gene, sample and design column. The messages
+and coarse error kinds are preserved. Ordered-factor contrast tests now
+check the structured prerequisite and canonical factor name through both
+Wald and LRT entry points.
+
+The targeted batches passed 88 integration tests and one unit test.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
