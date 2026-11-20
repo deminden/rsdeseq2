@@ -6,7 +6,7 @@ mod offsets;
 pub use offsets::normalization_factors_with_offsets;
 
 use crate::errors::{DeseqError, invalid_dimensions};
-use crate::math::median::median;
+use crate::math::median::median_in_place;
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::options::SizeFactorMethod;
@@ -499,8 +499,9 @@ fn estimate_from_log_geo_means(
     }
     let genes = usable_gene_indices(counts, control_genes)?;
     let mut size_factors = Vec::with_capacity(counts.n_samples());
+    let mut log_ratios = Vec::new();
     for sample in 0..counts.n_samples() {
-        let mut log_ratios = Vec::new();
+        log_ratios.clear();
         for gene in &genes {
             let log_geo_mean = log_geo_means[*gene];
             let count = counts.row_values(*gene)[sample];
@@ -521,7 +522,7 @@ fn estimate_from_log_geo_means(
                 reason: format!("sample {sample} has no usable positive count ratios"),
             });
         }
-        size_factors.push(median(&log_ratios)?.exp_p());
+        size_factors.push(median_in_place(&mut log_ratios)?.exp_p());
     }
     validate_size_factors(&size_factors, counts.n_samples())?;
     if stabilize_to_geometric_mean_one {

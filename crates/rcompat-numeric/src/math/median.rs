@@ -2,6 +2,11 @@ use crate::errors::Error;
 
 /// Deterministic median over finite input values.
 pub fn median(values: &[f64]) -> Result<f64, Error> {
+    median_in_place(&mut values.to_vec())
+}
+
+/// Deterministic median over finite input values, partitioning the input in place.
+pub fn median_in_place(values: &mut [f64]) -> Result<f64, Error> {
     if values.is_empty() {
         return Err(Error::InvalidDimensions {
             context: "median input".to_string(),
@@ -9,7 +14,6 @@ pub fn median(values: &[f64]) -> Result<f64, Error> {
             actual: 0,
         });
     }
-    let mut sorted = Vec::with_capacity(values.len());
     for (idx, value) in values.iter().copied().enumerate() {
         if !value.is_finite() {
             return Err(Error::NonFiniteValue {
@@ -18,9 +22,8 @@ pub fn median(values: &[f64]) -> Result<f64, Error> {
                 value,
             });
         }
-        sorted.push(value);
     }
-    let (lower, upper) = middle_values(&mut sorted);
+    let (lower, upper) = middle_values(values);
     lower
         .map_or(Some(upper), |left| midpoint(left, upper))
         .ok_or_else(|| Error::NonFiniteValue {

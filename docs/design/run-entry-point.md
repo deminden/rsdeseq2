@@ -126,18 +126,25 @@ two fast-VST trend helpers, which stay outside `run` and will be renamed in
 3. Stopping early is `Analysis::stop_after: Stage`; the staged methods become
    deprecated wrappers too.
 
-## Candidate public surface for 1.0
+## Reviewed public surface for 1.0
 
-| Area | Entry points and data types |
+The public paths below are the starting point for the 1.0 API. They cover
+complete matrix-design analyses, reuse of fitted models, and callers that
+use individual DESeq2 stages.
+
+| Area | Public paths |
 | --- | --- |
-| Workflow | `DeseqBuilder::run`, `Analysis` and its input selectors, `RunOutput`, `DeseqFit` and `ResultRequest` for queries on existing fits |
-| Data | Count and design matrices, labeled input readers, observations and offsets, result tables and diagnostics |
-| Standalone stages | Canonical request types for normalization, dispersion, GLM, transformations and supported shrinkage |
-| Configuration | `DeseqError` and its classifications, `NumericProfile`, work cancellation and thread settings |
+| Workflow | `core::DeseqBuilder::run`, `Analysis`, its matrix-design selectors, `RunOutput`, `DeseqFit` and `Stage` |
+| Stored fits | `results::ResultRequest`, `DeseqFit::results_for_request` and the replacement-aware query with its refit plan |
+| Data and policy | Count, design and row-major matrices, labeled readers in `io`, observation weights, `Offsets`, contrasts, result rows, Cook's replacement settings and fit diagnostics |
+| Standalone stages | Size-factor options and estimation, gene-wise/trend/MAP dispersion estimation, `DispersionFitInput` for lower-level search, `GlmInput` and the canonical fixed-dispersion fits, `vst_with_dispersion_trend_and_offsets` and the offset-based rlog functions |
+| Configuration | `DeseqError`, `ErrorKind`, runtime `NumericProfile` and `DeseqBuilder::threads` |
 
-Keep the current compatibility exports through 0.6.0. During the 0.7.0
-migration, remove the deprecated analysis wrappers and narrow the remaining
-convenience exports as part of the public API review. Document the accepted
-exports in the crate's prelude before treating the table as a stability
-commitment. Keep ashr, apeglm and formula evaluation experimental until their
-coverage meets the supported contract.
+The 0.6 prelude documents the preferred workflow and retains existing
+imports. Remove the deprecated builder aliases during the 0.7 migration.
+Check the transitive types in public signatures, including replacement plans
+and GLM options, before narrowing any exports. Expressions evaluated directly
+from formulas and the ashr and apeglm implementations retain their
+experimental scope. Cooperative cancellation currently controls posterior work
+through `PosteriorWorkControl`, so it belongs to shrinkage rather than to the
+matrix-design workflow API.

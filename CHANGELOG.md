@@ -104,6 +104,9 @@ versions live in [docs/releases](docs/releases/).
 
 ### Changed
 
+- Size-factor estimation reuses one log-ratio buffer across samples and
+  selects the median in place.
+
 - The R package's copy of the Rust core is no longer committed. Its
   configure step regenerates it from `crates/` in a git checkout, and
   `scripts/release/build_r_source.sh` builds a self-contained source package

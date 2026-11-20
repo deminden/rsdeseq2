@@ -1,4 +1,12 @@
 //! Common public imports for users of the `rsdeseq2` crate.
+//!
+//! Use [`DeseqBuilder::run`] with [`Analysis`] to fit a matrix design,
+//! and [`DeseqFit::results_for_request`] with [`ResultRequest`] to query
+//! a stored fit. Use [`SizeFactorOptions`], [`DispersionFitInput`],
+//! [`GlmInput`] and [`Offsets`] to call individual stages.
+//!
+//! The prelude still re-exports compatibility methods and low-level helpers.
+//! Their availability here does not imply a 1.0 stability commitment.
 
 pub use crate::contrasts::{
     ContrastCounts, ContrastSpec, ContrastZeroPolicy, FactorLevelContrast, ResolvedResultsContrast,
