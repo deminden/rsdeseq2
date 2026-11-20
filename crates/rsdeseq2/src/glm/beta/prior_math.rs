@@ -1,6 +1,7 @@
 use super::intercept::intercept_value_error;
 use super::*;
 use crate::errors::{ErrorKind, Requirement, invalid_calculation, invalid_parameter};
+use crate::matrix::try_alloc_matrix;
 // Prior input checks, stable arithmetic and quantiles.
 
 pub(super) fn validate_beta_prior_inputs(
@@ -174,7 +175,7 @@ pub(super) fn quantile_type7_stable(
 
 pub(super) fn weighted_abs_quantile(
     betas: &[f64],
-    weights: &[f64],
+    weights: impl Iterator<Item = f64>,
     probability: f64,
 ) -> Result<f64, DeseqError> {
     if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
@@ -182,13 +183,8 @@ pub(super) fn weighted_abs_quantile(
             reason: "weighted quantile probability must be finite and between 0 and 1".to_string(),
         });
     }
-    let mut pairs = Vec::with_capacity(betas.len());
-    for (idx, (beta, weight)) in betas
-        .iter()
-        .copied()
-        .zip(weights.iter().copied())
-        .enumerate()
-    {
+    let mut pairs = try_alloc_matrix(betas.len(), 1, "weighted beta prior pairs")?;
+    for (idx, (beta, weight)) in betas.iter().copied().zip(weights).enumerate() {
         if beta.is_finite() && weight.is_finite() && weight > 0.0 {
             pairs.push((beta.abs(), weight));
         } else if !weight.is_finite() || weight < 0.0 {
@@ -233,8 +229,10 @@ pub(super) fn weighted_abs_quantile(
             "weighted beta prior variance quantile produced non-finite normalization scale",
         )
     })?;
-    let mut unique = Vec::<(f64, f64)>::with_capacity(pairs.len());
-    for (value, weight) in pairs {
+    // Merge ties in stable input order while compacting the sorted pairs.
+    let mut unique = 0;
+    for index in 0..pairs.len() {
+        let (value, weight) = pairs[index];
         let normalized_weight = checked::try_mul(weight, norm_scale).map_err(|failure| {
             invalid_calculation(
                 ErrorKind::Options,
@@ -253,7 +251,7 @@ pub(super) fn weighted_abs_quantile(
                 "weighted beta prior variance quantile needs positive normalized weight",
             ));
         }
-        if let Some((last_value, last_weight)) = unique.last_mut()
+        if let Some((last_value, last_weight)) = pairs[..unique].last_mut()
             && *last_value == value
         {
             let Some(next_weight) = checked::add(*last_weight, normalized_weight) else {
@@ -266,14 +264,15 @@ pub(super) fn weighted_abs_quantile(
             *last_weight = next_weight;
             continue;
         }
-        unique.push((value, normalized_weight));
+        pairs[unique] = (value, normalized_weight);
+        unique += 1;
+    }
+    pairs.truncate(unique);
+    if pairs.len() == 1 {
+        return Ok(pairs[0].0);
     }
 
-    if unique.len() == 1 {
-        return Ok(unique[0].0);
-    }
-
-    let Some(n) = checked::sum(unique.iter().map(|(_, weight)| *weight)) else {
+    let Some(n) = checked::sum(pairs.iter().map(|(_, weight)| *weight)) else {
         return Err(DeseqError::InvalidOptions {
             reason:
                 "weighted beta prior variance quantile produced non-finite total normalized weight"
@@ -290,9 +289,8 @@ pub(super) fn weighted_abs_quantile(
     let high = (low + 1.0).min(n);
     let fraction = order.fract();
 
-    let mut cumulative_weights = Vec::with_capacity(unique.len());
     let mut cumulative = 0.0;
-    for (_, weight) in &unique {
+    for (_, weight) in &mut pairs {
         let Some(next_cumulative) = checked::add(cumulative, *weight) else {
             return Err(DeseqError::InvalidOptions {
                 reason:
@@ -301,12 +299,14 @@ pub(super) fn weighted_abs_quantile(
             });
         };
         cumulative = next_cumulative;
-        cumulative_weights.push(cumulative);
+        *weight = cumulative;
     }
 
-    let low_quantile = weighted_order_statistic(&unique, &cumulative_weights, low);
-    let high_quantile = weighted_order_statistic(&unique, &cumulative_weights, high);
-    stable_interpolate(low_quantile, high_quantile, fraction).map_err(|failure| {
+    let order_statistic = |position| {
+        let index = pairs.partition_point(|&(_, cumulative)| cumulative < position);
+        pairs[index.min(pairs.len() - 1)].0
+    };
+    stable_interpolate(order_statistic(low), order_statistic(high), fraction).map_err(|failure| {
         invalid_calculation(
             ErrorKind::Options,
             "weighted beta prior quantile",
@@ -328,17 +328,4 @@ pub(super) fn stable_interpolate(left: f64, right: f64, fraction: f64) -> checke
     let delta = checked::try_add(right, -left)?;
     let offset = checked::try_mul(fraction, delta)?;
     checked::try_add(left, offset)
-}
-
-pub(super) fn weighted_order_statistic(
-    values_and_weights: &[(f64, f64)],
-    cumulative_weights: &[f64],
-    position: f64,
-) -> f64 {
-    for (idx, cumulative) in cumulative_weights.iter().copied().enumerate() {
-        if position <= cumulative {
-            return values_and_weights[idx].0;
-        }
-    }
-    values_and_weights[values_and_weights.len() - 1].0
 }

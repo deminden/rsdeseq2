@@ -1388,3 +1388,48 @@ Both 8,032-field golden manifests matched. Clippy, formatting and the
 module dependency check passed. The separate exact-R formula-transform
 panel passed in the host R profile. Its degree-10 polynomial bit
 comparison also fails under the portable profile at the baseline commit.
+
+### Weighted rlog prior storage
+
+Prior estimation stores one weight per gene. The shared weighted quantile
+merges tied values and accumulates normalized weights in the sorted pair
+buffer. Stable sorting preserves tie order, and the cumulative search
+retains the existing cutoff and interpolation. The regression covers
+tied absolute values and a fractional position.
+
+A 20,000-gene, 100-sample probe on macOS arm64 used four workers and
+three paired runs per profile. Median peak RSS fell from 126.89 to
+81.34 MiB for the portable profile and from 126.94 to 81.34 MiB for
+the host R profile against `7ee8515`. Prior variance bits matched
+on every pair. Each profile passed 78 focused tests and its 8,032-field
+golden check. A single workspace run for the combined rlog changes
+passed 1,251 unit and integration tests plus one doctest. The default
+workspace run skipped the two full GTEx replays previously run
+separately.
+
+## Review plan verification for 0.6.0
+
+| Priority | Implementation and evidence |
+| --- | --- |
+| 1. Golden harness | The [golden harness](../development.md) covers 8,032 fields. Portable hashes have replayed on macOS arm64, Linux arm64 and emulated Linux x86_64. |
+| 2. Per-gene parallelism | MAP, Cook's distance and replacement, and the rlog prior run in parallel with ordered errors and results. See the [thread-scaling probe](#local-verification-and-benchmark). |
+| 3. Borrowed offsets | Sample factors stay in a sample vector through fitting. Selected dispersion, Wald, LRT, beta-prior and rlog fits borrow source rows. Where the API returns gene-by-sample factors, the matrix is created for that output. |
+| 4. Numerical profiles | The crate and CLI default to portable arithmetic. The R bridge selects its host profile. The [platform workflow](../../.github/workflows/platform-checks.yml) checks the release panel and portable golden hashes on five targets. Native Intel macOS and Windows x64 runtime results are still open. |
+| 5. One workflow entry point | The builder, CLI and R bridge use `DeseqBuilder::run(&Analysis)`. The [API migration](../design/run-entry-point.md) keeps deprecated wrappers in 0.6 and schedules removal in 0.7. |
+| 6. Real-data probability gates | The compact GTEx gate checks log-scale probability, nonfinite values, underflow and significance flips. Both full 56,200-gene replays passed separately under both profiles at the [local release checkpoint](#batched-local-060-release-validation). |
+| 7. Shared checked arithmetic | `rcompat-numeric` owns the checked arithmetic, matrix allocation and validation primitives. The [summation rules](../summation-rules.md) specify the reduction used for each R primitive. |
+| 8. Structured errors | The non-exhaustive error enum carries domains, dimensions, indices and rejected values. The [diagnostics work](#structured-design-and-glm-diagnostics) covers the early input stages, GLM, contrasts and probability calculations. |
+| 9. Rank and initial coefficients | `aaea914` implemented R's rank rule and `1977237` aligned rank-deficient starts. The independently generated rank reference includes scaled near-collinear designs. |
+| 10. Modules and dependency cycles | Core and R bridge use modules. The module checker reports zero mutual top-level dependency pairs. It runs in Rust CI. |
+| 11. Cargo features and workspace | The four Cargo packages separate numerical, formula, shrinkage and DESeq workflow code. Formula, shrinkage and CLI features are checked independently. The CLI ships from the workflow crate and the R native backend has its own package manifest. |
+| 12. Release build and IRLS buffers | Release uses thin LTO, one codegen unit and unwinding. IRLS reuses worker buffers, writes outputs directly and skips unrequested covariance and hat work. The [QR work](#direct-householder-projection-for-wider-designs) records the measured range used by the direct solver. |
+| 13. Test layout, fuzzing and fixtures | One integration binary shares a support module. The suite has property tests and seven fuzz targets, including parsing and transactional publication. The large GTEx tables are restored by hash. Reference breadth covers small, sparse and 500-plus-sample designs, and a previous Bioconductor release. |
+| 14. CI and toolchain | Pinned workflows cover locked builds, caching, Rust 1.96.0, dependency audit, semver, coverage, mutation tests, Miri and R sanitizers. The [local release checkpoint](#batched-local-060-release-validation) records offline builds with the minimum toolchain. |
+| 15. R bridge | Native entries are guarded and CI denies undocumented Rust unsafe blocks. The offline package passed both R reference environments and SIGINT recovery. R 4.6.2 reported one compiled-code warning for the Rust runtime's `abort` import. |
+| 16. CLI and R vendor | The CLI shares typed argument groups and [labelled TSV readers](#labelled-tsv-parsing). The R release builds from an offline vendor archive generated from the locked dependencies. [Contributor documentation](../../CONTRIBUTING.md) links to the checks and generator inventory. |
+
+The [quirk register](../deseq2-quirks.md) links intentional compatibility
+behavior to its pinning tests. Formula evaluation, ashr and apeglm
+retain their experimental scope. The [release procedure](../release.md)
+tracks the remaining hosted checks and publishing separately from local
+verification.

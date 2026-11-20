@@ -63,6 +63,24 @@ fn beta_prior_weighted_quantile_uses_row_weights() {
 }
 
 #[test]
+fn beta_prior_weighted_quantile_merges_ties_before_interpolation() {
+    let betas = [-10.0, 1.0, -1.0, 4.0, 7.0];
+    let weights = [3.0, 1.0, 2.0, 2.0, 2.0];
+    // The merged cumulative weights are 1.5, 2.5, 3.5 and 5.0.
+    for (tail_probability, expected_quantile) in [(0.5, 7.0), (0.375, 8.5)] {
+        let expected = match_weighted_upper_quantile_for_variance(
+            &[expected_quantile],
+            &[1.0],
+            tail_probability,
+        )
+        .unwrap();
+        let observed =
+            match_weighted_upper_quantile_for_variance(&betas, &weights, tail_probability).unwrap();
+        assert_eq!(observed.to_bits(), expected.to_bits());
+    }
+}
+
+#[test]
 fn beta_prior_weighted_quantile_rejects_overflowed_variance() {
     let err = match_weighted_upper_quantile_for_variance(&[f64::MAX], &[1.0], 0.5).unwrap_err();
 

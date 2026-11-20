@@ -120,6 +120,28 @@ pub fn match_weighted_upper_quantile_for_variance(
             weights.len(),
         ));
     }
+    weighted_variance(betas, weights.iter().copied(), upper_quantile)
+}
+
+pub(crate) fn match_row_weighted_upper_quantile_for_variance(
+    betas: &[f64],
+    row_weights: &[f64],
+    samples: usize,
+    upper_quantile: f64,
+) -> Result<f64, DeseqError> {
+    validate_upper_quantile(upper_quantile)?;
+    debug_assert_eq!(row_weights.len() * samples, betas.len());
+    let weights = row_weights
+        .iter()
+        .flat_map(|&weight| std::iter::repeat_n(weight, samples));
+    weighted_variance(betas, weights, upper_quantile)
+}
+
+fn weighted_variance(
+    betas: &[f64],
+    weights: impl Iterator<Item = f64>,
+    upper_quantile: f64,
+) -> Result<f64, DeseqError> {
     let weighted_quantile = weighted_abs_quantile(betas, weights, 1.0 - upper_quantile)?;
     variance_from_quantile(
         weighted_quantile,

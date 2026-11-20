@@ -1,9 +1,9 @@
 use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::errors::{ErrorKind, missing_prerequisite};
-use crate::glm::beta::fit_prior_for_output;
+use crate::glm::beta::{fit_prior_for_output, match_row_weighted_upper_quantile_for_variance};
 use crate::glm::irls::{IrlsOutput, OutputRequirements};
-use crate::glm::{GlmInput, IrlsOptions, NbinomGlmFit, match_weighted_upper_quantile_for_variance};
+use crate::glm::{GlmInput, IrlsOptions, NbinomGlmFit};
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::matrix::try_alloc_matrix;
@@ -189,9 +189,9 @@ fn estimate_rlog_prior(
         }
         Cow::Owned(matrix) => (None, matrix.into_values()),
     };
-    let mut weights = try_alloc_matrix(genes, samples, "rlog prior weights")?;
-    weights.resize(length, 0.0);
-    let fill_row = |gene: usize, changes: &mut [f64], weights: &mut [f64]| {
+    let mut weights = try_alloc_matrix(genes, 1, "rlog prior row weights")?;
+    weights.resize(genes, 0.0);
+    let fill_row = |gene: usize, changes: &mut [f64], row_weight: &mut f64| {
         let source = selected.map_or(gene, |selected| selected[gene]);
         let stat = |values: &[f64]| {
             values.get(source).copied().ok_or_else(|| {
@@ -233,21 +233,24 @@ fn estimate_rlog_prior(
                 });
             }
             *change = (value + 0.5).log2_p() - mean_log;
-            weights[sample] = weight;
         }
+        *row_weight = weight;
         Ok(())
     };
     let rows = log_fold_changes
         .par_chunks_mut(samples)
-        .zip(weights.par_chunks_mut(samples))
+        .zip(weights.par_iter_mut())
         .enumerate()
         .map(|(gene, (changes, weights))| fill_row(gene, changes, weights))
         .collect::<Vec<_>>();
     // Report the first row error in the same order as the serial loop.
     rows.into_iter().collect::<Result<(), DeseqError>>()?;
-    // The quantile still sees flattened row-major data, including tied values.
-
-    match_weighted_upper_quantile_for_variance(&log_fold_changes, &weights, upper_quantile)
+    match_row_weighted_upper_quantile_for_variance(
+        &log_fold_changes,
+        &weights,
+        samples,
+        upper_quantile,
+    )
 }
 
 fn rlog_coefficient_count(n_samples: usize) -> Result<usize, DeseqError> {
