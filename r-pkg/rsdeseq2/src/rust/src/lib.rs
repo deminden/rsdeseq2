@@ -7,6 +7,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 
 use rcompat_numeric::matrix::try_alloc_matrix;
+use rsdeseq2::matrix::{CountView, MatrixOrder, MatrixView};
 use rsdeseq2::prelude::{
     Analysis, DeseqFit, GlmInput, MeanModel, Offsets, RunOutput, Stage,
     fit_glms_with_beta_prior, fit_glms_with_estimated_beta_prior,
@@ -149,33 +150,34 @@ unsafe fn counts_from_r(
     values: *const f64,
 ) -> Result<CountMatrix, String> {
     // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
-    let column_major = unsafe {
-        input_slice(
-            values,
-            n_genes
-                .checked_mul(n_samples)
-                .ok_or("count dimensions overflow")?,
-            "counts",
-        )?
-    };
-    rsdeseq2::matrix::CountView::from_doubles(
-        rsdeseq2::matrix::MatrixView::new(
-            n_genes,
-            n_samples,
-            column_major,
-            rsdeseq2::matrix::MatrixOrder::ColumnMajor,
-        )
-        .map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| e.to_string())?;
+    let column_major = unsafe { column_major_view(n_genes, n_samples, values, "counts")? };
+    CountView::from_doubles(column_major).map_err(|e| e.to_string())?;
+    let values = column_major.as_slice();
     let mut row_major =
         try_alloc_matrix(n_genes, n_samples, "R counts").map_err(|error| error.to_string())?;
     for gene in 0..n_genes {
         for sample in 0..n_samples {
-            row_major.push(column_major[gene + sample * n_genes] as u32);
+            row_major.push(values[gene + sample * n_genes] as u32);
         }
     }
     CountMatrix::from_row_major_u32(n_genes, n_samples, row_major)
+        .map_err(|error| error.to_string())
+}
+
+/// # Safety
+/// The caller meets the input buffer contract for `rows * columns` doubles.
+unsafe fn column_major_view<'a>(
+    rows: usize,
+    columns: usize,
+    values: *const f64,
+    name: &str,
+) -> Result<MatrixView<'a, f64>, String> {
+    let length = rows
+        .checked_mul(columns)
+        .ok_or_else(|| format!("{name} dimensions overflow"))?;
+    // SAFETY: the caller guarantees the storage and lifetime.
+    let values = unsafe { input_slice(values, length, name)? };
+    MatrixView::new(rows, columns, values, MatrixOrder::ColumnMajor)
         .map_err(|error| error.to_string())
 }
 

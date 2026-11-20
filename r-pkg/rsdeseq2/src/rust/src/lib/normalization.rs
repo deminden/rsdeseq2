@@ -1,6 +1,7 @@
 // Size factors, normalized counts and base metadata exports.
 // Optional geometric means use natural-scale units, as in the standalone API.
 use super::*;
+use rsdeseq2::normalization::visit_normalized_counts_column_major;
 
 /// # Safety
 ///
@@ -64,19 +65,25 @@ pub unsafe extern "C" fn rsdeseq2_r_normalized_counts(
 ) -> i32 {
     run_backend(|| {
         // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
-        let counts = unsafe { counts_from_r(n_genes, n_samples, counts)? };
-        let normalized = if normalization_factors.is_null() {
+        let values = unsafe { column_major_view(n_genes, n_samples, counts, "counts")? };
+        let counts = CountView::from_doubles(values).map_err(|error| error.to_string())?;
+        let (size_factors, factors) = if normalization_factors.is_null() {
             // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
-            let sf = unsafe { input_slice(size_factors, n_samples, "size factors")? };
-            normalized_counts(&counts, sf).map_err(|e| e.to_string())?
+            let size_factors = unsafe { input_slice(size_factors, n_samples, "size factors")? };
+            (size_factors, None)
         } else {
-            let factors =
-                // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
-                unsafe { row_major_from_column_major(n_genes, n_samples, normalization_factors)? };
-            normalized_counts_with_factors(&counts, &factors).map_err(|e| e.to_string())?
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
+            let factors = unsafe {
+                column_major_view(n_genes, n_samples, normalization_factors, "normalization factors")?
+            };
+            (&[][..], Some(factors))
         };
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
-        unsafe { copy_matrix_to_r(&normalized, output) }
+        let output = unsafe { output_slice(output, values.as_slice().len(), "matrix")? };
+        visit_normalized_counts_column_major(counts, size_factors, factors, |index, value| {
+            output[index].write(value);
+        })
+        .map_err(|error| error.to_string())
     })
 }
 

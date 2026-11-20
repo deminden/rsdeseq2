@@ -1087,6 +1087,19 @@ offsets. In one paired synthetic run with 20,000 genes and 100 samples,
 both builds produced byte-identical output in 0.21 s, and peak RSS
 fell from 194.5 to 178.9 MiB.
 
+### Direct normalized-count output in R
+
+The R wrapper borrows the original column-major counts and per-cell
+factors. The core streams checked divisions into the R result matrix.
+Invalid factors and division overflow still report the first failing
+cell in logical row order.
+
+All 24 selected Rust tests and 88 R 4.6.2 expectations passed. Paired
+synthetic runs with 60,000 genes and 128 samples produced byte-identical
+results. Peak RSS fell from 269.8 to 182.0 MiB with sample factors and
+from 387.0 to 240.6 MiB with per-cell factors. The smaller probe also
+matched all four error messages exactly.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

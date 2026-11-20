@@ -7,8 +7,7 @@ pub use offsets::normalization_factors_with_offsets;
 
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::math::median::median_in_place;
-use crate::matrix::CountMatrix;
-use crate::matrix::RowMajorMatrix;
+use crate::matrix::{CountMatrix, CountView, MatrixOrder, MatrixView, RowMajorMatrix};
 use crate::options::SizeFactorMethod;
 
 /// Estimate size factors with the selected method.
@@ -121,11 +120,11 @@ pub fn normalized_counts(
         for (sample, count) in counts.row_values(gene).iter().copied().enumerate() {
             values.push(
                 checked::try_div(f64::from(count), size_factors[sample]).map_err(|error| {
-                    DeseqError::NonFiniteValue {
-                        context: "normalized count".to_string(),
-                        index: Some(gene * counts.n_samples() + sample),
-                        value: error.value,
-                    }
+                    normalized_count_error(
+                        "normalized count",
+                        gene * counts.n_samples() + sample,
+                        error.value,
+                    )
                 })?,
             );
         }
@@ -169,15 +168,85 @@ pub fn normalized_counts_with_factors(
             .enumerate()
         {
             values.push(checked::try_div(f64::from(count), factor).map_err(|error| {
-                DeseqError::NonFiniteValue {
-                    context: "normalization-factor normalized count".to_string(),
-                    index: Some(gene * counts.n_samples() + sample),
-                    value: error.value,
-                }
+                normalized_count_error(
+                    "normalization-factor normalized count",
+                    gene * counts.n_samples() + sample,
+                    error.value,
+                )
             })?);
         }
     }
     RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values)
+}
+
+/// Visit normalized counts in column-major order for foreign output buffers.
+/// Cell-specific factors take precedence. The caller discards output on error.
+#[doc(hidden)]
+pub fn visit_normalized_counts_column_major(
+    counts: CountView<'_>,
+    size_factors: &[f64],
+    normalization_factors: Option<MatrixView<'_, f64>>,
+    write: impl FnMut(usize, f64),
+) -> Result<(), DeseqError> {
+    if let Some(factors) = normalization_factors {
+        validate_normalization_factor_view(
+            factors,
+            counts.n_genes(),
+            counts.n_samples(),
+            "normalization factors",
+        )?;
+        visit_normalized_columns(
+            counts,
+            |gene, sample| *factors.at(gene, sample),
+            "normalization-factor normalized count",
+            write,
+        )
+    } else {
+        validate_size_factors(size_factors, counts.n_samples())?;
+        visit_normalized_columns(
+            counts,
+            |_, sample| size_factors[sample],
+            "normalized count",
+            write,
+        )
+    }
+}
+
+fn visit_normalized_columns(
+    counts: CountView<'_>,
+    factor: impl Fn(usize, usize) -> f64,
+    context: &str,
+    mut write: impl FnMut(usize, f64),
+) -> Result<(), DeseqError> {
+    let genes = counts.n_genes();
+    let samples = counts.n_samples();
+    let mut first_error = None;
+    let mut genes_to_check = genes;
+    for sample in 0..samples {
+        for gene in 0..genes_to_check {
+            match checked::try_div(f64::from(counts.at(gene, sample)), factor(gene, sample)) {
+                Ok(value) => write(sample * genes + gene, value),
+                Err(error) => {
+                    first_error = Some((gene * samples + sample, error.value));
+                    // In later columns, only an earlier row can take precedence.
+                    genes_to_check = gene;
+                    break;
+                }
+            }
+        }
+    }
+    if let Some((index, value)) = first_error {
+        return Err(normalized_count_error(context, index, value));
+    }
+    Ok(())
+}
+
+fn normalized_count_error(context: &str, index: usize, value: f64) -> DeseqError {
+    DeseqError::NonFiniteValue {
+        context: context.to_string(),
+        index: Some(index),
+        value,
+    }
 }
 
 /// Validate that normalization factors can be used as DESeq2-style count-scale factors.
@@ -201,15 +270,40 @@ pub(crate) fn validate_normalization_factor_matrix(
     n_samples: usize,
     context: &str,
 ) -> Result<(), DeseqError> {
+    validate_normalization_factor_view(normalization_factors.into(), n_genes, n_samples, context)
+}
+
+fn validate_normalization_factor_view(
+    normalization_factors: MatrixView<'_, f64>,
+    n_genes: usize,
+    n_samples: usize,
+    context: &str,
+) -> Result<(), DeseqError> {
     if normalization_factors.n_rows() != n_genes || normalization_factors.n_cols() != n_samples {
         return Err(DeseqError::InvalidDimensions {
             context: context.to_string(),
             expected: n_genes * n_samples,
-            actual: normalization_factors.len(),
+            actual: normalization_factors.as_slice().len(),
         });
     }
-    for (idx, value) in normalization_factors.as_slice().iter().copied().enumerate() {
-        validate_normalization_factor_value(value, idx)?;
+    if let Some((index, &value)) = normalization_factors
+        .as_slice()
+        .iter()
+        .enumerate()
+        .find(|(_, value)| !value.is_finite() || **value <= 0.0)
+    {
+        if normalization_factors.order() == MatrixOrder::RowMajor {
+            return validate_normalization_factor_value(value, index);
+        }
+        // On invalid input, find the first failing logical cell.
+        for gene in 0..n_genes {
+            for sample in 0..n_samples {
+                validate_normalization_factor_value(
+                    *normalization_factors.at(gene, sample),
+                    gene * n_samples + sample,
+                )?;
+            }
+        }
     }
     Ok(())
 }

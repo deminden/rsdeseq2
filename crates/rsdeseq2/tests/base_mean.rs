@@ -58,6 +58,33 @@ fn normalized_counts_with_factors_reject_overflowed_tiny_factor_division() {
 }
 
 #[test]
+fn column_major_normalization_reports_the_first_logical_row_error() {
+    use rsdeseq2::normalization::visit_normalized_counts_column_major;
+
+    let counts = CountMatrix::from_row_major_u32(2, 2, vec![0, u32::MAX, u32::MAX, 0]).unwrap();
+    let rejected_factors = [1.0, -1.0, 0.0, 1.0];
+    let rejected = MatrixView::new(2, 2, &rejected_factors, MatrixOrder::ColumnMajor).unwrap();
+    let error =
+        visit_normalized_counts_column_major((&counts).into(), &[], Some(rejected), |_, _| {})
+            .unwrap_err();
+    assert!(matches!(
+        error,
+        DeseqError::InvalidParameter { parameter, .. }
+            if parameter == "normalization factor at index 1"
+    ));
+
+    let tiny_factors = [1.0, f64::MIN_POSITIVE, f64::MIN_POSITIVE, 1.0];
+    let tiny = MatrixView::new(2, 2, &tiny_factors, MatrixOrder::ColumnMajor).unwrap();
+    let error = visit_normalized_counts_column_major((&counts).into(), &[], Some(tiny), |_, _| {})
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        DeseqError::NonFiniteValue { context, index: Some(1), .. }
+            if context == "normalization-factor normalized count"
+    ));
+}
+
+#[test]
 fn normalization_factors_validate_dimensions_and_positive_values() {
     let counts = CountMatrix::from_row_major_u32(1, 3, vec![10, 20, 30]).unwrap();
     let bad_dims = RowMajorMatrix::from_row_major(1, 2, vec![1.0, 2.0]).unwrap();
