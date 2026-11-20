@@ -1407,6 +1407,37 @@ passed 1,251 unit and integration tests plus one doctest. The default
 workspace run skipped the two full GTEx replays previously run
 separately.
 
+### Native rlog smoke and full GTEx probability replay
+
+The installed-package smoke test now calls estimated and frozen rlog
+with per-cell factors and an interior all-zero gene. It compares the
+active results against a separate compact fit, using two workers for
+the masked fit and one for the compact fit. It also checks the zero
+row and the returned intercepts and prior.
+
+The R source at `c293eec` produced archive SHA-256
+`d8e2fbacc40feb9cce46a9f24b48077600c2dfa344d0dc9498e45ca3138ebdbe`.
+R 4.6.2 on macOS arm64 installed it with Rust 1.96.0 and an empty
+offline Cargo home. The expanded smoke test passed, as did 113
+expectations across eight transform tests against DESeq2 1.52.0 with
+zero skips. The same archive cross-linked against Windows R 4.5.3
+with Rust 1.96.0. The x64 UCRT DLL exported only `R_init_rsdeseq2`.
+The Intel macOS test executables cross-linked. Native Windows and
+Intel macOS runtime results remain open.
+
+The fixed-dispersion compact and full GTEx panels now also require a
+maximum absolute log10 error of `1e-5` for p-values and adjusted
+p-values. The release workflow replays the full fixture under both
+numerical profiles with one release test build. The frozen reference
+hashes and compact selection were verified before replay. The full
+normalization and Wald tests passed under both profiles on macOS arm64,
+Linux arm64 and Linux x86_64 under QEMU. On all three targets, maximum
+log10 error was `4.142e-7` under the host R profile and `7.167e-8`
+under the portable profile for both probabilities. No significance
+decisions flipped at either cutoff. The compact checks passed under
+both profiles on macOS. Integration Clippy, the Rust 1.96.0 all-targets
+check, workflow lint, formatting and documentation checks passed.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |
@@ -1416,7 +1447,7 @@ separately.
 | 3. Borrowed offsets | Sample factors stay in a sample vector through fitting. Selected dispersion, Wald, LRT, beta-prior and rlog fits borrow source rows. Where the API returns gene-by-sample factors, the matrix is created for that output. |
 | 4. Numerical profiles | The crate and CLI default to portable arithmetic. The R bridge selects its host profile. The [platform workflow](../../.github/workflows/platform-checks.yml) checks the release panel and portable golden hashes on five targets. Native Intel macOS and Windows x64 runtime results are still open. |
 | 5. One workflow entry point | The builder, CLI and R bridge use `DeseqBuilder::run(&Analysis)`. The [API migration](../design/run-entry-point.md) keeps deprecated wrappers in 0.6 and schedules removal in 0.7. |
-| 6. Real-data probability gates | The compact GTEx gate checks log-scale probability, nonfinite values, underflow and significance flips. Both full 56,200-gene replays passed separately under both profiles at the [local release checkpoint](#batched-local-060-release-validation). |
+| 6. Real-data probability gates | The compact GTEx gate checks log-scale probability, nonfinite values, underflow and significance flips. The [full replay](#native-rlog-smoke-and-full-gtex-probability-replay) checks all 56,200 genes under both profiles, including log-scale error for p-values and adjusted p-values. |
 | 7. Shared checked arithmetic | `rcompat-numeric` owns the checked arithmetic, matrix allocation and validation primitives. The [summation rules](../summation-rules.md) specify the reduction used for each R primitive. |
 | 8. Structured errors | The non-exhaustive error enum carries domains, dimensions, indices and rejected values. The [diagnostics work](#structured-design-and-glm-diagnostics) covers the early input stages, GLM, contrasts and probability calculations. |
 | 9. Rank and initial coefficients | `aaea914` implemented R's rank rule and `1977237` aligned rank-deficient starts. The independently generated rank reference includes scaled near-collinear designs. |

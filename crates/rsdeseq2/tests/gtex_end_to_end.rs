@@ -69,14 +69,7 @@ fn compare(
             (Some(a), Some(e)) if a.is_finite() && e.is_finite() => {
                 gap.abs = gap.abs.max((a - e).abs());
                 if log_scale {
-                    let log_gap = match (*a, *e) {
-                        (0.0, 0.0) => 0.0,
-                        (a, e) if a > 0.0 && a <= 1.0 && e > 0.0 && e <= 1.0 => {
-                            (a.log10() - e.log10()).abs()
-                        }
-                        _ => f64::INFINITY,
-                    };
-                    gap.log10 = gap.log10.max(log_gap);
+                    gap.log10 = gap.log10.max(common::probability_log10_error(*a, *e));
                 }
             }
             (None, None) => {}

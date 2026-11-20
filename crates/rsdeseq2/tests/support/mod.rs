@@ -344,6 +344,15 @@ pub fn assert_option_close(
     }
 }
 
+/// Log10 gap between valid probabilities, with zero requiring an exact match.
+pub fn probability_log10_error(actual: f64, expected: f64) -> f64 {
+    match (actual, expected) {
+        (0.0, 0.0) => 0.0,
+        (a, e) if a > 0.0 && a <= 1.0 && e > 0.0 && e <= 1.0 => (a.log10() - e.log10()).abs(),
+        _ => f64::INFINITY,
+    }
+}
+
 /// Genes whose significance at `alpha` differs between `actual` and
 /// `expected` adjusted p-values; a missing value counts as not significant.
 /// Parity tests treat any flip as a failure.

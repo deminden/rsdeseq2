@@ -173,6 +173,7 @@ fn check_wald(compact: bool) {
     let columns = ["baseMean", "log2FoldChange", "lfcSE", "stat", "pvalue"];
     let indexes = columns.map(|name| reference.column(name));
     let mut max_errors = [0.0_f64; 6];
+    let mut max_probability_log_errors = [0.0_f64; 2];
     let padj = reference_padj(&reference);
     let mut actual_padj = Vec::new();
     let mut expected_padj = Vec::new();
@@ -214,6 +215,15 @@ fn check_wald(compact: bool) {
                 [1e-6, 1e-5, 1e-6, 1e-5, 1e-6, 1e-6][slot],
                 &label,
             ));
+            if slot >= 4
+                && let (Some(actual), Some(expected)) =
+                    (actual_values[slot], expected_values_all[slot])
+            {
+                let error = common::probability_log10_error(actual, expected);
+                assert!(error <= 1e-5, "{label}: log10 error {error:e} > 1e-5");
+                let max_error = &mut max_probability_log_errors[slot - 4];
+                *max_error = max_error.max(error);
+            }
         }
         if expected_values[1].is_some()
             && expected_values[2].is_some()
@@ -232,7 +242,10 @@ fn check_wald(compact: bool) {
         max_errors[4],
         max_size_factor_relative_error
     );
-    eprintln!("padj max absolute error={:.3e}", max_errors[5]);
+    eprintln!(
+        "padj max absolute error={:.3e}; max log10 errors pvalue={:.3e}, padj={:.3e}",
+        max_errors[5], max_probability_log_errors[0], max_probability_log_errors[1]
+    );
     for alpha in [0.05, 0.1] {
         let flips = common::significance_flips(&actual_padj, &expected_padj, alpha);
         assert_eq!(

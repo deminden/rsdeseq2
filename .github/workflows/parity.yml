@@ -45,5 +45,10 @@ jobs:
         env:
           RSDESEQ2_FULL_GTEX: '1'
         run: python3 -m unittest scripts.tests.test_gtex_parity_tools.CompactFixtureTests
-      - name: All 56,200 genes, normalization factors and six Wald result columns
-        run: cargo test --locked -p rsdeseq2 --test integration gtex_real_wald_parity::full_gtex_ -- --ignored --nocapture
+      - name: Full normalization and Wald replay under both numerical profiles
+        shell: bash
+        run: |
+          for profile in r-host portable; do
+            RSDESEQ2_NUMERIC_PROFILE="$profile" cargo test --release --locked -p rsdeseq2 \
+              --test integration gtex_real_wald_parity::full_gtex_ -- --ignored --nocapture
+          done

@@ -68,19 +68,24 @@ Ordinary tests fit a fixed-dispersion panel of **512 genes × all 61 samples**,
 selected from count/reference tails, quantiles, missingness and deterministic
 background coverage. It checks all six result fields and both directions of
 missingness. Full-cohort size factors and final dispersions are supplied; the
-subset's BH-adjusted p-values are recomputed for that subset.
+subset's BH-adjusted p-values are recomputed for that subset. The compact
+and full fixed-dispersion replays both enforce a log10 error of at most
+`1e-5` for p-values and adjusted p-values.
 
 The opt-in full replay covers all genes and independently checks their
-normalization. Restore the frozen full tables by SHA-256 from Git before
-running the full replay or generating new contrasts. See the
+normalization. Release CI runs it under the host R and portable profiles.
+Restore the frozen full tables by SHA-256 from Git before running the full
+replay or generating new contrasts. See the
 [fixture description](../crates/rsdeseq2/tests/data/gtex_v8_real_wald/README.md).
 
 ```sh
 cargo test --locked --workspace
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 python3 scripts/references/stage_gtex_full_fixture.py --fetch
-cargo test --locked -p rsdeseq2 --test integration gtex_real_wald_parity::full_gtex_ \
-  -- --ignored --nocapture
+for profile in r-host portable; do
+  RSDESEQ2_NUMERIC_PROFILE="$profile" cargo test --release --locked -p rsdeseq2 \
+    --test integration gtex_real_wald_parity::full_gtex_ -- --ignored --nocapture
+done
 ```
 
 Significance agreement on the eleven contrasts (log10 errors of small p-values,
@@ -122,7 +127,9 @@ The Windows x64 job installs the source archive checked by the Linux
 reference lane with Cargo offline. It runs
 `scripts/validation/check_r_native_install.R LIBRARY` to check registered
 routine arities, normalization, recovery after a rejected count buffer and
-agreement between one- and two-worker fits.
+agreement between one- and two-worker fits. It also checks estimated and
+frozen rlog with per-cell factors and an all-zero row against fits on the
+active rows.
 
 ## Platform arithmetic and native safety
 
