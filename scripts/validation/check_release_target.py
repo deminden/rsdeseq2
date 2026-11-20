@@ -45,7 +45,8 @@ def main():
     )
     subprocess.run(
         ['cargo', 'test', *build, '--test', 'integration', '--',
-         'bounded_posterior::', 'beta_prior_run::', 'gtex_end_to_end::',
+         'adaptive_result::', 'bounded_posterior::', 'location_shrinkage::',
+         'beta_prior_run::', 'gtex_end_to_end::',
          'numeric_transform::', 'formula_expression::', 'formula_fitting::',
          'native_formula::', 'model_matrix::'],
         cwd=ROOT, check=True, env=portable_env,

@@ -20,6 +20,36 @@ pub(super) fn log_interval_mass(a: f64, b: f64) -> f64 {
     symmetric_log_mass(a, b, normal_log_cdf)
 }
 
+pub(super) fn far_tail_cdf(a: f64, t: f64, b: f64, estimate: f64, se: f64) -> Option<f64> {
+    let estimate_left = estimate < a;
+    let (distance, near_width, far_width) = if estimate_left {
+        ((a - estimate) / se, t - a, b - t)
+    } else {
+        ((estimate - b) / se, b - t, t - a)
+    };
+    if !distance.is_finite() || distance < 65_536.0 {
+        return None;
+    }
+    // Beyond this distance the leading Mills ratio 1/d gives the relative
+    // tail probabilities to f64 precision. Difference the squared distances
+    // analytically using the original interval widths.
+    let log_tail_ratio = |d: f64, step: f64| -(d + 0.5 * step) * step - (step / d).ln_1p_p();
+    let near_step = near_width / se;
+    let near_tail = log_tail_ratio(distance, near_step);
+    let full_mass = -log_tail_ratio(distance, (b - a) / se).exp_m1_p();
+    if full_mass == 0.0 {
+        return None;
+    }
+    let mass = if estimate_left {
+        -near_tail.exp_m1_p()
+    } else if near_tail == f64::NEG_INFINITY {
+        0.0
+    } else {
+        near_tail.exp_p() * -log_tail_ratio(distance + near_step, far_width / se).exp_m1_p()
+    };
+    Some((mass / full_mass).clamp(0.0, 1.0))
+}
+
 pub(super) fn narrow_interval(a: f64, b: f64, estimate: f64, se: f64) -> Option<NarrowInterval> {
     let half = ((b - a) / se) / 2.0;
     let center = (a.midpoint(b) - estimate) / se;

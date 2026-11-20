@@ -1823,6 +1823,29 @@ arm64 and Linux x86_64 under QEMU 10.0.13. The release panel now runs these
 checks under portable arithmetic. The portable integration audit passed
 1,027 tests and has five remaining shrinkage failures.
 
+### Portable uniform posterior CDFs and adaptive summaries
+
+The portable uniform CDF now divides interval masses directly. Extremely
+small Gaussian masses use an endpoint-relative tail ratio so nearby log
+probabilities retain their difference. With estimates of ±1,000,000 and
+standard error 0.001, a symmetric uniform prior gives mirrored probabilities
+at cutoffs one posterior scale from the endpoints. In the adaptive mixture
+case, the corresponding extreme estimates both receive an s-value of zero.
+The analytic checks also cover the central observation and all three
+posterior means and SDs. The R-host replay uses the frozen ashr outputs.
+
+One fixed uniform batch has two analytically equal local false discovery
+rates. Its portable replay checks both cumulative q-values in the order
+determined by the computed rates, with row order breaking exact ties.
+All other fields keep the frozen comparisons. The release checks now include
+both adaptive-query and complete-location replays in the portable profile.
+
+The targeted macOS arm64 checks passed 16 tests in each profile, and both
+golden manifests matched all 8,032 fields. The five affected tests also
+passed in both profiles on Linux arm64 and Linux x86_64 under QEMU 10.0.13.
+Shrinkage Clippy passed. Three portable mode-search comparisons from the
+preceding audit remain open.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |

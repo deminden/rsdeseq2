@@ -70,22 +70,37 @@ impl PortableLocation {
         if let Some(interval) = self.narrow_interval(a, b, estimate, se) {
             return interval.log_density(se);
         }
+        self.log_interval_mass(a, b, estimate, se) - (b - a).ln_p()
+    }
+
+    fn log_interval_mass(self, a: f64, b: f64, estimate: f64, se: f64) -> f64 {
         let alpha = (a - estimate) / se;
         let beta = (b - estimate) / se;
-        let mass = match self {
+        match self {
             Self::Normal => truncated_standard::log_interval_mass(alpha, beta),
             Self::StudentT(df) => student_t::log_interval_mass(alpha, beta, df),
-        };
-        mass - (b - a).ln_p()
+        }
     }
 
     fn interval_cdf(self, a: f64, t: f64, b: f64, estimate: f64, se: f64) -> f64 {
         if t == a {
             return 0.0;
         }
-        let partial = self.log_average_density(a, t, estimate, se);
-        let full = self.log_average_density(a, b, estimate, se);
-        (partial - full + ((t - a).ln_p() - (b - a).ln_p()))
+        if matches!(self, Self::Normal)
+            && let Some(cdf) = truncated_standard::far_tail_cdf(a, t, b, estimate, se)
+        {
+            return cdf;
+        }
+        // Ordinary interval masses already include the width. For narrow
+        // intervals, defer the width correction until after subtracting the
+        // log densities so it survives even when the densities are tiny.
+        let log_mass_terms = |end| match self.narrow_interval(a, end, estimate, se) {
+            Some(interval) => (interval.log_density(se), (end - a).ln_p()),
+            None => (self.log_interval_mass(a, end, estimate, se), 0.0),
+        };
+        let (partial, partial_width) = log_mass_terms(t);
+        let (full, full_width) = log_mass_terms(b);
+        ((partial - full) + (partial_width - full_width))
             .exp_p()
             .clamp(0.0, 1.0)
     }

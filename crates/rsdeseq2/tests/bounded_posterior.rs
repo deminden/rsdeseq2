@@ -333,6 +333,20 @@ fn uniform_point_masses_boundaries_and_invalid_inputs_remain_explicit() {
         assert!((p.mean() - 0.999_997_435_897_773).abs() < 1e-12);
         assert!((p.standard_deviation() - 2.564_102_058_362_641e-6).abs() < 1e-12);
         assert_eq!(p.cdf(0.), 0.);
+
+        let estimate = 1e6;
+        let se = 0.001_f64;
+        let cutoff = 1.0 - 1e-12;
+        // The squared-distance correction to the limiting exponential is
+        // below f64 precision at one endpoint scale in this case.
+        let log_tail = -((estimate - 1.0) / se.powi(2)) * (1.0 - cutoff);
+        for (x, threshold, expected) in [
+            (estimate, cutoff, log_tail.exp()),
+            (-estimate, -cutoff, -log_tail.exp_m1()),
+        ] {
+            let cdf = prior.cdf_values(x, se, &[threshold]).unwrap()[0];
+            assert!((cdf - expected).abs() < 5e-15, "{cdf} != {expected}");
+        }
     } else {
         assert!(p.mean().is_nan());
         assert!(p.standard_deviation().is_nan());
