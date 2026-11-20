@@ -36,7 +36,7 @@ fn rank_deficient_start_overwrites_reused_coefficients() {
 #[test]
 fn qr_triangle_keeps_lu_signed_zeros_and_subnormal_pivots() {
     let mut triangular = DMatrix::zeros(4, 4);
-    for first_pivot in [2.0, f64::from_bits(1)] {
+    for first_pivot in [2.0, f64::from_bits(1), 0.0, 2.0] {
         let upper = DMatrix::from_row_slice(
             4,
             4,
@@ -62,7 +62,7 @@ fn qr_triangle_keeps_lu_signed_zeros_and_subnormal_pivots() {
         let diagonal = [first_pivot, 3.0, 4.0, 5.0];
         let mut response = DVector::from_vec(vec![-0.0, -0.0, -6.0, 0.0]);
         let expected = upper.clone().lu().solve(&response);
-        let solved = solve_qr_triangle(&upper, &diagonal, &mut triangular, &mut response).unwrap();
+        let solved = solve_qr_triangle(&upper, &diagonal, &mut triangular, &mut response);
 
         assert_eq!(solved, expected.is_some());
         if let Some(expected) = expected {
@@ -176,6 +176,67 @@ fn unretained_covariance_keeps_off_diagonal_overflow_check() {
             retain_covariance_on_log2_scale(&covariance, destination, 10, "covariance test"),
             Err(DeseqError::NonFiniteValue {index:Some(11), context, ..}) if context == "covariance test"
         ));
+    }
+}
+
+#[test]
+fn reusable_covariance_inverse_matches_nalgebra_after_singular_fits() {
+    let mut scratch = CovarianceScratch::default();
+    for p in [4, 5, 9] {
+        let samples = p + 3;
+        let design = DMatrix::from_fn(samples, p, |row, col| {
+            let spike = if row == col { 3.0 } else { 0.0 };
+            let value = spike + ((row * 11 + col * 17) % 29) as f64 / 29.0 - 0.5;
+            if col == 0 { value / 32.0 } else { value }
+        });
+        let ridge = (0..p)
+            .map(|col| (col + 1) as f64 / 4096.0)
+            .collect::<Vec<_>>();
+        for pass in 0..2 {
+            let weights = (0..samples)
+                .map(|sample| 0.5 + (sample + pass) as f64 / 13.0)
+                .collect::<Vec<_>>();
+            let crossproduct = xtwx_without_ridge(&design, &weights).unwrap();
+            let mut regularized = crossproduct.clone();
+            for (col, value) in ridge.iter().copied().enumerate() {
+                regularized[(col, col)] += value;
+            }
+            assert!(regularized.column(0).icamax() > 0);
+            let inverse = regularized.try_inverse().unwrap();
+            let expected = (&inverse * crossproduct) * inverse;
+            let computed = covariance_and_hat_diagonal(
+                &mut scratch,
+                &design,
+                &weights,
+                &ridge,
+                None,
+                None,
+                true,
+            )
+            .unwrap();
+            let Some(FitCovariance::Full(actual)) = computed else {
+                panic!("expected covariance for {p} coefficients");
+            };
+            for (index, (actual, expected)) in actual.iter().zip(expected.iter()).enumerate() {
+                assert_eq!(
+                    actual.to_bits(),
+                    expected.to_bits(),
+                    "{p} columns, entry {index}"
+                );
+            }
+
+            let singular = covariance_and_hat_diagonal(
+                &mut scratch,
+                &design,
+                &vec![0.0; samples],
+                &vec![0.0; p],
+                None,
+                None,
+                true,
+            )
+            .unwrap();
+            assert!(singular.is_none());
+        }
     }
 }
 

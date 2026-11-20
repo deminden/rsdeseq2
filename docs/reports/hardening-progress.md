@@ -900,9 +900,17 @@ The IRLS optimizer penalty reuses the gradient and Hessian buffers.
 The 164 focused Rust tests and workspace Clippy passed. The oversized
 workspace regression covers QR, normal equations and covariance and checks
 that each workspace can complete a valid solve after the error. Both
-numeric profiles matched their 8,032-field golden manifest. Scratch
-allocated internally by nalgebra's wide covariance inverse remains a
-separate performance and allocation-hardening item.
+numeric profiles matched their 8,032-field golden manifest.
+
+The covariance calculation now uses its existing product matrix for pivoted
+LU on wider designs. The four-coefficient case uses nalgebra's original
+closed form with a stack copy. The rare QR path for irregular pivots also
+solves in its existing triangular buffer. Its lower triangle is cleared
+before reuse. Tests compared covariance bits with nalgebra at four, five
+and nine coefficients, including pivot swaps and reuse after a singular fit.
+The QR comparison includes a subnormal pivot and a successful retry. Each
+profile passed 85 focused tests, including the independent covariance
+reference, and matched all 8,032 golden fields. Workspace Clippy passed.
 
 ### Mutation workflow verification
 

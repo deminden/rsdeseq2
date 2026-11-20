@@ -1,4 +1,5 @@
 use super::*;
+use nalgebra::{Dim, Dyn, Matrix, Matrix4, StorageMut};
 // Weighted least squares, QR, covariance and design crossproducts.
 
 #[derive(Default)]
@@ -120,7 +121,7 @@ pub(super) fn solve_weighted_least_squares_qr(
         }
         coefficients.copy_from(&augmented_response.rows(0, p));
     }
-    if !solve_qr_triangle(augmented_design, diagonal, triangular, coefficients)? {
+    if !solve_qr_triangle(augmented_design, diagonal, triangular, coefficients) {
         return Ok(false);
     }
     std::mem::swap(coefficients, beta);
@@ -178,7 +179,7 @@ pub(super) fn solve_qr_triangle(
     diagonal: &[f64],
     triangular: &mut DMatrix<f64>,
     coefficients: &mut DVector<f64>,
-) -> Result<bool, DeseqError> {
+) -> bool {
     let p = diagonal.len();
     let mut regular = true;
     for col in 0..p {
@@ -206,18 +207,23 @@ pub(super) fn solve_qr_triangle(
         let needs_lower_solve = coefficients
             .iter()
             .any(|value| !value.is_finite() || value.to_bits() == (-0.0_f64).to_bits());
-        Ok((!needs_lower_solve
-            || triangular.solve_lower_triangular_with_diag_mut(coefficients, 1.0))
-            && triangular.solve_upper_triangular_mut(coefficients))
+        (!needs_lower_solve || triangular.solve_lower_triangular_with_diag_mut(coefficients, 1.0))
+            && triangular.solve_upper_triangular_mut(coefficients)
     } else {
         for col in 0..p {
             for row in 0..col {
                 triangular[(row, col)] = augmented_design[(row, col)];
             }
         }
-        let mut values = try_alloc_matrix(p, p, "IRLS QR LU fallback matrix")?;
-        values.extend_from_slice(triangular.as_slice());
-        Ok(DMatrix::from_vec(p, p, values).lu().solve_mut(coefficients))
+        let solved = solve_lu_in_place(triangular, coefficients);
+        // The next QR solve overwrites the upper triangle only.
+        for col in 0..p {
+            triangular
+                .column_mut(col)
+                .rows_range_mut(col + 1..)
+                .fill(0.0);
+        }
+        solved
     }
 }
 
@@ -264,7 +270,7 @@ pub(super) fn covariance_and_hat_diagonal<'a>(
         active,
     } = scratch;
     if fill_xtwx(x, w, crossproduct, active).is_none()
-        || invert_regularized_crossproduct(crossproduct, ridge_lambda, inverse).is_none()
+        || invert_regularized_crossproduct(crossproduct, ridge_lambda, inverse, product).is_none()
     {
         return Ok(None);
     }
@@ -300,12 +306,35 @@ fn invert_regularized_crossproduct(
     crossproduct: &DMatrix<f64>,
     ridge_lambda: &[f64],
     inverse: &mut DMatrix<f64>,
+    product: &mut DMatrix<f64>,
 ) -> Option<()> {
-    inverse.copy_from(crossproduct);
+    let p = crossproduct.ncols();
+    // Once the inverse is ready, the covariance multiply overwrites product.
+    // Reuse it for the wide pivoted LU that otherwise clones the input.
+    let regularized = if p > 4 { &mut *product } else { &mut *inverse };
+    regularized.copy_from(crossproduct);
     for (diagonal, &ridge) in ridge_lambda.iter().enumerate() {
-        inverse[(diagonal, diagonal)] = checked::add(inverse[(diagonal, diagonal)], ridge)?;
+        let entry = &mut regularized[(diagonal, diagonal)];
+        *entry = checked::add(*entry, ridge)?;
     }
-    inverse.try_inverse_mut().then_some(())
+    let invertible = match p {
+        0..=3 => inverse.try_inverse_mut(),
+        4 => {
+            // The four-coefficient inverse uses nalgebra's same closed form
+            // with a fixed-size copy so the temporary stays on the stack.
+            let mut small = Matrix4::from_column_slice(inverse.as_slice());
+            if !small.try_inverse_mut() {
+                return None;
+            }
+            inverse.as_mut_slice().copy_from_slice(small.as_slice());
+            true
+        }
+        _ => {
+            inverse.fill_with_identity();
+            solve_lu_in_place(product, inverse)
+        }
+    };
+    invertible.then_some(())
 }
 
 pub(super) fn covariance_diagonal_is_positive(
@@ -464,7 +493,10 @@ fn fill_normal_equations(
     Some(())
 }
 
-fn solve_lu_in_place(matrix: &mut DMatrix<f64>, response: &mut DVector<f64>) -> bool {
+fn solve_lu_in_place<C: Dim, S: StorageMut<f64, Dyn, C>>(
+    matrix: &mut DMatrix<f64>,
+    response: &mut Matrix<f64, Dyn, C, S>,
+) -> bool {
     use nalgebra::linalg::{gauss_step, gauss_step_swap};
 
     let p = matrix.ncols();
@@ -472,7 +504,7 @@ fn solve_lu_in_place(matrix: &mut DMatrix<f64>, response: &mut DVector<f64>) -> 
         let pivot = matrix.view_range(col.., col).icamax() + col;
         let value = matrix[(pivot, col)];
         if value == 0.0 {
-            continue;
+            return false;
         }
         if pivot == col {
             gauss_step(matrix, value, col);

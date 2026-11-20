@@ -117,6 +117,7 @@ versions live in [docs/releases](docs/releases/).
 - IRLS and Cox-Reid use checked allocation for fit workspaces. An IRLS
   workspace allocation failure carries its context and stops the fit.
   A failed numerical solve still follows the existing refit rules.
+  Covariance inversion and the exceptional QR solve reuse existing scratch.
 
 - Size-factor estimation filters unusable geometric means once, reuses one
   log-ratio buffer across samples and selects the median in place.
