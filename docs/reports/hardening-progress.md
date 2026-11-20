@@ -1201,6 +1201,18 @@ headers and DLL on Linux arm64. The check used R's own Windows
 had no `libunwind.dll` or `msvcrt.dll` import. Native Windows
 installation and runtime checks remain open.
 
+### Native Windows R workflow
+
+The R workflow installs the Linux reference lane's checked source archive
+on Windows x64 with Cargo offline. The smoke script checks DLL
+registration, normalization, recovery after a native error and agreement
+between one- and two-worker fits. The Windows job is required by the
+reusable R workflow used in release validation.
+
+The smoke script passed on the macOS arm64 R 4.5.3 and 4.6.2
+installations. Workflow lint passed and the x64 LLVM-MinGW driver path
+was verified in the pinned ZIP. The hosted Windows run remains open.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

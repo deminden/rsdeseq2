@@ -191,3 +191,55 @@ jobs:
             ${{ steps.r-source.outputs.archive }}
             R-reference-session.txt
           if-no-files-found: error
+
+  windows-native:
+    needs: r
+    runs-on: windows-latest
+    env:
+      CARGO_BUILD_JOBS: '2'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: r-lib/actions/setup-r@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
+        with:
+          r-version: '4.6.2'
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
+        with:
+          toolchain: '1.96.0'
+          targets: x86_64-pc-windows-gnullvm
+      - name: Prepare UCRT LLVM-MinGW
+        shell: pwsh
+        run: |
+          $release = '20261117'
+          $toolchain = "llvm-mingw-$release-ucrt-x86_64"
+          $zip = Join-Path $env:RUNNER_TEMP "$toolchain.zip"
+          Invoke-WebRequest "https://github.com/mstorsjo/llvm-mingw/releases/download/$release/$toolchain.zip" -OutFile $zip
+          $expected = '4d002e330a0f703625aa5ccbc37e96f8f824413e163bfc7336774aabd2c3a412'
+          if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash -ne $expected) {
+            throw 'LLVM-MinGW archive checksum mismatch'
+          }
+          $directory = Join-Path $env:RUNNER_TEMP 'llvm-mingw'
+          Expand-Archive -LiteralPath $zip -DestinationPath $directory
+          $bin = Join-Path $directory "$toolchain/bin"
+          if (!(Test-Path -LiteralPath (Join-Path $bin 'x86_64-w64-mingw32-clang.exe') -PathType Leaf)) {
+            throw 'Missing x86_64 LLVM-MinGW driver'
+          }
+          $bin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Download checked R source
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: r-source-${{ github.sha }}
+          path: ${{ runner.temp }}/checked-r-source
+      - name: Install offline and exercise native routines
+        shell: pwsh
+        env:
+          CARGO_NET_OFFLINE: 'true'
+          RUSTUP_TOOLCHAIN: '1.96.0'
+        run: |
+          $source = Join-Path $env:RUNNER_TEMP 'checked-r-source'
+          $archive = Get-ChildItem -LiteralPath $source -File -Filter 'rsdeseq2_*.tar.gz'
+          if (@($archive).Count -ne 1) { throw 'Expected one checked R source archive' }
+          $library = Join-Path $env:RUNNER_TEMP 'rsdeseq2-r-library'
+          [void](New-Item -ItemType Directory -Path $library)
+          R.exe CMD INSTALL "--library=$library" $archive.FullName
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Rscript.exe --vanilla scripts/validation/check_r_native_install.R $library

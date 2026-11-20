@@ -118,6 +118,12 @@ Use fresh output directories. `.github/workflows/r.yml` lists the complete
 matrix/fresh-fit, expression, factor, frozen-local, mixture, posterior, warning
 and live-reference identity panels; it is the executable combined gate.
 
+The Windows x64 job installs the source archive checked by the Linux
+reference lane with Cargo offline. It runs
+`scripts/validation/check_r_native_install.R LIBRARY` to check registered
+routine arities, normalization, recovery after a rejected count buffer and
+agreement between one- and two-worker fits.
+
 ## Platform arithmetic and native safety
 
 The pinned Linux lane independently regenerates seven formula panels under
