@@ -5,6 +5,50 @@ use approx::assert_relative_eq;
 use serde::Deserialize;
 
 #[test]
+fn qr_triangle_keeps_lu_signed_zeros_and_subnormal_pivots() {
+    let mut triangular = DMatrix::zeros(4, 4);
+    for first_pivot in [2.0, f64::from_bits(1)] {
+        let upper = DMatrix::from_row_slice(
+            4,
+            4,
+            &[
+                first_pivot,
+                -2.0,
+                -0.0,
+                -1.0,
+                0.0,
+                3.0,
+                -0.0,
+                -0.0,
+                0.0,
+                0.0,
+                4.0,
+                -0.0,
+                0.0,
+                0.0,
+                0.0,
+                5.0,
+            ],
+        );
+        let diagonal = [first_pivot, 3.0, 4.0, 5.0];
+        let mut response = DVector::from_vec(vec![-0.0, -0.0, -6.0, 0.0]);
+        let expected = upper.clone().lu().solve(&response);
+        let solved = solve_qr_triangle(&upper, &diagonal, &mut triangular, &mut response);
+
+        assert_eq!(solved, expected.is_some());
+        if let Some(expected) = expected {
+            for (actual, reference) in response.iter().zip(expected.iter()) {
+                assert_eq!(actual.to_bits(), reference.to_bits());
+            }
+        }
+        if first_pivot.is_normal() {
+            assert_eq!(triangular[(0, 2)].to_bits(), (-0.0_f64).to_bits());
+            assert_eq!(triangular[(1, 2)].to_bits(), 0.0_f64.to_bits());
+        }
+    }
+}
+
+#[test]
 fn transient_covariance_preserves_all_retained_fields_and_fallbacks() {
     let counts = CountMatrix::from_row_major_u32(
         3,
@@ -446,7 +490,19 @@ fn weighted_least_squares_helpers_reject_nonfinite_accumulation() {
     assert!(xtwx_without_ridge(&x, &[2.0]).is_none());
 
     let unit_x = DMatrix::from_row_slice(1, 1, &[1.0]);
-    assert!(solve_weighted_least_squares_qr(&unit_x, &[4.0], &[f64::MAX], &[0.0]).is_none());
+    let mut beta = DVector::from_element(1, 1.0);
+    assert!(
+        solve_weighted_least_squares_qr(
+            &mut QrScratch::default(),
+            &unit_x,
+            &[4.0],
+            &[f64::MAX],
+            &[0.0],
+            &mut beta,
+        )
+        .is_none()
+    );
+    assert_eq!(beta[0], 1.0);
 }
 
 #[test]

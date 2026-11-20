@@ -10,6 +10,7 @@ pub(super) struct IrlsScratch {
     weights: Vec<f64>,
     response: Vec<f64>,
     covariance: Vec<f64>,
+    qr: QrScratch,
 }
 
 pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
@@ -33,6 +34,7 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
         weights: w,
         response: z,
         covariance: transient_covariance,
+        qr,
     } = scratch;
     y.clear();
     y.extend(count_row.iter().copied().map(f64::from));
@@ -66,13 +68,20 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
         iter += 1;
         working_weights_into(mu, dispersion, weight_row, w)?;
         working_response_into(mu, nf, y, Some(log_nf), z)?;
-        let Some(next_beta) =
-            solve_weighted_least_squares(input.x, w, z, input.ridge_lambda, input.options.solver)
-        else {
+        if solve_weighted_least_squares(
+            qr,
+            input.x,
+            w,
+            z,
+            input.ridge_lambda,
+            input.options.solver,
+            &mut beta,
+        )
+        .is_none()
+        {
             iter = input.options.maxit;
             break;
-        };
-        beta = next_beta;
+        }
         if beta
             .iter()
             .any(|value| !value.is_finite() || value.abs() > input.options.max_beta_abs)

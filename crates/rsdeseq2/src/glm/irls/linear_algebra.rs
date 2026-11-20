@@ -1,54 +1,169 @@
 use super::*;
 // Weighted least squares, QR, covariance and design crossproducts.
 
+#[derive(Default)]
+pub(super) struct QrScratch {
+    augmented_design: DMatrix<f64>,
+    augmented_response: DVector<f64>,
+    sqrt_weights: Vec<f64>,
+    diagonal: Vec<f64>,
+    basis: DMatrix<f64>,
+    transposed_basis: DMatrix<f64>,
+    triangular: DMatrix<f64>,
+    coefficients: DVector<f64>,
+}
+
 pub(super) fn solve_weighted_least_squares(
+    scratch: &mut QrScratch,
     x: &DMatrix<f64>,
     w: &[f64],
     z: &[f64],
     ridge_lambda: &[f64],
     solver: IrlsSolver,
-) -> Option<DVector<f64>> {
+    beta: &mut DVector<f64>,
+) -> Option<()> {
     match solver {
         IrlsSolver::NormalEquations => {
             let (xtwx, xtwz) = xtwx_and_xtwz(x, w, z, ridge_lambda)?;
-            xtwx.lu().solve(&xtwz)
+            *beta = xtwx.lu().solve(&xtwz)?;
+            Some(())
         }
-        IrlsSolver::Qr => solve_weighted_least_squares_qr(x, w, z, ridge_lambda),
+        IrlsSolver::Qr => solve_weighted_least_squares_qr(scratch, x, w, z, ridge_lambda, beta),
     }
 }
 
 pub(super) fn solve_weighted_least_squares_qr(
+    scratch: &mut QrScratch,
     x: &DMatrix<f64>,
     w: &[f64],
     z: &[f64],
     ridge_lambda: &[f64],
-) -> Option<DVector<f64>> {
+    beta: &mut DVector<f64>,
+) -> Option<()> {
+    use nalgebra::{
+        ComplexField, Unit, geometry::Reflection, linalg::householder::clear_column_unchecked,
+    };
+
     let n = x.nrows();
     let p = x.ncols();
-    let mut augmented_x = DMatrix::zeros(n + p, p);
-    let mut augmented_z = DVector::zeros(n + p);
-    for row in 0..n {
-        let sqrt_weight = w[row].sqrt();
+    let m = n + p;
+    if scratch.augmented_design.shape() != (m, p) {
+        scratch.augmented_design = DMatrix::zeros(m, p);
+        scratch.augmented_response = DVector::zeros(m);
+        scratch.sqrt_weights.resize(n, 0.0);
+        scratch.diagonal.resize(p, 0.0);
+        scratch.basis = DMatrix::zeros(m, p);
+        scratch.transposed_basis = DMatrix::zeros(p, m);
+        scratch.triangular = DMatrix::zeros(p, p);
+        scratch.coefficients = DVector::zeros(p);
+    }
+
+    let QrScratch {
+        augmented_design,
+        augmented_response,
+        sqrt_weights,
+        diagonal,
+        basis,
+        transposed_basis,
+        triangular,
+        coefficients,
+    } = scratch;
+
+    for (row, sqrt_weight) in sqrt_weights.iter_mut().enumerate() {
+        *sqrt_weight = w[row].sqrt();
         if !sqrt_weight.is_finite() {
             return None;
         }
-        augmented_z[row] = checked::mul(z[row], sqrt_weight)?;
-        for col in 0..p {
-            augmented_x[(row, col)] = checked::mul(x[(row, col)], sqrt_weight)?;
-        }
+        augmented_response[row] = checked::mul(z[row], *sqrt_weight)?;
     }
-    for col in 0..p {
+
+    for (col, (mut column, original)) in augmented_design
+        .column_iter_mut()
+        .zip(x.column_iter())
+        .enumerate()
+    {
+        let column = column.as_mut_slice();
+        for ((target, design_value), sqrt_weight) in column[..n]
+            .iter_mut()
+            .zip(original.as_slice())
+            .zip(&*sqrt_weights)
+        {
+            *target = checked::mul(*design_value, *sqrt_weight)?;
+        }
         let sqrt_ridge = ridge_lambda[col].sqrt();
         if !sqrt_ridge.is_finite() {
             return None;
         }
-        augmented_x[(n + col, col)] = sqrt_ridge;
+        column[n..].fill(0.0);
+        column[n + col] = sqrt_ridge;
     }
-    let (q, r) = augmented_x.qr().unpack();
-    let rhs = q.transpose() * augmented_z;
-    // The augmented matrix has n+p >= p rows; unpack already returns an
-    // economic p-by-p R and a p-element transformed response.
-    r.lu().solve(&rhs)
+
+    for (col, signed_norm) in diagonal.iter_mut().enumerate() {
+        *signed_norm = clear_column_unchecked(augmented_design, col, 0, None);
+    }
+    // Replay the economic QR basis in nalgebra's original reflector order.
+    basis.fill(0.0);
+    basis.fill_diagonal(1.0);
+    for (col, signed_norm) in diagonal.iter().copied().enumerate().rev() {
+        let axis = augmented_design.view_range(col.., col);
+        let reflection = Reflection::new(Unit::new_unchecked(axis), 0.0);
+        reflection.reflect_with_sign(
+            &mut basis.view_range_mut(col.., col..),
+            ComplexField::signum(signed_norm),
+        );
+    }
+    basis.transpose_to(transposed_basis);
+    coefficients.gemv(1.0, transposed_basis, augmented_response, 0.0);
+    if !solve_qr_triangle(augmented_design, diagonal, triangular, coefficients) {
+        return None;
+    }
+    std::mem::swap(coefficients, beta);
+    Some(())
+}
+
+pub(super) fn solve_qr_triangle(
+    augmented_design: &DMatrix<f64>,
+    diagonal: &[f64],
+    triangular: &mut DMatrix<f64>,
+    coefficients: &mut DVector<f64>,
+) -> bool {
+    let p = diagonal.len();
+    let mut regular = true;
+    for col in 0..p {
+        let mut negative_above = false;
+        for row in 0..col {
+            let value = augmented_design[(row, col)];
+            // Elimination with a zero lower factor can only clear the sign
+            // of a zero entry after a negative entry in the same column.
+            triangular[(row, col)] = if value == 0.0 && negative_above {
+                0.0
+            } else {
+                value
+            };
+            negative_above |= value.is_sign_negative();
+            regular &= value.is_finite();
+        }
+        triangular[(col, col)] = diagonal[col].abs();
+        let pivot = triangular[(col, col)];
+        // LU scales each lower entry by 1/pivot. A subnormal pivot can
+        // overflow that reciprocal even when the pivot itself is finite.
+        regular &= pivot == 0.0 || pivot.is_normal();
+    }
+
+    if regular {
+        let needs_lower_solve = coefficients
+            .iter()
+            .any(|value| !value.is_finite() || value.to_bits() == (-0.0_f64).to_bits());
+        (!needs_lower_solve || triangular.solve_lower_triangular_with_diag_mut(coefficients, 1.0))
+            && triangular.solve_upper_triangular_mut(coefficients)
+    } else {
+        for col in 0..p {
+            for row in 0..col {
+                triangular[(row, col)] = augmented_design[(row, col)];
+            }
+        }
+        triangular.clone().lu().solve_mut(coefficients)
+    }
 }
 
 pub(super) fn covariance_and_hat_diagonal(
