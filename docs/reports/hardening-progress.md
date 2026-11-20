@@ -815,6 +815,13 @@ All 15 targeted posterior and regression tests passed, including the
 exact grid budget boundary and cancellation during active work. Workspace
 Clippy passed for all targets.
 
+Optimizer validation now exposes the rejected control or array input
+through structured variants. Numeric errors identify the observation and
+component for likelihood cells, and the relevant index for weights and
+Dirichlet parameters. Compiled EM parser errors reach Rust callers as
+typed errors and retain the original diagnostic in the fixture transport.
+The 19 targeted optimizer and mixture tests and workspace Clippy passed.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

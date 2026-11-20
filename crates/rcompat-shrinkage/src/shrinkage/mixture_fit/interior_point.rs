@@ -1,7 +1,7 @@
 //! Native log-barrier path following for the convex mixture problem.
 //! Scaled Newton equations avoid inverse-square weight conditioning. The
 //! accepted SQP path is neither called nor changed by this solver.
-use super::{DMatrix, DVector, ERROR_SCOPE, Problem};
+use super::{DMatrix, DVector, ERROR_SCOPE, Problem, invalid_mixture_value};
 use crate::Error;
 use crate::errors::scoped_invalid_options;
 use crate::numeric::math::ProfileMath;
@@ -44,8 +44,10 @@ impl Problem {
         o: InteriorPointOptions,
     ) -> Result<InteriorPointFit, Error> {
         if !o.relative_tolerance.is_finite() || o.relative_tolerance <= 0.0 {
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
+            return Err(invalid_mixture_value(
+                "interior-point relative tolerance",
+                None,
+                o.relative_tolerance,
                 "interior-point relative tolerance must be positive finite",
             ));
         }

@@ -1,8 +1,23 @@
-use crate::errors::scoped_invalid_options;
+use crate::errors::{CalculationLocation, ErrorKind, invalid_calculation, scoped_invalid_options};
 use crate::numeric::math::ProfileMath;
 pub(super) const ERROR_SCOPE: &str = "mixture prior fit";
 use crate::{Error, errors::invalid_dimensions, matrix::MatrixView};
 use nalgebra::{DMatrix, DVector};
+
+fn invalid_mixture_value(
+    operation: &'static str,
+    location: Option<CalculationLocation>,
+    value: f64,
+    reason: &'static str,
+) -> Error {
+    invalid_calculation(
+        ErrorKind::Options,
+        operation,
+        location,
+        value,
+        format_args!("{ERROR_SCOPE}: {reason}"),
+    )
+}
 
 /// Controls for the native convex mixture-weight fitter, independent of any
 /// R package's optimizer-specific control list.
@@ -252,9 +267,15 @@ pub fn fit_mixture_proportions(
             dirichlet.len(),
         ));
     }
-    if dirichlet.iter().any(|p| !p.is_finite() || *p < 1.0) {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
+    if let Some((component, &value)) = dirichlet
+        .iter()
+        .enumerate()
+        .find(|(_, value)| !value.is_finite() || **value < 1.0)
+    {
+        return Err(invalid_mixture_value(
+            "mixture Dirichlet parameter",
+            Some(CalculationLocation::Component(component)),
+            value,
             "Dirichlet parameters must be finite and >= 1",
         ));
     }
@@ -267,9 +288,15 @@ pub fn fit_mixture_proportions(
                 a.len(),
             ));
         }
-        if a.iter().any(|a| !a.is_finite() || *a < 0.0) {
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
+        if let Some((observation, &value)) = a
+            .iter()
+            .enumerate()
+            .find(|(_, value)| !value.is_finite() || **value < 0.0)
+        {
+            return Err(invalid_mixture_value(
+                "mixture observation weight",
+                Some(CalculationLocation::Observation(observation)),
+                value,
                 "observation weights must be finite and nonnegative",
             ));
         }
@@ -279,8 +306,10 @@ pub fn fit_mixture_proportions(
     };
     let mass = a.iter().sum::<f64>() + prior_counts.iter().sum::<f64>();
     if !mass.is_finite() || mass <= 0.0 {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
+        return Err(invalid_mixture_value(
+            "mixture data and prior mass",
+            None,
+            mass,
             "positive finite data or prior mass is required",
         ));
     }
@@ -293,16 +322,27 @@ pub fn fit_mixture_proportions(
         let row = (0..k)
             .map(|j| log_likelihoods.get(i, j).copied())
             .collect::<Result<Vec<_>, _>>()?;
-        if row.iter().any(|l| l.is_nan() || *l == f64::INFINITY) {
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
+        if let Some((component, &value)) = row
+            .iter()
+            .enumerate()
+            .find(|(_, value)| value.is_nan() || **value == f64::INFINITY)
+        {
+            return Err(invalid_mixture_value(
+                "mixture log likelihood",
+                Some(CalculationLocation::MixtureLikelihood {
+                    observation: i,
+                    component,
+                }),
+                value,
                 "log likelihoods must be finite or negative infinity",
             ));
         }
         let max = row.iter().copied().fold(f64::NEG_INFINITY, f64::max);
         if !max.is_finite() && weight > 0.0 {
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
+            return Err(invalid_mixture_value(
+                "maximum mixture row log likelihood",
+                Some(CalculationLocation::Observation(i)),
+                max,
                 "positive-weight observation has no finite component",
             ));
         }

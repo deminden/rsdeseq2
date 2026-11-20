@@ -130,6 +130,55 @@ pub enum Error {
         reason: String,
     },
 
+    /// Compiled EM received text for its numeric method control.
+    #[error("invalid options: compiled-style EM requires a numeric method control")]
+    CompiledEmNumericMethodRequired {
+        /// Supplied text values, preserving missing values.
+        values: Vec<Option<String>>,
+    },
+
+    /// An optimizer count control could not be read as a nonnegative integer.
+    #[error("invalid options: control '{control}' requires a nonnegative integer")]
+    InvalidOptimizerCount {
+        /// Control supplied to the optimizer.
+        control: String,
+        /// The rejected value.
+        value: f64,
+    },
+
+    /// A caller passed observation weights to an unweighted EM method.
+    #[error(
+        "invalid options: mixture prior fit: observation weights require the weighted EM optimizer"
+    )]
+    WeightedEmRequired {
+        /// Number of supplied observation weights.
+        weights: usize,
+    },
+
+    /// An optimizer input has the wrong number of elements.
+    #[error("invalid options: mixture prior fit: {reason}")]
+    MixtureInputLengthMismatch {
+        /// Input whose length was checked.
+        input: &'static str,
+        /// Expected element count.
+        expected: usize,
+        /// Actual element count.
+        actual: usize,
+        /// The original diagnostic text.
+        reason: &'static str,
+    },
+
+    /// The requested polynomial extrapolation order exceeds the retained support.
+    #[error(
+        "invalid options: mixture prior fit: polynomial order exceeds retained component count"
+    )]
+    EmPolynomialOrderExceeded {
+        /// Requested polynomial order.
+        order: usize,
+        /// Number of retained components.
+        components: usize,
+    },
+
     /// A posterior operation was interrupted by its caller.
     #[error("invalid options: heavy-tailed shrinkage: posterior operation cancelled")]
     PosteriorCancelled,
@@ -489,6 +538,17 @@ pub enum CalculationLocation {
     Gene(usize),
     /// Zero-based column in an input of coefficients.
     Coefficient(usize),
+    /// An observation in a mixture fit.
+    Observation(usize),
+    /// A component in a mixture fit.
+    Component(usize),
+    /// An entry in an observation-by-component likelihood matrix.
+    MixtureLikelihood {
+        /// Zero-based observation row.
+        observation: usize,
+        /// Zero-based component column.
+        component: usize,
+    },
 }
 
 /// Input and arithmetic stages of a negative-binomial likelihood.
@@ -719,6 +779,11 @@ impl Error {
                 ErrorKind::Dispersion
             }
             Self::InvalidOptions { .. }
+            | Self::CompiledEmNumericMethodRequired { .. }
+            | Self::InvalidOptimizerCount { .. }
+            | Self::WeightedEmRequired { .. }
+            | Self::MixtureInputLengthMismatch { .. }
+            | Self::EmPolynomialOrderExceeded { .. }
             | Self::PosteriorCancelled
             | Self::PosteriorGridBudgetExceeded { .. }
             | Self::PosteriorGridOverflow { .. }

@@ -1,8 +1,8 @@
 //! Mixture EM and variational-Dirichlet updates with native acceleration.
 //! Equations are likelihood responsibilities and the Dirichlet ELBO, not an
 //! execution bridge or translation of foreign package source.
-use super::{ERROR_SCOPE, MixtureFit, MixtureOptimizer, squarem};
-use crate::errors::scoped_invalid_options;
+use super::{ERROR_SCOPE, MixtureFit, MixtureOptimizer, invalid_mixture_value, squarem};
+use crate::errors::{CalculationLocation, scoped_invalid_options};
 use crate::numeric::math::ProfileMath;
 use crate::probability::digamma_positive;
 use crate::{Error, matrix::MatrixView};
@@ -203,31 +203,59 @@ pub(super) fn fit(
     controls.validate()?;
     let n = log_likelihoods.n_rows();
     let k = log_likelihoods.n_cols();
-    if weights.is_some() && !weighted {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
-            "observation weights require the weighted EM optimizer",
-        ));
-    }
-    if prior.len() != k
-        || prior
-            .iter()
-            .any(|v| !v.is_finite() || *v <= 0.0 || (!variational && *v < 1.0))
+    if let Some(weights) = weights
+        && !weighted
     {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
-            "invalid EM Dirichlet parameters",
+        return Err(Error::WeightedEmRequired {
+            weights: weights.len(),
+        });
+    }
+    const DIRICHLET: &str = "invalid EM Dirichlet parameters";
+    validate_input_length("EM Dirichlet parameters", k, prior.len(), DIRICHLET)?;
+    if let Some((component, &value)) = prior
+        .iter()
+        .enumerate()
+        .find(|(_, value)| !value.is_finite() || **value <= 0.0 || (!variational && **value < 1.0))
+    {
+        return Err(invalid_mixture_value(
+            "EM Dirichlet parameter",
+            Some(CalculationLocation::Component(component)),
+            value,
+            DIRICHLET,
         ));
     }
     let weights = weights.map(<[f64]>::to_vec).unwrap_or_else(|| vec![1.0; n]);
-    if weights.len() != n
-        || weights.iter().any(|v| !v.is_finite() || *v < 0.0)
-        || !weights.iter().sum::<f64>().is_finite()
-        || weights.iter().sum::<f64>() + prior.iter().map(|p| p - 1.0).sum::<f64>() <= 0.0
+    const WEIGHTS: &str =
+        "EM observation weights must be finite nonnegative and row aligned with positive total";
+    validate_input_length("EM observation weights", n, weights.len(), WEIGHTS)?;
+    if let Some((observation, &value)) = weights
+        .iter()
+        .enumerate()
+        .find(|(_, value)| !value.is_finite() || **value < 0.0)
     {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
-            "EM observation weights must be finite nonnegative and row aligned with positive total",
+        return Err(invalid_mixture_value(
+            "EM observation weight",
+            Some(CalculationLocation::Observation(observation)),
+            value,
+            WEIGHTS,
+        ));
+    }
+    let weight_sum = weights.iter().sum::<f64>();
+    if !weight_sum.is_finite() {
+        return Err(invalid_mixture_value(
+            "EM observation weight sum",
+            None,
+            weight_sum,
+            WEIGHTS,
+        ));
+    }
+    let total = weight_sum + prior.iter().map(|p| p - 1.0).sum::<f64>();
+    if total <= 0.0 {
+        return Err(invalid_mixture_value(
+            "EM effective weight total",
+            None,
+            total,
+            WEIGHTS,
         ));
     }
     let mut likelihood = Vec::with_capacity(n * k);
@@ -236,16 +264,27 @@ pub(super) fn fit(
         let row = (0..k)
             .map(|j| *log_likelihoods.at(i, j))
             .collect::<Vec<_>>();
-        if row.iter().any(|v| v.is_nan() || *v == f64::INFINITY) {
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
+        if let Some((component, &value)) = row
+            .iter()
+            .enumerate()
+            .find(|(_, value)| value.is_nan() || **value == f64::INFINITY)
+        {
+            return Err(invalid_mixture_value(
+                "EM log likelihood",
+                Some(CalculationLocation::MixtureLikelihood {
+                    observation: i,
+                    component,
+                }),
+                value,
                 "EM log likelihoods must be finite or negative infinity",
             ));
         }
         let max = row.iter().copied().fold(f64::NEG_INFINITY, f64::max);
         if !max.is_finite() {
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
+            return Err(invalid_mixture_value(
+                "maximum EM row log likelihood",
+                Some(CalculationLocation::Observation(i)),
+                max,
                 "EM row has no finite likelihood",
             ));
         }
@@ -255,13 +294,27 @@ pub(super) fn fit(
     let mut initial = initial
         .map(<[f64]>::to_vec)
         .unwrap_or_else(|| vec![1.0 / k as f64; k]);
-    if initial.len() != k
-        || initial.iter().any(|v| !v.is_finite() || *v < 0.0)
-        || !initial.iter().any(|v| *v > 0.0)
+    const INITIAL: &str = "invalid initial EM weights";
+    validate_input_length("initial EM weights", k, initial.len(), INITIAL)?;
+    if let Some((component, &value)) = initial
+        .iter()
+        .enumerate()
+        .find(|(_, value)| !value.is_finite() || **value < 0.0)
     {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
-            "invalid initial EM weights",
+        return Err(invalid_mixture_value(
+            "initial EM weight",
+            Some(CalculationLocation::Component(component)),
+            value,
+            INITIAL,
+        ));
+    }
+    if !initial.iter().any(|v| *v > 0.0) {
+        let maximum = initial.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        return Err(invalid_mixture_value(
+            "maximum initial EM weight",
+            None,
+            maximum,
+            INITIAL,
         ));
     }
     if initial.contains(&0.0) {
@@ -336,8 +389,15 @@ pub(super) fn fit(
     let ll = problem.log_likelihood(&active);
     let pll = ll + problem.penalty(&active);
     if !ll.is_finite() || !pll.is_finite() {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
+        let (operation, value) = if !ll.is_finite() {
+            ("EM fitted log likelihood", ll)
+        } else {
+            ("EM fitted penalized log likelihood", pll)
+        };
+        return Err(invalid_mixture_value(
+            operation,
+            None,
+            value,
             "EM fit returned nonfinite likelihood",
         ));
     }
@@ -360,4 +420,21 @@ pub(super) fn fit(
         posterior_concentrations: (variational && !shortcut).then_some(concentrations),
         optimizer_objective: (!shortcut).then_some(iteration.objective),
     })
+}
+
+fn validate_input_length(
+    input: &'static str,
+    expected: usize,
+    actual: usize,
+    reason: &'static str,
+) -> Result<(), Error> {
+    if actual != expected {
+        return Err(Error::MixtureInputLengthMismatch {
+            input,
+            expected,
+            actual,
+            reason,
+        });
+    }
+    Ok(())
 }

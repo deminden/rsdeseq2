@@ -1,6 +1,9 @@
 //! Independent original-ashr optimizer states and complete posterior batches.
 use crate::support::json_fixture;
 use crate::support::posterior as support;
+use rsdeseq2::DeseqError;
+use rsdeseq2::errors::{CalculationLocation, ErrorKind};
+use std::assert_matches;
 use support::*;
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/location_shrinkage.rs"]
@@ -161,30 +164,90 @@ fn alternative_optimizers_keep_complete_posterior_and_warning_coverage() {
 fn em_validation_does_not_silently_change_optimizer_or_prior_semantics() {
     let r = json_fixture!("ashr_optimizer_r462.json");
     let base = &r["em_fit_cases"][0];
-    let mut variants = vec![];
+    let reject = |path: &str, value: serde_json::Value| {
+        let mut c = base.clone();
+        *c.pointer_mut(path).unwrap() = value;
+        *em_fit::run(&serde_json::from_value(c).unwrap())
+            .unwrap_err()
+            .downcast::<DeseqError>()
+            .unwrap()
+    };
+    assert_matches!(
+        reject("/observation_weights", serde_json::json!(["1"])),
+        DeseqError::WeightedEmRequired { weights: 1 }
+    );
+    assert_matches!(
+        reject("/control", serde_json::json!({"K":5})),
+        DeseqError::EmPolynomialOrderExceeded {
+            order: 5,
+            components: 4
+        }
+    );
+    assert_matches!(
+        reject("/control", serde_json::json!({"K":-1})),
+        DeseqError::InvalidOptimizerCount { control, value: -1.0 } if control == "K"
+    );
+    let invalid_tolerance = reject("/control", serde_json::json!({"tol":-1}));
+    assert_eq!(
+        invalid_tolerance.to_string(),
+        "invalid options: mixture prior fit: invalid squared-EM controls",
+    );
+    assert_matches!(
+        invalid_tolerance,
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Options,
+            operation: "squared-EM tolerance",
+            location: None,
+            value: -1.0,
+            ..
+        }
+    );
+    assert_matches!(
+        reject("/log_likelihoods/6", serde_json::json!("NaN")),
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Options, operation: "EM log likelihood",
+            location: Some(CalculationLocation::MixtureLikelihood { observation: 1, component: 2 }),
+            value, ..
+        } if value.is_nan()
+    );
+    assert_matches!(
+        reject("/dirichlet/1", serde_json::json!("0.5")),
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Options,
+            operation: "EM Dirichlet parameter",
+            location: Some(CalculationLocation::Component(1)),
+            value: 0.5,
+            ..
+        }
+    );
+    assert_matches!(
+        reject("/dirichlet", serde_json::json!(["1"])),
+        DeseqError::MixtureInputLengthMismatch {
+            input: "EM Dirichlet parameters",
+            expected: 4,
+            actual: 1,
+            ..
+        }
+    );
     let mut c = base.clone();
-    c["observation_weights"] = serde_json::json!(["1"]);
-    variants.push((c, "weighted EM"));
-    let mut c = base.clone();
-    c["control"] = serde_json::json!({"K":5});
-    variants.push((c, "polynomial order"));
-    let mut c = base.clone();
-    c["control"] = serde_json::json!({"tol":-1});
-    variants.push((c, "controls"));
-    let mut c = base.clone();
-    c["log_likelihoods"][0] = serde_json::json!("NaN");
-    variants.push((c, "log likelihoods"));
-    let mut c = base.clone();
-    c["dirichlet"][0] = serde_json::json!("0.5");
-    variants.push((c, "Dirichlet"));
-    for (c, message) in variants {
-        let c: em_fit::Case = serde_json::from_value(c).unwrap();
-        assert!(
-            em_fit::run(&c).unwrap_err().to_string().contains(message),
-            "{}: {message}",
-            c.name
-        );
-    }
+    c["optimizer"] = serde_json::json!("w_mixEM");
+    let mut weights = vec!["1"; 48];
+    weights[5] = "-0.5";
+    c["observation_weights"] = serde_json::json!(weights);
+    let error = *em_fit::run(&serde_json::from_value(c).unwrap())
+        .unwrap_err()
+        .downcast::<DeseqError>()
+        .unwrap();
+    assert_matches!(
+        error,
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Options,
+            operation: "EM observation weight",
+            location: Some(CalculationLocation::Observation(5)),
+            value: -0.5,
+            ..
+        }
+    );
     // No fixed-point calls are allowed when the requested budget is zero.
     let mut c = base.clone();
     c["control"] = serde_json::json!({"maxiter":0});

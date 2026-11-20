@@ -58,10 +58,10 @@ pub(super) fn run(
 ) -> Result<Iteration, Error> {
     let k = o.polynomial_order;
     if k > initial.len() {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
-            "polynomial order exceeds retained component count",
-        ));
+        return Err(Error::EmPolynomialOrderExceeded {
+            order: k,
+            components: initial.len(),
+        });
     }
     let capacity = k
         .checked_mul(2)

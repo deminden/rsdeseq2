@@ -1,10 +1,23 @@
 //! Independent cycling references and certified interior-point optima.
 use crate::support::json_fixture;
 use crate::support::posterior as support;
+use rsdeseq2::DeseqError;
+use rsdeseq2::errors::{CalculationLocation, ErrorKind};
+use std::assert_matches;
+use std::error::Error;
 use support::*;
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/location_shrinkage.rs"]
 mod location_shrinkage;
+
+fn assert_invalid_compiled_method(error: Box<dyn Error>) {
+    assert_matches!(
+        *error.downcast::<DeseqError>().unwrap(),
+        DeseqError::CompiledEmNumericMethodRequired { values }
+            if values == [Some("mpe".into())]
+    );
+}
+
 #[test]
 fn cycling_and_interior_point_queries_match_independent_references() {
     let r = json_fixture!("ashr_advanced_optimizer_r462.json");
@@ -13,11 +26,7 @@ fn cycling_and_interior_point_queries_match_independent_references() {
         let input: location_shrinkage::Case = serde_json::from_value(c.clone()).unwrap();
         let result = location_shrinkage::run(&input);
         if c["expected_error"].is_string() {
-            assert!(
-                result.unwrap_err().to_string().contains("numeric method"),
-                "{}",
-                input.name
-            );
+            assert_invalid_compiled_method(result.unwrap_err());
             continue;
         }
         let f = match result {
@@ -94,7 +103,15 @@ fn primitive_cycling_states_keep_source_budgets_and_variational_counts() {
         let input: em_fit::Case = serde_json::from_value(c.clone()).unwrap();
         let f = em_fit::run(&input);
         if c["expected_error"].is_string() {
-            assert!(f.unwrap_err().to_string().contains("numeric method"));
+            assert_invalid_compiled_method(f.unwrap_err());
+            let encoded = em_fit::evaluate(em_fit::Input {
+                em_fit_cases: vec![input],
+            })
+            .unwrap();
+            assert_eq!(
+                encoded["cases"][0]["error"],
+                "compiled-style EM requires a numeric method control",
+            );
             continue;
         }
         let f = f.unwrap();
@@ -226,7 +243,7 @@ fn native_barrier_obeys_simplex_solutions_limits_and_validation() {
     .unwrap();
     assert!(!f.converged);
     assert_eq!(f.iterations, Some(0));
-    assert!(
+    assert_matches!(
         fit(
             InteriorPointOptions {
                 relative_tolerance: 0.0,
@@ -235,10 +252,24 @@ fn native_barrier_obeys_simplex_solutions_limits_and_validation() {
             None,
             &[1.0, 1.0]
         )
-        .unwrap_err()
-        .to_string()
-        .contains("tolerance")
+        .unwrap_err(),
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Options,
+            operation: "interior-point relative tolerance",
+            location: None,
+            value: 0.0,
+            ..
+        }
     );
     // Priors below one select variational fitting, never a convex barrier fit.
-    assert!(fit(InteriorPointOptions::default(), None, &[0.2, 0.4]).is_err());
+    assert_matches!(
+        fit(InteriorPointOptions::default(), None, &[0.2, 0.4]).unwrap_err(),
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Options,
+            operation: "mixture Dirichlet parameter",
+            location: Some(CalculationLocation::Component(0)),
+            value: 0.2,
+            ..
+        }
+    );
 }

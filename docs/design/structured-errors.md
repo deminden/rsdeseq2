@@ -147,6 +147,19 @@ in its message and exposes the failed arithmetic result in `value`.
 
 These posterior errors retain the previous messages and classification.
 
+## Mixture optimizers
+
+`InvalidOptimizerCount` reports the control name and rejected value.
+`CompiledEmNumericMethodRequired` retains the supplied text values.
+`EmPolynomialOrderExceeded` reports the requested order and retained
+component count. `MixtureInputLengthMismatch` reports the expected and
+actual length of the affected input.
+
+Mixture `InvalidCalculation` errors carry the rejected numeric value.
+The location can identify an observation, a component, or both axes of a
+likelihood matrix entry. The standalone validation transport retains
+its original text when it serializes these errors.
+
 ## Not in this step
 - `scoped_invalid_options` sites keep their `"{scope}: {reason}"` text.
 - The free-text variants stay; nothing is deprecated.

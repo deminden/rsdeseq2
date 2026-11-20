@@ -161,6 +161,11 @@ versions live in [docs/releases](docs/releases/).
   report the relevant limits, dimensions, gene or coefficient and preserve
   the existing messages and error kinds.
 
+- Mixture optimizer errors retain rejected control values, array lengths
+  and the offending observation or component. Compiled EM reports the
+  text supplied for its numeric method control. Existing messages and
+  error kinds are preserved.
+
 - Missing-prerequisite errors ("Wald fitting requires MAP dispersions") are
   `DeseqError::MissingPrerequisite { domain, operation, prerequisite }`
   (119 sites). 57 of these messages were reworded into the one form

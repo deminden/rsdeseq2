@@ -93,8 +93,24 @@ pub fn evaluate(input: Input) -> Result<Value, Box<dyn Error>> {
         .iter()
         .map(|c| match run(c) {
             Ok(f) => json!({"name":c.name,"value":encode(f)}),
-            Err(e) => json!({"name":c.name,"error":e.to_string()}),
+            Err(e) => json!({"name":c.name,"error":fixture_error_text(e.as_ref())}),
         })
         .collect::<Vec<_>>();
     Ok(json!({"cases":cases}))
+}
+
+fn fixture_error_text(error: &(dyn Error + 'static)) -> String {
+    let text = error.to_string();
+    // This transport historically emitted parser errors without the domain prefix.
+    if matches!(
+        error.downcast_ref::<rsdeseq2::DeseqError>(),
+        Some(
+            rsdeseq2::DeseqError::CompiledEmNumericMethodRequired { .. }
+                | rsdeseq2::DeseqError::InvalidOptimizerCount { .. }
+        )
+    ) && let Some(reason) = text.strip_prefix("invalid options: ")
+    {
+        return reason.into();
+    }
+    text
 }

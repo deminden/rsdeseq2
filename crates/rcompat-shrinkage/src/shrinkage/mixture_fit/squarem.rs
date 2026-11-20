@@ -1,8 +1,7 @@
 //! Independent squared extrapolation (Varadhan/Roland 2008), with explicit
 //! frontend policy controls. No SQUAREM/ashr source implementation is imported.
-use super::ERROR_SCOPE;
+use super::invalid_mixture_value;
 use crate::Error;
-use crate::errors::scoped_invalid_options;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 /// Polynomial extrapolation scheme of higher-order SQUAREM.
 pub enum PolynomialExtrapolation {
@@ -54,23 +53,31 @@ impl Default for SquaremOptions {
 }
 impl SquaremOptions {
     pub(super) fn validate(self) -> Result<(), Error> {
-        if self.polynomial_order == 0
-            || self.tolerance.is_some_and(|v| !v.is_finite() || v < 0.0)
-            || !(1..=3).contains(&self.method)
-            || !self.minimum_step.is_finite()
-            || !self.maximum_step.is_finite()
-            || self.minimum_step > self.maximum_step
-            || !self.step_multiplier.is_finite()
-            || self.step_multiplier <= 1.0
-            || self.objective_increase.is_nan()
-            || self.objective_increase < 0.0
+        let (operation, value) = if self.polynomial_order == 0 {
+            ("squared-EM polynomial order", 0.0)
+        } else if let Some(value) = self.tolerance
+            && (!value.is_finite() || value < 0.0)
         {
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
-                "invalid squared-EM controls",
-            ));
-        }
-        Ok(())
+            ("squared-EM tolerance", value)
+        } else if !(1..=3).contains(&self.method) {
+            ("squared-EM method", f64::from(self.method))
+        } else if !self.minimum_step.is_finite() {
+            ("squared-EM minimum step", self.minimum_step)
+        } else if !self.maximum_step.is_finite() || self.minimum_step > self.maximum_step {
+            ("squared-EM maximum step", self.maximum_step)
+        } else if !self.step_multiplier.is_finite() || self.step_multiplier <= 1.0 {
+            ("squared-EM step multiplier", self.step_multiplier)
+        } else if self.objective_increase.is_nan() || self.objective_increase < 0.0 {
+            ("squared-EM objective increase", self.objective_increase)
+        } else {
+            return Ok(());
+        };
+        Err(invalid_mixture_value(
+            operation,
+            None,
+            value,
+            "invalid squared-EM controls",
+        ))
     }
 }
 pub(super) struct Iteration {
