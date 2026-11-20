@@ -1,7 +1,10 @@
 //! Batch orchestration; likelihood, prior and optimizers have no R dependency.
 use super::{
+    analysis::{AnalysisRow, GridPosteriorRow, PosteriorAnalysis},
+    beta_binomial,
     negative_binomial::Row,
     prior::{CauchyCoefficientPrior, ERROR_SCOPE, estimate_cauchy_prior_variance},
+    regression::{self, GeneralRow, RegressionMethod, RegressionPosteriorOptions},
 };
 use crate::errors::{PosteriorArray, PosteriorArrayAxis, scoped_invalid_options};
 use crate::numeric::math::ProfileMath;
@@ -12,6 +15,7 @@ use crate::{
     shrinkage::svalues,
 };
 use nalgebra::{DMatrix, Matrix4, linalg::try_invert_to};
+use rcompat_lbfgsb::OptimResult;
 
 /// MLE scale supplied for empirical prior adaptation.
 #[derive(Clone, Copy, Debug)]
@@ -545,8 +549,157 @@ impl<'a> PreparedBatch<'a> {
     }
 }
 
+enum RowLikelihood<'a> {
+    CompiledNegativeBinomial(&'a Row<'a>),
+    NegativeBinomialRegression(&'a Row<'a>, &'a RegressionPosteriorOptions),
+    General(GeneralRow<'a>),
+    BetaBinomial(beta_binomial::Row<'a>, &'a RegressionPosteriorOptions),
+}
+
+impl<'a> RowLikelihood<'a> {
+    fn new(
+        row: &'a Row<'a>,
+        regression: RegressionRequest<'_, 'a>,
+        gene: usize,
+    ) -> Result<Self, Error> {
+        let Some((parameters, config)) = regression else {
+            return Ok(Self::CompiledNegativeBinomial(row));
+        };
+        match config.method {
+            RegressionMethod::General => Ok(Self::General(GeneralRow {
+                y: &row.counts,
+                design: row.design,
+                parameters: parameters.map(|m| (0..m.n_cols()).map(|j| *m.at(gene, j)).collect()),
+                weights: &row.weights,
+                offsets: &row.offsets,
+                prior: row.prior,
+                options: config,
+                error: std::cell::RefCell::new(None),
+            })),
+            RegressionMethod::NegativeBinomialR => {
+                Ok(Self::NegativeBinomialRegression(row, config))
+            }
+            RegressionMethod::BetaBinomialR
+            | RegressionMethod::BetaBinomialCR
+            | RegressionMethod::BetaBinomialC
+            | RegressionMethod::BetaBinomialCStar => {
+                let parameters = parameters.ok_or_else(|| {
+                    crate::errors::invariant("validated beta-binomial parameters")
+                })?;
+                Ok(Self::BetaBinomial(
+                    beta_binomial::Row {
+                        design: row.design,
+                        successes: &row.counts,
+                        trials: (1..parameters.n_cols())
+                            .map(|j| *parameters.at(gene, j))
+                            .collect(),
+                        weights: &row.weights,
+                        concentration: *parameters.at(gene, 0),
+                        prior: row.prior,
+                    },
+                    config,
+                ))
+            }
+        }
+    }
+
+    fn optimize(
+        &self,
+        p: usize,
+        options: &NegativeBinomialPosteriorOptions,
+        shared_initial: Option<&[f64]>,
+        warnings: &mut PosteriorWarnings,
+    ) -> Result<MapFit, Error> {
+        let alternating_start = |magnitude: f64| {
+            (0..p)
+                .map(|j| if j % 2 == 0 { magnitude } else { -magnitude })
+                .collect::<Vec<_>>()
+        };
+        let compiled_start =
+            || shared_initial.map_or_else(|| alternating_start(0.1), <[f64]>::to_vec);
+        let optimization = match self {
+            Self::CompiledNegativeBinomial(row) => {
+                let initial = compiled_start();
+                let mut optimization = optimize(row, initial.clone())?;
+                if optimization.convergence < 0 {
+                    warnings.primary.push(optimization.message.clone());
+                }
+                let opposite_start_disagrees = if options.check_opposite_start {
+                    let second = optimize(row, initial.into_iter().map(|v| -v).collect())?;
+                    if second.convergence < 0 {
+                        warnings.opposite.push(second.message.clone());
+                    }
+                    optimization
+                        .par
+                        .iter()
+                        .zip(second.par)
+                        .any(|(a, b)| (a - b).abs() > 0.01)
+                } else {
+                    false
+                };
+                let refined = !options.map_only
+                    && (optimization.convergence != 0 || opposite_start_disagrees);
+                if refined {
+                    optimization = refine(row, optimization.par, options)?;
+                }
+                return Ok(MapFit {
+                    optimization,
+                    opposite_start_disagrees,
+                    refined,
+                });
+            }
+            Self::General(row) => row.optimize(alternating_start(1.0))?,
+            Self::BetaBinomial(row, config) => {
+                let optimization = if config.method == RegressionMethod::BetaBinomialR {
+                    row.optimize(vec![0.0; p], config)?
+                } else {
+                    row.prefit(compiled_start())?
+                };
+                if optimization.convergence < 0 {
+                    warnings.primary.push(optimization.message.clone());
+                }
+                optimization
+            }
+            Self::NegativeBinomialRegression(row, config) => {
+                let mut start = alternating_start(1.0);
+                if config.log_link {
+                    let baseline = (0..row.counts.len())
+                        .filter(|&i| {
+                            (0..p).filter(|&j| *row.design.at(i, j) == 0.0).count() == p - 1
+                        })
+                        .collect::<Vec<_>>();
+                    let mean = if baseline.is_empty() {
+                        row.counts.iter().sum::<f64>() / row.counts.len() as f64
+                    } else {
+                        baseline.iter().map(|&i| row.counts[i]).sum::<f64>() / baseline.len() as f64
+                    };
+                    start[0] = if mean == 0.0 { 0.0 } else { mean.ln_p() };
+                }
+                regression::optimize_nb_r(row, config, start)?
+            }
+        };
+        Ok(MapFit {
+            optimization,
+            opposite_start_disagrees: false,
+            refined: false,
+        })
+    }
+}
+
+#[derive(Default)]
+struct PosteriorWarnings {
+    primary: Vec<String>,
+    opposite: Vec<String>,
+}
+
+struct MapFit {
+    optimization: OptimResult,
+    opposite_start_disagrees: bool,
+    refined: bool,
+}
+
 struct LaplaceFit {
-    optimization: rcompat_lbfgsb::OptimResult,
+    map: MapFit,
     covariance: Option<DMatrix<f64>>,
 }
 
@@ -585,66 +738,141 @@ fn has_valid_covariance_diagonal(matrix: &DMatrix<f64>) -> bool {
 }
 
 fn fit_laplace(
-    row: &Row<'_>,
+    likelihood: &RowLikelihood<'_>,
     options: &NegativeBinomialPosteriorOptions,
-    regression: RegressionRequest<'_, '_>,
-    general: Option<&super::regression::GeneralRow<'_>>,
-    beta_binomial: Option<&super::beta_binomial::Row<'_>>,
-    mut result: rcompat_lbfgsb::OptimResult,
-    refined: bool,
+    mut map: MapFit,
 ) -> Result<LaplaceFit, Error> {
-    let mut covariance = if let Some(general) = general {
-        let hessian = general.hessian(&result.par, options.hessian_step)?;
-        if let Some(error) = general.take_error() {
-            return Err(error);
+    let result = &mut map.optimization;
+    let covariance = match likelihood {
+        RowLikelihood::General(general) => {
+            let hessian = general.hessian(&result.par, options.hessian_step)?;
+            if let Some(error) = general.take_error() {
+                return Err(error);
+            }
+            invert_finite_hessian(hessian)?
         }
-        invert_finite_hessian(hessian)?
-    } else if let Some(beta_binomial) = beta_binomial {
-        let (_, config) = regression
-            .ok_or_else(|| crate::errors::invariant("regression likelihood configured"))?;
-        let hessian = beta_binomial.hessian(&result.par, options.hessian_step)?;
-        let compiled_refinement =
-            config.method == super::regression::RegressionMethod::BetaBinomialCR;
-        let finite = hessian.iter().all(|v| v.is_finite());
-        // The compiled policy tests the inverse's diagonal before discarding
-        // nonfinite Hessians. Keep that retry decision and reuse a valid inverse.
-        let inverse = if compiled_refinement || finite {
-            invert_hessian(hessian)?
-        } else {
-            None
-        };
-        if compiled_refinement
-            && (result.convergence != 0
-                || !inverse.as_ref().is_some_and(has_valid_covariance_diagonal))
-        {
-            result = beta_binomial.optimize(result.par, config)?;
-            invert_finite_hessian(beta_binomial.hessian(&result.par, options.hessian_step)?)?
-        } else {
-            inverse.filter(|_| finite)
+        RowLikelihood::BetaBinomial(beta_binomial, config) => {
+            let hessian = beta_binomial.hessian(&result.par, options.hessian_step)?;
+            let compiled_refinement = config.method == RegressionMethod::BetaBinomialCR;
+            let finite = hessian.iter().all(|v| v.is_finite());
+            // The compiled policy tests the inverse's diagonal before discarding
+            // nonfinite Hessians. Keep that retry decision and reuse a valid inverse.
+            let inverse = if compiled_refinement || finite {
+                invert_hessian(hessian)?
+            } else {
+                None
+            };
+            if compiled_refinement
+                && (result.convergence != 0
+                    || !inverse.as_ref().is_some_and(has_valid_covariance_diagonal))
+            {
+                *result = beta_binomial.optimize(std::mem::take(&mut result.par), config)?;
+                invert_finite_hessian(beta_binomial.hessian(&result.par, options.hessian_step)?)?
+            } else {
+                inverse.filter(|_| finite)
+            }
         }
-    } else {
-        invert_finite_hessian(row.hessian(&result.par, options.hessian_step)?)?
+        RowLikelihood::NegativeBinomialRegression(row, _) => {
+            invert_finite_hessian(row.hessian(&result.par, options.hessian_step)?)?
+        }
+        RowLikelihood::CompiledNegativeBinomial(row) => {
+            let covariance =
+                invert_finite_hessian(row.hessian(&result.par, options.hessian_step)?)?;
+            // Compiled prefits with nonpositive variance use deferred refinement.
+            if !map.refined
+                && covariance
+                    .as_ref()
+                    .is_some_and(|m| (0..m.nrows()).any(|i| m[(i, i)] <= 0.0))
+            {
+                *result = refine(row, std::mem::take(&mut result.par), options)?;
+                invert_finite_hessian(row.hessian(&result.par, options.hessian_step)?)?
+            } else {
+                covariance
+            }
+        }
     };
-    // Compiled prefits with nonpositive variance use the deferred refinement controls.
-    if regression.is_none()
-        && !refined
-        && covariance
-            .as_ref()
-            .is_some_and(|m| (0..m.nrows()).any(|i| m[(i, i)] <= 0.0))
-    {
-        result = refine(row, result.par, options)?;
-        covariance = invert_finite_hessian(row.hessian(&result.par, options.hessian_step)?)?;
-    }
-    if regression.is_some() && covariance.is_none() {
+    if covariance.is_none() && !matches!(likelihood, RowLikelihood::CompiledNegativeBinomial(_)) {
         return Err(scoped_invalid_options(
             ERROR_SCOPE,
             "general posterior Hessian is singular or nonfinite",
         ));
     }
     Ok(LaplaceFit {
-        optimization: result,
+        map,
         covariance: covariance.filter(has_valid_covariance_diagonal),
     })
+}
+
+struct PosteriorRates {
+    false_sign: Option<Vec<Option<f64>>>,
+    false_sign_or_small: Option<Vec<Option<f64>>>,
+}
+
+impl PosteriorRates {
+    fn new(options: &NegativeBinomialPosteriorOptions, genes: usize) -> Self {
+        Self {
+            false_sign: options.coefficient.map(|_| vec![None; genes]),
+            false_sign_or_small: options
+                .threshold
+                .filter(|_| options.coefficient.is_some())
+                .map(|_| vec![None; genes]),
+        }
+    }
+
+    fn record<'a>(
+        &mut self,
+        analysis: &mut PosteriorAnalysis,
+        query: AnalysisRow<'a>,
+        grid_density: impl FnOnce() -> GridPosteriorRow<'a>,
+    ) -> Result<(), Error> {
+        let gene = query.gene;
+        if let Some(coefficient) = query.coefficient {
+            let mean = query.mode[coefficient];
+            let error = query.sd[coefficient];
+            self.set_false_sign(gene, Some(normal_upper_tail(mean.abs() / error)))?;
+            if let Some(rates) = &mut self.false_sign_or_small {
+                let threshold = query.threshold.ok_or_else(|| {
+                    crate::errors::invariant("threshold set when threshold rates are requested")
+                })?;
+                let cutoff = if query.flip_sign {
+                    (if mean == 0.0 { 0.0 } else { mean.signum() }) * threshold
+                } else {
+                    threshold
+                };
+                let z = (cutoff - mean) / error;
+                rates[gene] = Some(if query.flip_sign && mean < 0.0 {
+                    normal_upper_tail(z)
+                } else {
+                    normal_upper_tail(-z)
+                });
+            }
+        }
+        if query.options.interval.is_some() || query.options.contrasts.is_some() {
+            let work = &query.options.work;
+            let density = grid_density();
+            let mut grid_evaluations = 0usize;
+            if let Some(summary) = analysis.row(query, |beta, shift| {
+                if grid_evaluations.is_multiple_of(256) {
+                    work.check()?;
+                }
+                grid_evaluations += 1;
+                density.value(beta, shift)
+            })? {
+                self.set_false_sign(gene, summary.false_sign_rate)?;
+                if let Some(rates) = &mut self.false_sign_or_small {
+                    rates[gene] = summary.threshold_rate;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn set_false_sign(&mut self, gene: usize, rate: Option<f64>) -> Result<(), Error> {
+        self.false_sign.as_mut().ok_or_else(|| {
+            crate::errors::invariant("false-sign rates allocated for a selected coefficient")
+        })?[gene] = rate;
+        Ok(())
+    }
 }
 
 pub(super) fn fit_batch(
@@ -665,27 +893,19 @@ pub(super) fn fit_batch(
     } else {
         Some(RowMajorMatrix::from_elem(g, p, na)?.into_values())
     };
-    let mut fsr = options.coefficient.map(|_| vec![None; g]);
-    let mut fsos = options
-        .threshold
-        .filter(|_| options.coefficient.is_some())
-        .map(|_| vec![None; g]);
+    let mut rates = PosteriorRates::new(options, g);
     let mut diagnostics = Vec::with_capacity(g);
-    let mut warnings = vec![];
-    let mut second_warnings = vec![];
+    let mut warnings = PosteriorWarnings::default();
     let shared_initial = random.as_deref_mut().map(|rng| rng.start_vector(p));
+    let skip_zero = regression.is_none()
+        || regression.is_some_and(|(_, config)| {
+            config.method == RegressionMethod::NegativeBinomialR && config.log_link
+        });
     for gene in 0..g {
         options.analysis.work.check()?;
         let counts = (0..n)
             .map(|i| *input.counts.at(gene, i))
             .collect::<Vec<_>>();
-        let nb_r = regression.is_some_and(|(_, o)| {
-            o.method == super::regression::RegressionMethod::NegativeBinomialR
-        });
-        let skip_zero = regression.is_none()
-            || regression.is_some_and(|(_, o)| {
-                o.method == super::regression::RegressionMethod::NegativeBinomialR && o.log_link
-            });
         if skip_zero && counts.iter().all(|&v| v == 0.0) {
             if regression.is_none() && !options.map_only && !options.log_link {
                 return Err(Error::PosteriorMissingPrefit { gene });
@@ -717,226 +937,63 @@ pub(super) fn fit_batch(
             size: 1.0 / dispersion,
             prior,
         };
-        let initial = shared_initial.clone().unwrap_or_else(|| {
-            (0..p)
-                .map(|j| if j % 2 == 0 { 0.1 } else { -0.1 })
-                .collect::<Vec<_>>()
-        });
-        let general = regression
-            .filter(|(_, o)| o.method == super::regression::RegressionMethod::General)
-            .map(|(parameters, config)| super::regression::GeneralRow {
-                y: &row.counts,
-                design: input.design,
-                parameters: parameters.map(|m| (0..m.n_cols()).map(|j| *m.at(gene, j)).collect()),
-                weights: &row.weights,
-                offsets: &row.offsets,
-                prior,
-                options: config,
-                error: std::cell::RefCell::new(None),
-            });
-        let beta_parameters = regression
-            .filter(|(_, config)| {
-                matches!(
-                    config.likelihood,
-                    super::regression::RegressionLikelihood::BetaBinomial
-                )
-            })
-            .map(|(parameters, _)| {
-                let parameters = parameters.ok_or_else(|| {
-                    crate::errors::invariant("validated beta-binomial parameters")
-                })?;
-                Ok::<_, Error>(
-                    (0..parameters.n_cols())
-                        .map(|j| *parameters.at(gene, j))
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .transpose()?;
-        let beta_binomial = beta_parameters
-            .as_ref()
-            .map(|parameters| super::beta_binomial::Row {
-                design: input.design,
-                successes: &row.counts,
-                trials: &parameters[1..],
-                weights: &row.weights,
-                concentration: parameters[0],
-                prior,
-            });
-        let mut result = if let Some(general) = &general {
-            general.optimize(
-                (0..p)
-                    .map(|j| if j % 2 == 0 { 1.0 } else { -1.0 })
-                    .collect(),
-            )?
-        } else if let Some(beta_binomial) = &beta_binomial {
-            let (_, config) = regression
-                .ok_or_else(|| crate::errors::invariant("regression likelihood configured"))?;
-            if config.method == super::regression::RegressionMethod::BetaBinomialR {
-                beta_binomial.optimize(vec![0.0; p], config)?
-            } else {
-                beta_binomial.prefit(initial.clone())?
-            }
-        } else {
-            if nb_r {
-                let (_, config) = regression
-                    .ok_or_else(|| crate::errors::invariant("regression likelihood configured"))?;
-                let mut start = (0..p)
-                    .map(|j| if j % 2 == 0 { 1.0 } else { -1.0 })
-                    .collect::<Vec<_>>();
-                if config.log_link {
-                    let baseline = (0..n)
-                        .filter(|&i| {
-                            (0..p).filter(|&j| *input.design.at(i, j) == 0.0).count() == p - 1
-                        })
-                        .collect::<Vec<_>>();
-                    let mean = if baseline.is_empty() {
-                        row.counts.iter().sum::<f64>() / n as f64
-                    } else {
-                        baseline.iter().map(|&i| row.counts[i]).sum::<f64>() / baseline.len() as f64
-                    };
-                    start[0] = if mean == 0.0 { 0.0 } else { mean.ln_p() };
-                }
-                super::regression::optimize_nb_r(&row, config, start)?
-            } else {
-                optimize(&row, initial.clone())?
-            }
-        };
-        if (regression.is_none() || beta_binomial.is_some()) && result.convergence < 0 {
-            warnings.push(result.message.clone());
-        }
-        let disagreement = if regression.is_none() && options.check_opposite_start {
-            let second = optimize(&row, initial.into_iter().map(|v| -v).collect())?;
-            if second.convergence < 0 {
-                second_warnings.push(second.message.clone());
-            }
-            result
-                .par
-                .iter()
-                .zip(second.par)
-                .any(|(a, b)| (a - b).abs() > 0.01)
-        } else {
-            false
-        };
-        let mut refined = false;
-        if regression.is_none() && !options.map_only && (result.convergence != 0 || disagreement) {
-            result = refine(&row, result.par, options)?;
-            refined = true;
-        }
+        let likelihood = RowLikelihood::new(&row, regression, gene)?;
+        let mut map = likelihood.optimize(p, options, shared_initial.as_deref(), &mut warnings)?;
         let mut laplace_valid = false;
         if let Some(sd) = &mut sd {
-            let laplace = fit_laplace(
-                &row,
-                options,
-                regression,
-                general.as_ref(),
-                beta_binomial.as_ref(),
-                result,
-                refined,
-            )?;
-            result = laplace.optimization;
+            let laplace = fit_laplace(&likelihood, options, map)?;
+            map = laplace.map;
             if let Some(covariance) = laplace.covariance {
                 laplace_valid = true;
-                for j in 0..p {
-                    sd.as_mut_slice()[gene * p + j] = covariance[(j, j)].sqrt();
+                let row_sd = &mut sd[gene * p..(gene + 1) * p];
+                for (j, value) in row_sd.iter_mut().enumerate() {
+                    *value = covariance[(j, j)].sqrt();
                 }
-                if let Some(c) = options.coefficient {
-                    let mean = result.par[c];
-                    let error = sd.as_slice()[gene * p + c];
-                    fsr.as_mut().ok_or_else(|| {
-                        crate::errors::invariant(
-                            "false-sign rates allocated for a selected coefficient",
-                        )
-                    })?[gene] = Some(normal_upper_tail(mean.abs() / error));
-                    if let Some(rates) = &mut fsos {
-                        let cutoff = if options.flip_sign {
-                            (if mean == 0.0 { 0.0 } else { mean.signum() })
-                                * options.threshold.ok_or_else(|| {
-                                    crate::errors::invariant(
-                                        "threshold set when threshold rates are requested",
-                                    )
-                                })?
-                        } else {
-                            options.threshold.ok_or_else(|| {
-                                crate::errors::invariant(
-                                    "threshold set when threshold rates are requested",
-                                )
-                            })?
-                        };
-                        let z = (cutoff - mean) / error;
-                        rates[gene] = Some(if options.flip_sign && mean < 0.0 {
-                            normal_upper_tail(z)
-                        } else {
-                            normal_upper_tail(-z)
-                        });
-                    }
-                }
-                if options.analysis.interval.is_some() || options.analysis.contrasts.is_some() {
-                    let density = super::analysis::GridPosteriorRow::new(
-                        &row,
-                        regression,
+                rates.record(
+                    &mut prepared.analysis,
+                    AnalysisRow {
                         gene,
-                        dispersion,
-                        &options.analysis,
-                    );
-                    let mut grid_evaluations = 0usize;
-                    if let Some(summary) = prepared.analysis.row(
-                        super::analysis::AnalysisRow {
-                            gene,
-                            mode: &result.par,
-                            covariance: &covariance,
-                            sd: &sd[gene * p..(gene + 1) * p],
-                            coefficient: options.coefficient,
-                            options: &options.analysis,
-                            threshold: options.threshold,
-                            flip_sign: options.flip_sign,
-                        },
-                        |beta, shift| {
-                            if grid_evaluations.is_multiple_of(256) {
-                                options.analysis.work.check()?;
-                            }
-                            grid_evaluations += 1;
-                            density.value(beta, shift)
-                        },
-                    )? {
-                        fsr.as_mut().ok_or_else(|| {
-                            crate::errors::invariant(
-                                "false-sign rates allocated for a selected coefficient",
-                            )
-                        })?[gene] = summary.false_sign_rate;
-                        if let Some(rates) = &mut fsos {
-                            rates[gene] = summary.threshold_rate;
-                        }
-                    }
-                }
+                        mode: &map.optimization.par,
+                        covariance: &covariance,
+                        sd: row_sd,
+                        coefficient: options.coefficient,
+                        options: &options.analysis,
+                        threshold: options.threshold,
+                        flip_sign: options.flip_sign,
+                    },
+                    || GridPosteriorRow::new(&row, regression, gene, dispersion, &options.analysis),
+                )?;
             }
         }
-        for (j, &value) in result.par.iter().enumerate() {
-            modes.as_mut_slice()[gene * p + j] = value;
-        }
+        modes[gene * p..(gene + 1) * p].copy_from_slice(&map.optimization.par);
         diagnostics.push(PosteriorMapDiagnostic {
-            convergence: Some(result.convergence),
-            function_evaluations: result.counts.function,
-            opposite_start_disagrees: disagreement,
+            convergence: Some(map.optimization.convergence),
+            function_evaluations: map.optimization.counts.function,
+            opposite_start_disagrees: map.opposite_start_disagrees,
             laplace_valid,
         });
     }
-    let sign_svalues = fsr.as_ref().map(|v| svalues(v)).transpose()?;
-    let threshold_svalues = fsos.as_ref().map(|v| svalues(v)).transpose()?;
-    warnings.extend(second_warnings);
+    let sign_svalues = rates.false_sign.as_ref().map(|v| svalues(v)).transpose()?;
+    let threshold_svalues = rates
+        .false_sign_or_small
+        .as_ref()
+        .map(|v| svalues(v))
+        .transpose()?;
+    warnings.primary.extend(warnings.opposite);
     Ok(NegativeBinomialPosterior {
         summary_coefficient: options.coefficient,
         mode: RowMajorMatrix::from_row_major(g, p, modes)?,
         standard_deviation: sd
             .map(|v| RowMajorMatrix::from_row_major(g, p, v))
             .transpose()?,
-        false_sign_rate: fsr,
+        false_sign_rate: rates.false_sign,
         sign_svalues,
-        false_sign_or_small_rate: fsos,
+        false_sign_or_small_rate: rates.false_sign_or_small,
         threshold_svalues,
         prior: prepared.prior,
         analysis: prepared.analysis,
         diagnostics,
-        warnings,
+        warnings: warnings.primary,
         random_state: random.as_ref().map(|rng| rng.r_seed()),
     })
 }

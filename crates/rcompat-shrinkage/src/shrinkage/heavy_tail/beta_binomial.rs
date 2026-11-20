@@ -54,7 +54,7 @@ pub(super) fn log_rising(x: f64, k: f64) -> f64 {
 pub(super) struct Row<'a> {
     pub design: MatrixView<'a, f64>,
     pub successes: &'a [f64],
-    pub trials: &'a [f64],
+    pub trials: Vec<f64>,
     pub weights: &'a [f64],
     pub concentration: f64,
     pub prior: &'a CauchyCoefficientPrior,
@@ -195,7 +195,7 @@ mod tests {
             let row = Row {
                 design: MatrixView::new(y.len(), 2, &x, MatrixOrder::ColumnMajor).unwrap(),
                 successes: &y,
-                trials: &n,
+                trials: n,
                 weights: &w,
                 concentration: number(&c["theta"]),
                 prior: &prior,

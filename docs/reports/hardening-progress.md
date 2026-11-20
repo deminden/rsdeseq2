@@ -962,6 +962,18 @@ notes from vendoring. R 4.6.2 also retained the compiled-symbol warning.
 All four staged Cargo archives reproduced byte for byte. They built
 offline from the packaged sources and passed 221 library tests in total.
 
+### Typed posterior fit stages
+
+Posterior batches select one row likelihood and pass its MAP result into the
+Laplace stage when uncertainty is requested. A separate summary step writes
+false-sign and threshold rates and applies grid results when available.
+Primary and opposite-start warnings retain their output ordering, and
+random starts retain one shared draw per batch.
+
+The 23 focused posterior tests passed in each profile, all 11 shrinkage
+unit tests passed under the host R profile, and workspace Clippy passed.
+Both golden manifests matched all 8,032 fields.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
