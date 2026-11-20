@@ -1633,6 +1633,13 @@ and Rust 1.96.0. The R 4.5.3 and R 4.6.2 lanes each passed 150 tests
 and 2,874 expectations with zero skips or failures. Both passed the
 installed-package native smoke test.
 
+The release panel now exercises that compact pipeline in both arithmetic
+profiles on every target. The release build at `e2043e8` passed 144 R-host
+and nine portable integration checks on Linux arm64, and 128 R-host and
+nine portable checks on Linux x86_64 under QEMU 10.0.13. Both targets
+used Rust 1.100.0 and matched all 8,032 golden fields in each profile.
+The separate parity workflow runs the full fixed-dispersion GTEx tests.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |
