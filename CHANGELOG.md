@@ -166,6 +166,11 @@ versions live in [docs/releases](docs/releases/).
   text supplied for its numeric method control. Existing messages and
   error kinds are preserved.
 
+- Formula errors distinguish expansion and evaluation limits, unsupported
+  functions or namespaces, invalid transport lengths and invalid
+  model-matrix responses. They carry the observed resource use, declared
+  transport length or response index while preserving prior messages.
+
 - Missing-prerequisite errors ("Wald fitting requires MAP dispersions") are
   `DeseqError::MissingPrerequisite { domain, operation, prerequisite }`
   (119 sites). 57 of these messages were reworded into the one form

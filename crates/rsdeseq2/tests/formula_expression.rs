@@ -1,8 +1,11 @@
 use crate::support::formula_reference;
+use rsdeseq2::DeseqError;
 use rsdeseq2::design::expression::{
     Argument, Data, EvaluationOptions, Expression, Value, evaluate,
 };
+use rsdeseq2::errors::FormulaResource;
 use serde_json::Value as Json;
+use std::assert_matches;
 
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/formula.rs"]
@@ -303,18 +306,23 @@ fn primitive_wire_preserves_reference_bits_and_rejects_truncation() {
     let mut trailing = bytes.clone();
     trailing.push(0);
     assert!(wire::decode(&trailing).is_err());
-    let mut oversized = bytes;
-    oversized[5..13].copy_from_slice(&u64::MAX.to_le_bytes());
-    assert!(wire::decode(&oversized).is_err());
+    let mut oversized = wire::encode(&Value::scalar(1.0)).unwrap();
+    oversized[5..13].copy_from_slice(&(usize::MAX as u64).to_le_bytes());
+    assert_matches!(
+        wire::decode(&oversized).unwrap_err(),
+        DeseqError::InvalidFormulaTransportLength {
+            count: usize::MAX, element_bytes: 8, remaining_bytes,
+        } if remaining_bytes == oversized.len() - 13
+    );
     let huge = call(
         "seq_len",
         vec![Expression::Literal(Value::scalar(i32::MAX as f64))],
     );
-    assert!(
-        evaluate(&huge, &[], &EvaluationOptions::default())
-            .unwrap_err()
-            .to_string()
-            .contains("size limit")
+    assert_matches!(
+        evaluate(&huge, &[], &EvaluationOptions::default()).unwrap_err(),
+        DeseqError::FormulaLimitExceeded {
+            resource: FormulaResource::OutputElements, limit, observed: Some(count),
+        } if limit == wire::MAX_BYTES / size_of::<f64>() && count == i32::MAX as usize
     );
 }
 
@@ -346,14 +354,21 @@ fn rejects_custom_calls_even_in_unused_branches_and_validates_owned_inputs() {
             custom,
         ],
     );
-    assert!(
-        evaluate(&expression, &[], &options)
-            .unwrap_err()
-            .to_string()
-            .contains("custom or unsupported formula function 'custom_function'")
+    assert_matches!(
+        evaluate(&expression, &[], &options).unwrap_err(),
+        DeseqError::UnsupportedFormulaFunction { function, expected_namespace: None }
+            if function == "custom_function"
     );
-    for namespace in ["base::poly", "stats::log", "other::log"] {
-        assert!(evaluate(&call(namespace, vec![]), &[], &options).is_err());
+    for (name, namespace) in [
+        ("base::poly", Some("stats::")),
+        ("stats::log", Some("base::")),
+        ("other::log", None),
+    ] {
+        assert_matches!(
+            evaluate(&call(name, vec![]), &[], &options).unwrap_err(),
+            DeseqError::UnsupportedFormulaFunction { function, expected_namespace }
+                if function == name && expected_namespace == namespace
+        );
     }
     let mut malformed = Vec::new();
     let mut v = Value::numbers(vec![1.0]);
@@ -420,11 +435,30 @@ fn rejects_custom_calls_even_in_unused_branches_and_validates_owned_inputs() {
     for _ in 0..130 {
         nested = call("I", vec![nested]);
     }
-    assert!(
-        evaluate(&nested, &[], &options)
-            .unwrap_err()
-            .to_string()
-            .contains("nesting exceeds 128")
+    let error = evaluate(&nested, &[], &options).unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "invalid options: formula expression nesting exceeds 128"
+    );
+    assert_matches!(
+        error,
+        DeseqError::FormulaLimitExceeded {
+            resource: FormulaResource::ExpressionDepth,
+            limit: 128,
+            observed: Some(129),
+        }
+    );
+    let mut value = Value::scalar(1.0);
+    for _ in 0..129 {
+        value = Value::new(Data::List(vec![value]));
+    }
+    assert_matches!(
+        evaluate(&Expression::Literal(value), &[], &options).unwrap_err(),
+        DeseqError::FormulaLimitExceeded {
+            resource: FormulaResource::ValueDepth,
+            limit: 128,
+            observed: Some(129),
+        }
     );
 }
 

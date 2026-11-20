@@ -206,9 +206,14 @@ impl Default for EvaluationOptions {
 // Prevent short symbolic requests (e.g. seq_len(INT_MAX)) from requesting
 // unbounded intermediate storage before the bounded transport can reject it.
 pub(super) fn checked_elements(count: Option<usize>) -> Result<usize, Error> {
+    let limit = wire::MAX_BYTES / std::mem::size_of::<f64>();
     count
-        .filter(|n| *n <= wire::MAX_BYTES / std::mem::size_of::<f64>())
-        .ok_or_else(|| invalid_formula("formula expression output exceeds size limit"))
+        .filter(|n| *n <= limit)
+        .ok_or(Error::FormulaLimitExceeded {
+            resource: crate::errors::FormulaResource::OutputElements,
+            limit,
+            observed: count,
+        })
 }
 pub(super) const NA_REAL: f64 = f64::from_bits(0x7ff0_0000_0000_07a2);
 // Integer storage has one missing sentinel and no signed zero. Canonicalize
@@ -318,9 +323,7 @@ pub fn evaluate_many(
 }
 impl Evaluator<'_> {
     fn expression(&mut self, expression: &Expression, depth: usize) -> Result<Value, Error> {
-        if depth > 128 {
-            return Err(invalid_formula("formula expression nesting exceeds 128"));
-        }
+        validation::validate_expression_depth(depth)?;
         match expression {
             Expression::Literal(v) => {
                 validate_value(v, depth)?;

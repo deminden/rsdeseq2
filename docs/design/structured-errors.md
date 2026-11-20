@@ -160,6 +160,19 @@ The location can identify an observation, a component, or both axes of a
 likelihood matrix entry. The standalone validation transport retains
 its original text when it serializes these errors.
 
+## Formula resources
+
+`FormulaLimitExceeded` reports the resource, limit and observed value.
+An expansion preflight can provide a lower bound because it stops counting
+as soon as the limit is exceeded. Arithmetic overflow can leave the observed
+value unavailable.
+
+`UnsupportedFormulaFunction` retains the function spelling and the required
+namespace when the function is recognized. `InvalidFormulaTransportLength`
+reports the declared count, per-element minimum and remaining bytes.
+`InvalidModelMatrixResponse` distinguishes an out-of-range index from a
+factor supplied as a numeric response.
+
 ## Not in this step
 - `scoped_invalid_options` sites keep their `"{scope}: {reason}"` text.
 - The free-text variants stay; nothing is deprecated.

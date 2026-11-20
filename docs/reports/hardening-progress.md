@@ -822,6 +822,14 @@ Dirichlet parameters. Compiled EM parser errors reach Rust callers as
 typed errors and retain the original diagnostic in the fixture transport.
 The 19 targeted optimizer and mixture tests and workspace Clippy passed.
 
+Formula validation now identifies the resource that exceeded its bound,
+the observed count or lower bound, and the configured limit. Unsupported
+functions retain their names and the required namespace when known.
+Invalid wire lengths expose the declared count and remaining bytes, and
+model-matrix response errors distinguish an invalid index from a factor.
+All 150 targeted formula, design and model-matrix tests and workspace
+Clippy passed.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

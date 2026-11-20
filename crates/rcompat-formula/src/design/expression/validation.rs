@@ -1,6 +1,8 @@
-use super::{Data, Expression, Value, functions, invalid_options};
-use crate::errors::Error;
+use super::{Data, Expression, Value, functions};
 use crate::errors::invalid_formula;
+use crate::errors::{Error, FormulaResource};
+
+const MAX_EXPRESSION_DEPTH: usize = 128;
 
 pub(super) fn function_name(function: &str) -> Result<&str, Error> {
     let name = function
@@ -8,9 +10,10 @@ pub(super) fn function_name(function: &str) -> Result<&str, Error> {
         .or_else(|| function.strip_prefix("stats::"))
         .unwrap_or(function);
     if !functions::supported(name) {
-        return Err(invalid_options(format!(
-            "custom or unsupported formula function '{function}'; provide a supported built-in transform"
-        )));
+        return Err(Error::UnsupportedFormulaFunction {
+            function: function.into(),
+            expected_namespace: None,
+        });
     }
     let namespace = if matches!(name, "poly" | "offset" | "relevel" | "sd") {
         "stats::"
@@ -18,17 +21,27 @@ pub(super) fn function_name(function: &str) -> Result<&str, Error> {
         "base::"
     };
     if function.contains("::") && !function.starts_with(namespace) {
-        return Err(invalid_options(format!(
-            "unsupported formula namespace for '{function}'"
-        )));
+        return Err(Error::UnsupportedFormulaFunction {
+            function: function.into(),
+            expected_namespace: Some(namespace),
+        });
     }
     Ok(name)
 }
 
-pub(super) fn validate_expression(expression: &Expression, depth: usize) -> Result<(), Error> {
-    if depth > 128 {
-        return Err(invalid_formula("formula expression nesting exceeds 128"));
+pub(super) fn validate_expression_depth(depth: usize) -> Result<(), Error> {
+    if depth > MAX_EXPRESSION_DEPTH {
+        return Err(Error::FormulaLimitExceeded {
+            resource: FormulaResource::ExpressionDepth,
+            limit: MAX_EXPRESSION_DEPTH,
+            observed: Some(depth),
+        });
     }
+    Ok(())
+}
+
+pub(super) fn validate_expression(expression: &Expression, depth: usize) -> Result<(), Error> {
+    validate_expression_depth(depth)?;
     match expression {
         Expression::Literal(value) => validate_value(value, depth),
         Expression::Symbol(_) => Ok(()),
@@ -48,7 +61,7 @@ pub(super) fn validate_expression(expression: &Expression, depth: usize) -> Resu
 // Public primitive inputs must be checked before any matrix indexing or factor
 // lookup. This also bounds recursive metadata independently of AST recursion.
 pub(super) fn validate_value(value: &Value, depth: usize) -> Result<(), Error> {
-    validate_value_with_limit(value, depth, 128)
+    validate_value_with_limit(value, depth, MAX_EXPRESSION_DEPTH)
 }
 pub(super) fn validate_value_with_limit(
     value: &Value,
@@ -56,9 +69,11 @@ pub(super) fn validate_value_with_limit(
     limit: usize,
 ) -> Result<(), Error> {
     if depth > limit {
-        return Err(invalid_formula(format!(
-            "formula value nesting exceeds {limit}"
-        )));
+        return Err(Error::FormulaLimitExceeded {
+            resource: FormulaResource::ValueDepth,
+            limit,
+            observed: Some(depth),
+        });
     }
     if let Some([rows, columns]) = value.dimensions {
         if rows.checked_mul(columns) != Some(value.len()) {

@@ -146,6 +146,48 @@ pub enum Error {
         value: f64,
     },
 
+    /// Formula expansion, evaluation or serialization exceeded a resource limit.
+    #[error("invalid options: {}", resource.limit_message(*limit))]
+    FormulaLimitExceeded {
+        /// Resource measured at the failing check.
+        resource: FormulaResource,
+        /// Maximum allowed amount.
+        limit: usize,
+        /// Observed amount or a lower bound, absent on arithmetic overflow.
+        observed: Option<usize>,
+    },
+
+    /// A formula function or its qualification is unsupported.
+    #[error("invalid options: {}", formula_function_message(function, *expected_namespace))]
+    UnsupportedFormulaFunction {
+        /// Function spelling, including any namespace qualifier.
+        function: String,
+        /// Required namespace prefix when the function itself is supported.
+        expected_namespace: Option<&'static str>,
+    },
+
+    /// A formula transport count cannot fit into the remaining payload.
+    #[error("invalid options: invalid formula transport length")]
+    InvalidFormulaTransportLength {
+        /// Declared element count.
+        count: usize,
+        /// Minimum byte length of one element.
+        element_bytes: usize,
+        /// Bytes remaining after the count.
+        remaining_bytes: usize,
+    },
+
+    /// A model-matrix response does not identify a numeric variable.
+    #[error("invalid options: model matrix response must identify a numeric variable")]
+    InvalidModelMatrixResponse {
+        /// Requested zero-based response index.
+        index: usize,
+        /// Number of supplied variables.
+        variables: usize,
+        /// Why the requested response could not be used.
+        problem: ModelMatrixResponseProblem,
+    },
+
     /// A caller passed observation weights to an unweighted EM method.
     #[error(
         "invalid options: mixture prior fit: observation weights require the weighted EM optimizer"
@@ -449,6 +491,63 @@ pub enum Error {
         /// The violated condition.
         what: String,
     },
+}
+
+/// Bounded resources used by the formula parser, evaluator and transport.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum FormulaResource {
+    /// Count of expanded terms.
+    ExpandedTerms,
+    /// Length of the formula text in bytes.
+    InputBytes,
+    /// Nested parentheses in formula text.
+    ParenthesisDepth,
+    /// Recursive depth of a formula expression.
+    ExpressionDepth,
+    /// Recursive depth of value attributes and lists.
+    ValueDepth,
+    /// Element count of an intermediate expression result.
+    OutputElements,
+    /// Length of the encoded transport in bytes.
+    TransportBytes,
+    /// Recursive depth of transported values.
+    TransportDepth,
+}
+
+impl FormulaResource {
+    fn limit_message(self, limit: usize) -> String {
+        match self {
+            Self::ExpandedTerms => format!("formula expansion exceeds {limit} terms"),
+            Self::InputBytes => "formula exceeds 1 MiB".into(),
+            Self::ParenthesisDepth => format!("formula nesting exceeds {limit} levels"),
+            Self::ExpressionDepth => format!("formula expression nesting exceeds {limit}"),
+            Self::ValueDepth => format!("formula value nesting exceeds {limit}"),
+            Self::OutputElements => "formula expression output exceeds size limit".into(),
+            Self::TransportBytes => "formula transport exceeds size limit".into(),
+            Self::TransportDepth => format!("formula transport nesting exceeds {limit}"),
+        }
+    }
+}
+
+fn formula_function_message(function: &str, expected_namespace: Option<&str>) -> String {
+    if expected_namespace.is_some() {
+        format!("unsupported formula namespace for '{function}'")
+    } else {
+        format!(
+            "custom or unsupported formula function '{function}'; provide a supported built-in transform"
+        )
+    }
+}
+
+/// Problem with the response supplied to model-matrix assembly.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum ModelMatrixResponseProblem {
+    /// The response index is outside the supplied variables.
+    OutOfBounds,
+    /// The response refers to a factor.
+    NonNumeric,
 }
 
 /// Posterior controls rejected during query validation.
@@ -784,6 +883,9 @@ impl Error {
             | Self::WeightedEmRequired { .. }
             | Self::MixtureInputLengthMismatch { .. }
             | Self::EmPolynomialOrderExceeded { .. }
+            | Self::InvalidModelMatrixResponse { .. }
+            | Self::InvalidFormulaTransportLength { .. }
+            | Self::UnsupportedFormulaFunction { .. }
             | Self::PosteriorCancelled
             | Self::PosteriorGridBudgetExceeded { .. }
             | Self::PosteriorGridOverflow { .. }
@@ -809,7 +911,7 @@ impl Error {
             | Self::InvalidCalculation { domain, .. }
             | Self::AmbiguousName { domain, .. }
             | Self::NameNotFound { domain, .. } => *domain,
-            Self::InvalidFormula { .. } => ErrorKind::Formula,
+            Self::InvalidFormula { .. } | Self::FormulaLimitExceeded { .. } => ErrorKind::Formula,
             Self::CoefficientNotFound { .. }
             | Self::AmbiguousCoefficient { .. }
             | Self::DesignRankDeficient { .. }

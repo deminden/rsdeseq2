@@ -1,5 +1,5 @@
-use crate::errors::Error;
 use crate::errors::invalid_formula;
+use crate::errors::{Error, FormulaResource};
 
 pub(super) fn expand_parenthesized_formula_terms(rhs: &str) -> Result<String, Error> {
     let signed_terms = split_formula_signed_terms(rhs)?;
@@ -712,11 +712,17 @@ const MAX_EXPANDED_TERMS: usize = 16_384;
 
 pub(super) fn check_expansion_size(size: usize) -> Result<(), Error> {
     if size > MAX_EXPANDED_TERMS {
-        return Err(invalid_formula(format!(
-            "formula expansion exceeds {MAX_EXPANDED_TERMS} terms"
-        )));
+        return Err(expansion_limit(Some(size)));
     }
     Ok(())
+}
+
+fn expansion_limit(observed: Option<usize>) -> Error {
+    Error::FormulaLimitExceeded {
+        resource: FormulaResource::ExpandedTerms,
+        limit: MAX_EXPANDED_TERMS,
+        observed,
+    }
 }
 
 pub(super) fn check_combination_count(n: usize, order: usize) -> Result<(), Error> {
@@ -728,7 +734,7 @@ pub(super) fn check_combination_count(n: usize, order: usize) -> Result<(), Erro
     for i in 0..k {
         size = size.saturating_mul((n - i) as u128) / (i + 1) as u128;
         if size > MAX_EXPANDED_TERMS as u128 {
-            return check_expansion_size(usize::MAX);
+            return Err(expansion_limit(usize::try_from(size).ok()));
         }
     }
     Ok(())
@@ -757,8 +763,14 @@ fn canonical_interaction(term: &str) -> Result<String, Error> {
 }
 
 pub(super) fn validate_expansion_input(rhs: &str) -> Result<(), Error> {
-    if rhs.len() > 1_048_576 {
-        return Err(invalid_formula("formula exceeds 1 MiB"));
+    const MAX_FORMULA_BYTES: usize = 1_048_576;
+    const MAX_PARENTHESIS_DEPTH: usize = 128;
+    if rhs.len() > MAX_FORMULA_BYTES {
+        return Err(Error::FormulaLimitExceeded {
+            resource: FormulaResource::InputBytes,
+            limit: MAX_FORMULA_BYTES,
+            observed: Some(rhs.len()),
+        });
     }
     // Syntax validation remains in the parser; this preflight bounds recursive
     // group expansion while ignoring parentheses in strings and quoted names.
@@ -778,8 +790,12 @@ pub(super) fn validate_expansion_input(rhs: &str) -> Result<(), Error> {
             quote = Some(c);
         } else if c == '(' {
             depth += 1;
-            if depth > 128 {
-                return Err(invalid_formula("formula nesting exceeds 128 levels"));
+            if depth > MAX_PARENTHESIS_DEPTH {
+                return Err(Error::FormulaLimitExceeded {
+                    resource: FormulaResource::ParenthesisDepth,
+                    limit: MAX_PARENTHESIS_DEPTH,
+                    observed: Some(depth),
+                });
             }
         } else if c == ')' {
             depth = depth.saturating_sub(1);
@@ -796,7 +812,7 @@ pub(super) fn check_power_expansion(n: usize, order: usize) -> Result<(), Error>
         combination = combination.saturating_mul((n - k + 1) as u128) / k as u128;
         total = total.saturating_add(combination);
         if total > MAX_EXPANDED_TERMS as u128 {
-            return check_expansion_size(usize::MAX);
+            return Err(expansion_limit(usize::try_from(total).ok()));
         }
     }
     Ok(())

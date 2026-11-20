@@ -2,8 +2,11 @@ use crate::support::formula_reference;
 // Frozen independent R matrices, including attributes/order and signed zeros.
 #[path = "../tools/validation/evaluate_r_interface/model_matrix.rs"]
 mod input;
+use rsdeseq2::DeseqError;
 use rsdeseq2::design::{FactorCoding, ModelMatrixPlan, ModelMatrixVariable};
+use rsdeseq2::errors::ModelMatrixResponseProblem;
 use rsdeseq2::matrix::{MatrixOrder, MatrixView};
+use std::assert_matches;
 
 #[test]
 fn formula_term_assembly_matches_independent_r_in_both_storage_orders() {
@@ -46,12 +49,15 @@ fn model_matrix_rejects_invalid_shapes_codes_names_and_contrasts() {
         assert!(ModelMatrixPlan::new(3, &[variable], &terms, true).is_err());
     }
     assert!(ModelMatrixPlan::new(2, &[variable], &[vec![1]], true).is_err());
-    assert!(
+    assert_matches!(
         ModelMatrixPlan::with_response(3, &[variable], &[vec![1]], true, Some(1))
             .err()
-            .unwrap()
-            .to_string()
-            .contains("response")
+            .unwrap(),
+        DeseqError::InvalidModelMatrixResponse {
+            index: 1,
+            variables: 1,
+            problem: ModelMatrixResponseProblem::OutOfBounds,
+        }
     );
     let levels = vec!["a".into(), "b".into()];
     for codes in [[0, 1, 2], [1, 3, 2], [i32::MIN, 1, 2]] {
@@ -77,12 +83,15 @@ fn model_matrix_rejects_invalid_shapes_codes_names_and_contrasts() {
         levels: &levels,
         coding: FactorCoding::Treatment { base: 0 },
     };
-    assert!(
+    assert_matches!(
         ModelMatrixPlan::with_response(3, &[valid_factor], &[vec![1]], true, Some(0))
             .err()
-            .unwrap()
-            .to_string()
-            .contains("response")
+            .unwrap(),
+        DeseqError::InvalidModelMatrixResponse {
+            index: 0,
+            variables: 1,
+            problem: ModelMatrixResponseProblem::NonNumeric,
+        }
     );
     let custom = ModelMatrixVariable::Factor {
         name: "f",

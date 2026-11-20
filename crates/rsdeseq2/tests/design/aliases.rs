@@ -1,6 +1,6 @@
 use super::*;
 use crate::support::{assert_ambiguous_name, assert_name_not_found};
-use rsdeseq2::errors::{FactorLevelRole, NameScope};
+use rsdeseq2::errors::{FactorLevelRole, FormulaResource, NameScope};
 
 #[test]
 fn expanded_formula_design_supports_dot_main_effects() {
@@ -666,21 +666,33 @@ fn formula_interactions_are_idempotent_before_expansion() {
         .iter()
         .map(|name| ExpandedNumericSpec { name, values: &x })
         .collect::<Vec<_>>();
-    for formula in ["~ .^20", "~ . - .^20", "~ .:.:.:."] {
-        assert!(
-            expanded_formula_design(formula, &[], &covariates)
-                .unwrap_err()
-                .to_string()
-                .contains("formula expansion exceeds"),
+    let explosive = format!("~ {}", names.join("*"));
+    for formula in ["~ .^20", "~ . - .^20", "~ .:.:.:.", &explosive] {
+        assert_matches!(
+            expanded_formula_design(formula, &[], &covariates).unwrap_err(),
+            DeseqError::FormulaLimitExceeded {
+                resource: FormulaResource::ExpandedTerms, limit: 16_384, observed: Some(count),
+            } if count > 16_384,
             "{formula}"
         );
     }
-    let explosive = format!("~ {}", names.join("*"));
-    assert!(
-        expanded_formula_design(&explosive, &[], &covariates)
-            .unwrap_err()
-            .to_string()
-            .contains("formula expansion exceeds")
+    let oversized = " ".repeat(1_048_577);
+    assert_matches!(
+        expanded_formula_design(&oversized, &[], &numeric).unwrap_err(),
+        DeseqError::FormulaLimitExceeded {
+            resource: FormulaResource::InputBytes,
+            limit: 1_048_576,
+            observed: Some(1_048_577),
+        }
+    );
+    let nested = format!("~ {}x{}", "(".repeat(129), ")".repeat(129));
+    assert_matches!(
+        expanded_formula_design(&nested, &[], &numeric).unwrap_err(),
+        DeseqError::FormulaLimitExceeded {
+            resource: FormulaResource::ParenthesisDepth,
+            limit: 128,
+            observed: Some(129),
+        }
     );
 }
 

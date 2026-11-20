@@ -4,7 +4,7 @@
 //! The same validated plan can be used by native and foreign-language callers.
 use crate::errors::Error;
 use crate::errors::invalid_options;
-use crate::errors::{ErrorKind, missing_prerequisite};
+use crate::errors::{ErrorKind, ModelMatrixResponseProblem, missing_prerequisite};
 use crate::matrix::MatrixView;
 
 mod contrasts;
@@ -209,12 +209,21 @@ impl<'a> ModelMatrixPlan<'a> {
         intercept: bool,
         response: Option<usize>,
     ) -> Result<Self, Error> {
-        if response.is_some_and(|r| {
-            r >= variables.len() || matches!(variables[r], ModelMatrixVariable::Factor { .. })
-        }) {
-            return Err(invalid_options(
-                "model matrix response must identify a numeric variable",
-            ));
+        if let Some(index) = response {
+            let problem = match variables.get(index) {
+                None => Some(ModelMatrixResponseProblem::OutOfBounds),
+                Some(ModelMatrixVariable::Factor { .. }) => {
+                    Some(ModelMatrixResponseProblem::NonNumeric)
+                }
+                Some(ModelMatrixVariable::Numeric { .. }) => None,
+            };
+            if let Some(problem) = problem {
+                return Err(Error::InvalidModelMatrixResponse {
+                    index,
+                    variables: variables.len(),
+                    problem,
+                });
+            }
         }
         if samples == 0 {
             return Err(missing_prerequisite(
