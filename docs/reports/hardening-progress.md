@@ -516,9 +516,9 @@ manifests and all eleven GTEx result TSVs. It improved throughput by
 projection. In `b9b550e`, designs with up to four coefficients use the
 one-column projection and wider designs use the batched projection.
 The integrated version passed 31 IRLS unit tests, 72 host-profile
-integration tests and 10 portable-profile integration tests. The next
-milestone includes the combined release and performance checks for
-these two commits.
+integration tests and 10 portable-profile integration tests. The two
+commits together matched all 44 GTEx result and diagnostic files from
+`1d54903` and both macOS golden manifests.
 
 ### Preliminary dispersion mean replay
 
@@ -538,6 +538,31 @@ passed in each profile. Replaying two of the borderline convergence
 decisions in DESeq2 with the trial's own inputs also changed the stopping
 steps from the frozen output. The trial and replay inputs were archived
 locally, and the optimizer policy was restored.
+
+### Direct Householder projection for wider designs
+
+In `6ab4479`, IRLS applies the stored reflectors directly to the weighted
+response when the design has more than four coefficients. The triangular
+solve uses the same reusable scratch. With four workers and seven paired
+repetitions per fixture, rlog throughput rose 21.7% for 4,096 genes × 16
+samples and 32.5% for 2,048 genes × 32 samples. Peak RSS changed from
+11.80 to 12.25 MiB and from 11.56 to 11.45 MiB, respectively. The largest
+change between builds was `2.05e-14`. On both fixtures, maximum absolute
+error against DESeq2 1.52.0 remained below `6.3e-11`.
+
+Exactly 16 rlog fields changed in each 8,032-field manifest. The full
+portable manifest matched on macOS and Linux arm64. The toy and
+automatic-dispersion portable cases also matched on emulated Linux
+x86_64, where the full host manifest was regenerated. Targeted IRLS,
+covariance and rlog tests passed. All 44 GTEx result and diagnostic
+files again matched byte for byte across both profiles. A detached trial
+that used the direct projection for narrow designs introduced six
+failures across the six portable blocked contrasts, so those designs
+retain their earlier projection order.
+
+The combined macOS R 4.6.2 package check passed 2,874 expectations with
+zero skips. It recorded the existing compiled-symbol warning and two
+vendoring notes.
 
 ### Mutation workflow verification
 
