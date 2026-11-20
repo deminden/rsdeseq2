@@ -1806,6 +1806,23 @@ adding the targeted comparisons, 1,026 tests passed, six failed and
 two full-data tests remained ignored. The remaining failures cover
 high-order ordered-factor contrasts and five shrinkage reference tests.
 
+### Portable ordered-factor contrasts
+
+The model-matrix panel compares the seven high-order ordered factors
+against independent R 4.6.2 matrices. Portable columns retain their
+orientation up to the numerical rank from R's `qr()`. Beyond that rank,
+the comparison permits sign changes in the orthogonal completion.
+Absolute entry differences are bounded by `2e-10` through column 20 and
+`5e-5` for higher columns. The Gram matrix is checked to `1e-14`.
+The largest aligned entry difference was `3.591e-5` in the portable profile.
+
+Seven SHA-256 hashes pin the portable output, including column signs.
+Other model-matrix cases retain exact comparisons, as do all R-host
+cases. Both profiles passed four targeted tests on macOS arm64, Linux
+arm64 and Linux x86_64 under QEMU 10.0.13. The release panel now runs these
+checks under portable arithmetic. The portable integration audit passed
+1,027 tests and has five remaining shrinkage failures.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |
