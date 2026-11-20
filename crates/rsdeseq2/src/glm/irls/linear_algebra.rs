@@ -2,6 +2,12 @@ use super::*;
 // Weighted least squares, QR, covariance and design crossproducts.
 
 #[derive(Default)]
+pub(super) struct LeastSquaresScratch {
+    qr: QrScratch,
+    normal: NormalEquationsScratch,
+}
+
+#[derive(Default)]
 pub(super) struct QrScratch {
     augmented_design: DMatrix<f64>,
     augmented_response: DVector<f64>,
@@ -14,7 +20,7 @@ pub(super) struct QrScratch {
 }
 
 pub(super) fn solve_weighted_least_squares(
-    scratch: &mut QrScratch,
+    scratch: &mut LeastSquaresScratch,
     x: &DMatrix<f64>,
     w: &[f64],
     z: &[f64],
@@ -23,12 +29,10 @@ pub(super) fn solve_weighted_least_squares(
     beta: &mut DVector<f64>,
 ) -> Option<()> {
     match solver {
-        IrlsSolver::NormalEquations => {
-            let (xtwx, xtwz) = xtwx_and_xtwz(x, w, z, ridge_lambda)?;
-            *beta = xtwx.lu().solve(&xtwz)?;
-            Some(())
+        IrlsSolver::NormalEquations => scratch.normal.solve(x, w, z, ridge_lambda, beta),
+        IrlsSolver::Qr => {
+            solve_weighted_least_squares_qr(&mut scratch.qr, x, w, z, ridge_lambda, beta)
         }
-        IrlsSolver::Qr => solve_weighted_least_squares_qr(scratch, x, w, z, ridge_lambda, beta),
     }
 }
 
@@ -240,17 +244,54 @@ fn covariance_with_inverse(
     Some((inverse, beta_covariance))
 }
 
-pub(super) fn xtwx_and_xtwz(
+#[derive(Default)]
+struct NormalEquationsScratch {
+    crossproduct: DMatrix<f64>,
+    response: DVector<f64>,
+    active: Vec<(usize, f64)>,
+}
+
+impl NormalEquationsScratch {
+    fn solve(
+        &mut self,
+        x: &DMatrix<f64>,
+        w: &[f64],
+        z: &[f64],
+        ridge_lambda: &[f64],
+        beta: &mut DVector<f64>,
+    ) -> Option<()> {
+        let p = x.ncols();
+        if self.crossproduct.shape() != (p, p) {
+            self.crossproduct = DMatrix::zeros(p, p);
+            self.response = DVector::zeros(p);
+            self.active = Vec::with_capacity(p);
+        } else {
+            self.crossproduct.fill(0.0);
+            self.response.fill(0.0);
+        }
+        fill_normal_equations(x, w, z, ridge_lambda, self)?;
+        if !solve_lu_in_place(&mut self.crossproduct, &mut self.response) {
+            return None;
+        }
+        std::mem::swap(&mut self.response, beta);
+        Some(())
+    }
+}
+
+fn fill_normal_equations(
     x: &DMatrix<f64>,
     w: &[f64],
     z: &[f64],
     ridge_lambda: &[f64],
-) -> Option<(DMatrix<f64>, DVector<f64>)> {
-    let mut xtwx = DMatrix::zeros(x.ncols(), x.ncols());
-    let mut xtwz = DVector::zeros(x.ncols());
-    let mut active = Vec::with_capacity(x.ncols());
+    scratch: &mut NormalEquationsScratch,
+) -> Option<()> {
+    let NormalEquationsScratch {
+        crossproduct: xtwx,
+        response: xtwz,
+        active,
+    } = scratch;
     for (sample, &weight) in w.iter().enumerate().take(x.nrows()) {
-        fill_active_design_columns(x, sample, &mut active);
+        fill_active_design_columns(x, sample, active);
         for (col, col_value) in active.iter().copied() {
             xtwz[col] = checked::add(xtwz[col], checked_product3(col_value, weight, z[sample])?)?;
         }
@@ -270,7 +311,31 @@ pub(super) fn xtwx_and_xtwz(
         xtwx[(diagonal, diagonal)] =
             checked::add(xtwx[(diagonal, diagonal)], ridge_lambda[diagonal])?;
     }
-    Some((xtwx, xtwz))
+    Some(())
+}
+
+fn solve_lu_in_place(matrix: &mut DMatrix<f64>, response: &mut DVector<f64>) -> bool {
+    use nalgebra::linalg::{gauss_step, gauss_step_swap};
+
+    let p = matrix.ncols();
+    for col in 0..p {
+        let pivot = matrix.view_range(col.., col).icamax() + col;
+        let value = matrix[(pivot, col)];
+        if value == 0.0 {
+            continue;
+        }
+        if pivot == col {
+            gauss_step(matrix, value, col);
+        } else {
+            // Apply each LU permutation to the right-hand side immediately.
+            response.swap_rows(col, pivot);
+            matrix.columns_range_mut(..col).swap_rows(col, pivot);
+            gauss_step_swap(matrix, value, col, pivot);
+        }
+    }
+    p == 0
+        || (matrix.solve_lower_triangular_with_diag_mut(response, 1.0)
+            && matrix.solve_upper_triangular_mut(response))
 }
 
 pub(super) fn xtwx_without_ridge(x: &DMatrix<f64>, w: &[f64]) -> Option<DMatrix<f64>> {

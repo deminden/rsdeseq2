@@ -486,11 +486,23 @@ fn irls_deviance_convergence_stat_rejects_nonfinite_arithmetic() {
 #[test]
 fn weighted_least_squares_helpers_reject_nonfinite_accumulation() {
     let x = DMatrix::from_row_slice(1, 1, &[f64::MAX]);
-    assert!(xtwx_and_xtwz(&x, &[2.0], &[1.0], &[0.0]).is_none());
+    let mut beta = DVector::from_element(1, 1.0);
+    assert!(
+        solve_weighted_least_squares(
+            &mut LeastSquaresScratch::default(),
+            &x,
+            &[2.0],
+            &[1.0],
+            &[0.0],
+            IrlsSolver::NormalEquations,
+            &mut beta,
+        )
+        .is_none()
+    );
+    assert_eq!(beta[0], 1.0);
     assert!(xtwx_without_ridge(&x, &[2.0]).is_none());
 
     let unit_x = DMatrix::from_row_slice(1, 1, &[1.0]);
-    let mut beta = DVector::from_element(1, 1.0);
     assert!(
         solve_weighted_least_squares_qr(
             &mut QrScratch::default(),
@@ -503,6 +515,41 @@ fn weighted_least_squares_helpers_reject_nonfinite_accumulation() {
         .is_none()
     );
     assert_eq!(beta[0], 1.0);
+}
+
+#[test]
+fn reusable_normal_equations_match_pivoted_lu_after_a_failed_solve() {
+    let x = DMatrix::from_row_slice(3, 2, &[1.0, 4.0, 1.0, 5.0, 1.0, 7.0]);
+    let mut scratch = LeastSquaresScratch::default();
+    let mut beta = DVector::zeros(2);
+    let crossproduct = DMatrix::<f64>::from_row_slice(2, 2, &[4.0, 21.0, 21.0, 115.0]);
+    let expected = crossproduct
+        .lu()
+        .solve(&DVector::from_vec(vec![11.0, 61.0]))
+        .unwrap();
+
+    for (weights, succeeds) in [
+        ([1.0, 2.0, 1.0], true),
+        ([0.0; 3], false),
+        ([1.0, 2.0, 1.0], true),
+    ] {
+        assert_eq!(
+            solve_weighted_least_squares(
+                &mut scratch,
+                &x,
+                &weights,
+                &[-0.0, 4.0, 3.0],
+                &[0.0; 2],
+                IrlsSolver::NormalEquations,
+                &mut beta,
+            )
+            .is_some(),
+            succeeds
+        );
+        for (value, expected) in beta.iter().zip(expected.iter()) {
+            assert_eq!(value.to_bits(), expected.to_bits());
+        }
+    }
 }
 
 #[test]
