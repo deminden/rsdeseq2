@@ -1,5 +1,6 @@
 use crate::support::two_group_design;
 use approx::assert_relative_eq;
+use rsdeseq2::errors::{CalculationLocation, ErrorKind, Requirement};
 use rsdeseq2::prelude::*;
 
 #[test]
@@ -42,7 +43,17 @@ fn observation_weights_flag_rows_that_drop_design_rank() {
 
 #[test]
 fn observation_weights_use_thresholded_subset_for_cox_reid_check() {
-    let weights = RowMajorMatrix::from_row_major(1, 4, vec![1.0, 1.0, 0.001, 0.001]).unwrap();
+    let weights = RowMajorMatrix::from_row_major(
+        4,
+        4,
+        vec![
+            1.0, 1.0, 0.001, 0.001, // The thresholded design drops the group column.
+            0.001, 0.001, 1.0, 1.0, // Both retained columns are constant.
+            1.0, 1.0, 1.0, 1.0, // The full thresholded design is restored.
+            1.0, 1.0, 0.0, 0.0, // The weighted design itself has lost rank.
+        ],
+    )
+    .unwrap();
     let output = preprocess_observation_weights_with_options(
         &weights,
         &two_group_design(4, Some("condition_B_vs_A")),
@@ -53,7 +64,7 @@ fn observation_weights_use_thresholded_subset_for_cox_reid_check() {
     )
     .unwrap();
 
-    assert_eq!(output.weights_fail, vec![false]);
+    assert_eq!(output.weights_fail, vec![false, true, false, true]);
 }
 
 #[test]
@@ -131,13 +142,49 @@ fn observation_weights_for_non_full_rank_design_use_zero_column_check() {
 fn observation_weights_validate_inputs() {
     let design = two_group_design(4, Some("condition_B_vs_A"));
     let bad_dims = RowMajorMatrix::from_row_major(1, 3, vec![1.0, 1.0, 1.0]).unwrap();
-    assert!(preprocess_observation_weights(&bad_dims, &design).is_err());
+    std::assert_matches!(
+        preprocess_observation_weights(&bad_dims, &design).unwrap_err(),
+        DeseqError::InvalidDimensions { context, expected: 4, actual: 3 }
+            if context == "observation weight columns"
+    );
 
-    let bad_weight = RowMajorMatrix::from_row_major(1, 4, vec![1.0, -1.0, 1.0, 1.0]).unwrap();
-    assert!(preprocess_observation_weights(&bad_weight, &design).is_err());
+    let bad_weight = RowMajorMatrix::from_row_major(
+        3,
+        4,
+        vec![
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            -1.0,
+            1.0,
+            1.0,
+            f64::NAN,
+            1.0,
+            1.0,
+            1.0,
+        ],
+    )
+    .unwrap();
+    let error = preprocess_observation_weights(&bad_weight, &design).unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "out-of-range value in observation weight at index Some(1): -1"
+    );
+    std::assert_matches!(
+        error,
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Numeric,
+            operation: "observation weight",
+            location: Some(CalculationLocation::GeneSample { gene: 1, sample: 1 }),
+            value: -1.0,
+            ..
+        }
+    );
 
     let weights = RowMajorMatrix::from_row_major(1, 4, vec![1.0; 4]).unwrap();
-    assert!(
+    std::assert_matches!(
         preprocess_observation_weights_with_options(
             &weights,
             &design,
@@ -145,8 +192,12 @@ fn observation_weights_validate_inputs() {
                 weight_threshold: f64::NAN,
                 ..ObservationWeightOptions::default()
             }
-        )
-        .is_err()
+        ).unwrap_err(),
+        DeseqError::InvalidParameter {
+            domain: ErrorKind::Options,
+            parameter,
+            requirement: Requirement::FiniteAndNonNegative,
+        } if parameter == "weight threshold"
     );
 }
 

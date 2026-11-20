@@ -1,5 +1,6 @@
 use crate::support::two_group_design;
 use approx::assert_relative_eq;
+use rsdeseq2::errors::{CalculationLocation, ErrorKind};
 use rsdeseq2::prelude::*;
 
 #[test]
@@ -102,8 +103,13 @@ fn borrowed_base_metadata_keeps_error_priority_across_genes() {
     .unwrap_err();
     assert!(matches!(
         error,
-        DeseqError::NonFiniteValue { context, index: Some(1), .. }
-            if context == "weighted baseMean"
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Numeric,
+            operation: "weighted baseMean",
+            location: Some(CalculationLocation::GeneSample { gene: 1, sample: 0 }),
+            value: f64::INFINITY,
+            ..
+        }
     ));
 
     let factors = [1e-200, 1.0, f64::MIN_POSITIVE, 1.0];
@@ -279,8 +285,8 @@ fn weighted_base_metadata_multiplies_normalized_counts_by_weights() {
 
 #[test]
 fn weighted_base_metadata_rejects_nonfinite_products() {
-    let normalized = RowMajorMatrix::from_row_major(1, 2, vec![f64::MAX, 1.0]).unwrap();
-    let weights = RowMajorMatrix::from_row_major(1, 2, vec![2.0, 1.0]).unwrap();
+    let normalized = RowMajorMatrix::from_row_major(2, 2, vec![1.0, 1.0, 1.0, f64::MAX]).unwrap();
+    let weights = RowMajorMatrix::from_row_major(2, 2, vec![1.0, 1.0, 1.0, 2.0]).unwrap();
 
     for (error, operation) in [
         (
@@ -294,8 +300,11 @@ fn weighted_base_metadata_rejects_nonfinite_products() {
     ] {
         std::assert_matches!(
             error,
-            DeseqError::NonFiniteValue { context, index: Some(0), value: f64::INFINITY }
-                if context == operation
+            DeseqError::InvalidCalculation {
+                domain: ErrorKind::Numeric, operation: actual,
+                location: Some(CalculationLocation::GeneSample { gene: 1, sample: 1 }),
+                value: f64::INFINITY, ..
+            } if actual == operation
         );
     }
 }
@@ -346,14 +355,34 @@ fn weighted_base_variance_is_nan_for_one_sample() {
 
 #[test]
 fn weighted_base_metadata_validates_inputs() {
-    let normalized = RowMajorMatrix::from_row_major(1, 3, vec![10.0, 20.0, 30.0]).unwrap();
+    let normalized =
+        RowMajorMatrix::from_row_major(2, 3, vec![10.0, 20.0, 30.0, 5.0, 15.0, 25.0]).unwrap();
     let bad_dims = RowMajorMatrix::from_row_major(1, 2, vec![1.0, 1.0]).unwrap();
-    let bad_weight = RowMajorMatrix::from_row_major(1, 3, vec![1.0, -0.5, 1.0]).unwrap();
+    let bad_weight =
+        RowMajorMatrix::from_row_major(2, 3, vec![1.0, 1.0, 1.0, 1.0, -0.5, 1.0]).unwrap();
 
-    assert!(base_mean_with_weights(&normalized, &bad_dims).is_err());
-    assert!(base_variance_with_weights(&normalized, &bad_dims).is_err());
-    assert!(base_mean_with_weights(&normalized, &bad_weight).is_err());
-    assert!(base_variance_with_weights(&normalized, &bad_weight).is_err());
+    for stage in [base_mean_with_weights, base_variance_with_weights] {
+        std::assert_matches!(
+            stage(&normalized, &bad_dims).unwrap_err(),
+            DeseqError::InvalidDimensions { context, expected: 6, actual: 2 }
+                if context == "base metadata weights"
+        );
+        let error = stage(&normalized, &bad_weight).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "out-of-range value in base metadata weight at index Some(4): -0.5"
+        );
+        std::assert_matches!(
+            error,
+            DeseqError::InvalidCalculation {
+                domain: ErrorKind::Numeric,
+                operation: "base metadata weight",
+                location: Some(CalculationLocation::GeneSample { gene: 1, sample: 1 }),
+                value: -0.5,
+                ..
+            }
+        );
+    }
 }
 
 #[test]

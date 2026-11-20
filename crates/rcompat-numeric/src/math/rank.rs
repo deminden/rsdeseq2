@@ -1,5 +1,6 @@
 use crate::errors::Error;
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
+use crate::matrix::try_alloc_matrix;
 
 /// Default absolute tolerance for deterministic matrix-rank checks.
 pub const DEFAULT_RANK_TOLERANCE: f64 = 1e-10;
@@ -14,6 +15,30 @@ pub fn matrix_rank(
     n_cols: usize,
     tolerance: f64,
 ) -> Result<usize, Error> {
+    validate_rank_input(values, n_rows, n_cols, tolerance)?;
+    let mut matrix = try_alloc_matrix(n_rows, n_cols, "rank matrix")?;
+    matrix.extend_from_slice(values);
+    eliminate_rank(&mut matrix, n_rows, n_cols, tolerance)
+}
+
+/// Apply the same rank calculation to a caller-owned work matrix.
+#[doc(hidden)]
+pub fn matrix_rank_in_place(
+    matrix: &mut [f64],
+    n_rows: usize,
+    n_cols: usize,
+    tolerance: f64,
+) -> Result<usize, Error> {
+    validate_rank_input(matrix, n_rows, n_cols, tolerance)?;
+    eliminate_rank(matrix, n_rows, n_cols, tolerance)
+}
+
+fn validate_rank_input(
+    values: &[f64],
+    n_rows: usize,
+    n_cols: usize,
+    tolerance: f64,
+) -> Result<(), Error> {
     if !tolerance.is_finite() || tolerance < 0.0 {
         return Err(invalid_parameter(
             ErrorKind::Options,
@@ -44,11 +69,18 @@ pub fn matrix_rank(
             });
         }
     }
+    Ok(())
+}
+
+fn eliminate_rank(
+    matrix: &mut [f64],
+    n_rows: usize,
+    n_cols: usize,
+    tolerance: f64,
+) -> Result<usize, Error> {
     if n_rows == 0 || n_cols == 0 {
         return Ok(0);
     }
-
-    let mut matrix = values.to_vec();
     let mut rank = 0_usize;
     let mut row = 0_usize;
 
@@ -131,7 +163,7 @@ pub fn matrix_rank_relative(
             actual: values.len(),
         });
     }
-    let mut scaled = values.to_vec();
+    let mut scaled = try_alloc_matrix(n_rows, n_cols, "relative rank matrix")?;
     for (index, value) in values.iter().copied().enumerate() {
         if !value.is_finite() {
             return Err(Error::NonFiniteValue {
@@ -141,6 +173,7 @@ pub fn matrix_rank_relative(
             });
         }
     }
+    scaled.extend_from_slice(values);
     for col in 0..n_cols {
         let scale = (0..n_rows)
             .map(|row| values[row * n_cols + col].abs())
@@ -151,7 +184,7 @@ pub fn matrix_rank_relative(
             }
         }
     }
-    matrix_rank(&scaled, n_rows, n_cols, tolerance)
+    matrix_rank_in_place(&mut scaled, n_rows, n_cols, tolerance)
 }
 
 /// R's default `qr()` tolerance (LINPACK `dqrdc2`).

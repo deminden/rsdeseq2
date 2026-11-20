@@ -12,3 +12,5 @@ pub use rcompat_numeric::errors::{
     ambiguous_name, invalid_calculation, invalid_dimensions, invalid_dispersion, invalid_formula,
     invalid_options, invalid_parameter, invariant, missing_prerequisite, scoped_invalid_options,
 };
+
+pub(crate) use rcompat_numeric::errors::nonfinite_gene_cell;

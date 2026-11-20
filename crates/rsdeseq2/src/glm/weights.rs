@@ -1,10 +1,9 @@
 use crate::design::DesignMatrix;
-use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{DeseqError, invalid_dimensions, nonfinite_gene_cell};
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
-use crate::math::rank::matrix_rank;
+use crate::math::rank::matrix_rank_in_place;
 use crate::matrix::{RowMajorMatrix, try_alloc_matrix};
 use crate::numeric::checked;
-use crate::numeric::validate::nonnegative_finite as validate_nonnegative_finite;
 
 /// Options for DESeq2-style observation-weight preprocessing.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -75,27 +74,32 @@ pub fn preprocess_observation_weights_with_options(
     }
 
     let normalized_weights = normalize_weight_rows(weights)?;
-    let design_values = design.matrix().as_slice();
-    let p = design.n_coefficients();
-    let design_rank = matrix_rank(design_values, design.n_samples(), p, options.rank_tolerance)?;
-    let design_full_rank = design_rank == p;
-    let mut weights_fail = Vec::with_capacity(weights.n_rows());
+    let samples = design.n_samples();
+    let coefficients = design.n_coefficients();
+    let mut values = try_alloc_matrix(samples, coefficients, "weighted design")?;
+    values.extend_from_slice(design.matrix().as_slice());
+    let design_rank =
+        matrix_rank_in_place(&mut values, samples, coefficients, options.rank_tolerance)?;
+    let mut scratch = if design_rank == coefficients {
+        Some(WeightRankScratch {
+            values,
+            kept_samples: try_alloc_matrix(samples, 1, "Cox-Reid retained samples")?,
+            kept_columns: try_alloc_matrix(coefficients, 1, "Cox-Reid retained columns")?,
+        })
+    } else {
+        None
+    };
+    let mut weights_fail = try_alloc_matrix(weights.n_rows(), 1, "failed weight rows")?;
 
     for gene in 0..weights.n_rows() {
         let row = normalized_weights.row(gene)?;
         let ok = if row.iter().all(|weight| *weight == 0.0) {
             false
-        } else if design_full_rank {
-            weighted_design_full_rank(row, design, options.rank_tolerance)?
-                && cox_reid_subset_full_rank(
-                    row,
-                    design,
-                    gene,
-                    options.weight_threshold,
-                    options.rank_tolerance,
-                )?
+        } else if let Some(scratch) = &mut scratch {
+            scratch.weighted_design_full_rank(row, design, options.rank_tolerance)?
+                && scratch.cox_reid_subset_full_rank(row, design, gene, options)?
         } else {
-            weighted_design_has_no_zero_columns(row, design)?
+            weighted_design_has_no_zero_columns(row, design)
         };
         weights_fail.push(!ok);
     }
@@ -108,12 +112,24 @@ pub fn preprocess_observation_weights_with_options(
 }
 
 fn normalize_weight_rows(weights: &RowMajorMatrix<f64>) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    let mut normalized = Vec::with_capacity(weights.len());
+    let mut normalized = try_alloc_matrix(
+        weights.n_rows(),
+        weights.n_cols(),
+        "normalized observation weights",
+    )?;
     for gene in 0..weights.n_rows() {
         let row = weights.row(gene)?;
         let mut max_weight = 0.0_f64;
         for (sample, weight) in row.iter().copied().enumerate() {
-            validate_nonnegative_finite(weight, "observation weight", sample)?;
+            if !weight.is_finite() || weight < 0.0 {
+                return Err(nonfinite_gene_cell(
+                    "observation weight",
+                    gene,
+                    sample,
+                    sample,
+                    weight,
+                ));
+            }
             max_weight = max_weight.max(weight);
         }
         if max_weight == 0.0 {
@@ -125,122 +141,104 @@ fn normalize_weight_rows(weights: &RowMajorMatrix<f64>) -> Result<RowMajorMatrix
     RowMajorMatrix::from_row_major(weights.n_rows(), weights.n_cols(), normalized)
 }
 
-fn weighted_design_full_rank(
-    weights: &[f64],
-    design: &DesignMatrix,
-    tolerance: f64,
-) -> Result<bool, DeseqError> {
-    let values = weighted_design_values(weights, design)?;
-    Ok(matrix_rank(
-        &values,
-        design.n_samples(),
-        design.n_coefficients(),
-        tolerance,
-    )? == design.n_coefficients())
+struct WeightRankScratch {
+    values: Vec<f64>,
+    kept_samples: Vec<usize>,
+    kept_columns: Vec<usize>,
 }
 
-fn cox_reid_subset_full_rank(
-    weights: &[f64],
-    design: &DesignMatrix,
-    gene: usize,
-    weight_threshold: f64,
-    tolerance: f64,
-) -> Result<bool, DeseqError> {
-    let kept_rows = weights
-        .iter()
-        .copied()
-        .enumerate()
-        .filter_map(|(sample, weight)| (weight > weight_threshold).then_some(sample))
-        .collect::<Vec<_>>();
-    if kept_rows.is_empty() {
-        return Ok(false);
+impl WeightRankScratch {
+    fn weighted_design_full_rank(
+        &mut self,
+        weights: &[f64],
+        design: &DesignMatrix,
+        tolerance: f64,
+    ) -> Result<bool, DeseqError> {
+        let samples = design.n_samples();
+        let coefficients = design.n_coefficients();
+        self.values.clear();
+        for (&weight, row) in weights
+            .iter()
+            .zip(design.matrix().as_slice().chunks_exact(coefficients))
+        {
+            // The normalized weight is at most one and design entries are finite.
+            self.values.extend(row.iter().map(|value| weight * value));
+        }
+        Ok(
+            matrix_rank_in_place(&mut self.values, samples, coefficients, tolerance)?
+                == coefficients,
+        )
     }
 
-    let mut keep_cols = Vec::new();
-    for col in 0..design.n_coefficients() {
-        let mut col_sum = 0.0;
-        for &sample in &kept_rows {
-            let term = design
-                .matrix()
-                .get(sample, col)
-                .copied()
-                .unwrap_or(0.0)
-                .abs();
-            col_sum = checked::try_add(col_sum, term).map_err(|failure| {
-                DeseqError::CoxReidColumnSumOverflow {
-                    gene,
-                    sample,
-                    column: col,
-                    term,
-                    value: failure.value,
-                }
-            })?;
-        }
-        if col_sum > 0.0 {
-            keep_cols.push(col);
-        }
-    }
-    if keep_cols.is_empty() {
-        return Ok(false);
-    }
-
-    let mut values =
-        try_alloc_matrix(kept_rows.len(), keep_cols.len(), "Cox-Reid weighted design")?;
-    for sample in &kept_rows {
-        for col in &keep_cols {
-            values.push(design.matrix().get(*sample, *col).copied().unwrap_or(0.0));
-        }
-    }
-    Ok(matrix_rank(&values, kept_rows.len(), keep_cols.len(), tolerance)? == keep_cols.len())
-}
-
-fn weighted_design_has_no_zero_columns(
-    weights: &[f64],
-    design: &DesignMatrix,
-) -> Result<bool, DeseqError> {
-    for col in 0..design.n_coefficients() {
-        let mut has_nonzero = false;
-        for (sample, weight) in weights.iter().copied().enumerate() {
-            let value = design.matrix().get(sample, col).copied().unwrap_or(0.0);
-            if weight != 0.0 && value != 0.0 {
-                has_nonzero = true;
-                break;
-            }
-        }
-        if !has_nonzero {
+    fn cox_reid_subset_full_rank(
+        &mut self,
+        weights: &[f64],
+        design: &DesignMatrix,
+        gene: usize,
+        options: ObservationWeightOptions,
+    ) -> Result<bool, DeseqError> {
+        self.kept_samples.clear();
+        self.kept_samples.extend(
+            weights.iter().enumerate().filter_map(|(sample, &weight)| {
+                (weight > options.weight_threshold).then_some(sample)
+            }),
+        );
+        if self.kept_samples.is_empty() {
             return Ok(false);
         }
+
+        let coefficients = design.n_coefficients();
+        let design_values = design.matrix().as_slice();
+        self.kept_columns.clear();
+        for column in 0..coefficients {
+            let mut col_sum = 0.0;
+            for &sample in &self.kept_samples {
+                let term = design_values[sample * coefficients + column].abs();
+                col_sum = checked::try_add(col_sum, term).map_err(|failure| {
+                    DeseqError::CoxReidColumnSumOverflow {
+                        gene,
+                        sample,
+                        column,
+                        term,
+                        value: failure.value,
+                    }
+                })?;
+            }
+            if col_sum > 0.0 {
+                self.kept_columns.push(column);
+            }
+        }
+        if self.kept_columns.is_empty() {
+            return Ok(false);
+        }
+
+        self.values.clear();
+        for &sample in &self.kept_samples {
+            let start = sample * coefficients;
+            self.values.extend(
+                self.kept_columns
+                    .iter()
+                    .map(|&column| design_values[start + column]),
+            );
+        }
+        Ok(matrix_rank_in_place(
+            &mut self.values,
+            self.kept_samples.len(),
+            self.kept_columns.len(),
+            options.rank_tolerance,
+        )? == self.kept_columns.len())
     }
-    Ok(true)
 }
 
-fn weighted_design_values(weights: &[f64], design: &DesignMatrix) -> Result<Vec<f64>, DeseqError> {
-    if weights.len() != design.n_samples() {
-        return Err(invalid_dimensions(
-            "observation weight row",
-            design.n_samples(),
-            weights.len(),
-        ));
-    }
-    let mut values = try_alloc_matrix(
-        design.n_samples(),
-        design.n_coefficients(),
-        "weighted design",
-    )?;
-    for (sample, weight) in weights.iter().copied().enumerate() {
-        for col in 0..design.n_coefficients() {
-            let design_value = design.matrix().get(sample, col).copied().unwrap_or(0.0);
-            let Some(value) = checked::mul(weight, design_value) else {
-                return Err(DeseqError::NonFiniteValue {
-                    context: "weighted design value".to_string(),
-                    index: Some(sample * design.n_coefficients() + col),
-                    value: weight * design_value,
-                });
-            };
-            values.push(value);
-        }
-    }
-    Ok(values)
+fn weighted_design_has_no_zero_columns(weights: &[f64], design: &DesignMatrix) -> bool {
+    let values = design.matrix().as_slice();
+    let coefficients = design.n_coefficients();
+    (0..coefficients).all(|column| {
+        weights
+            .iter()
+            .enumerate()
+            .any(|(sample, &weight)| weight != 0.0 && values[sample * coefficients + column] != 0.0)
+    })
 }
 
 fn validate_weight_options(options: ObservationWeightOptions) -> Result<(), DeseqError> {

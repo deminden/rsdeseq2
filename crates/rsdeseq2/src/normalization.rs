@@ -8,7 +8,7 @@ pub(crate) use offsets::sample_factors_with_offsets;
 #[doc(hidden)]
 pub use offsets::visit_offset_factors_column_major;
 
-use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{DeseqError, invalid_dimensions, nonfinite_gene_cell};
 use crate::math::median::median_in_place;
 use crate::matrix::{CountMatrix, CountView, MatrixOrder, MatrixView, RowMajorMatrix};
 use crate::options::SizeFactorMethod;
@@ -544,8 +544,13 @@ fn base_row_mean(
 ) -> Result<f64, DeseqError> {
     let context = if let Some(weights) = weights {
         for (sample, value) in values.iter_mut().enumerate() {
-            *value = checked::try_mul(*value, *weights.at(gene, sample))
-                .nonfinite_at("weighted baseMean", Some(gene))?;
+            *value = weighted_base_value(
+                *value,
+                *weights.at(gene, sample),
+                "weighted baseMean",
+                gene,
+                sample,
+            )?;
         }
         "weighted baseMean"
     } else {
@@ -557,16 +562,26 @@ fn base_row_mean(
 fn checked_weighted_values(
     values: &[f64],
     weights: &[f64],
-    context: &str,
+    context: &'static str,
     gene: usize,
     out: &mut Vec<f64>,
 ) -> Result<(), DeseqError> {
     out.clear();
-    for (value, weight) in values.iter().copied().zip(weights.iter().copied()) {
-        let weighted = checked::try_mul(value, weight).nonfinite_at(context, Some(gene))?;
-        out.push(weighted);
+    for (sample, (&value, &weight)) in values.iter().zip(weights).enumerate() {
+        out.push(weighted_base_value(value, weight, context, gene, sample)?);
     }
     Ok(())
+}
+
+fn weighted_base_value(
+    value: f64,
+    weight: f64,
+    context: &'static str,
+    gene: usize,
+    sample: usize,
+) -> Result<f64, DeseqError> {
+    checked::try_mul(value, weight)
+        .map_err(|error| nonfinite_gene_cell(context, gene, sample, gene, error.value))
 }
 
 fn checked_sample_variance(values: &[f64], mean: f64) -> checked::Checked {
@@ -636,11 +651,13 @@ fn validate_base_weights(
     if let Some((index, value)) =
         first_invalid_cell(weights, |value| !value.is_finite() || value < 0.0)
     {
-        return Err(DeseqError::NonFiniteValue {
-            context: "base metadata weight".to_string(),
-            index: Some(index),
+        return Err(nonfinite_gene_cell(
+            "base metadata weight",
+            index / samples,
+            index % samples,
+            index,
             value,
-        });
+        ));
     }
     Ok(())
 }

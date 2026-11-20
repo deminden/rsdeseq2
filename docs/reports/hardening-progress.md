@@ -1438,6 +1438,32 @@ decisions flipped at either cutoff. The compact checks passed under
 both profiles on macOS. Integration Clippy, the Rust 1.96.0 all-targets
 check, workflow lint, formatting and documentation checks passed.
 
+### Observation-weight rank workspace and diagnostics
+
+Observation-weight preprocessing reuses one design matrix and two
+retained-index buffers across genes. Both the weighted design and
+each thresholded Cox–Reid design use the same elimination routine
+and tolerance as before. The normalized weight matrix and scratch
+buffers reserve capacity with checked allocation.
+
+Weight input and weighted base-metadata multiplication errors
+expose the zero-based gene and sample and the rejected value through
+`CalculationLocation::GeneSample`. Their displayed messages retain
+the established indices. The rank regression alternates restricted
+and full thresholded designs to exercise buffer reuse.
+
+A paired macOS arm64 probe preprocessed 20,000 genes and 100 samples,
+with three design columns and a mix of usable, all-zero and rank-deficient
+weight rows. Allocation and reallocation calls fell from 198,385 at
+`a8dc71b` to five. Median time over three runs fell from 64.2 to
+52.7 ms. The normalized-weight and rank-flag checksum matched on all
+three pairs.
+
+Each profile passed 132 focused integration tests and the 8,032-field
+golden check. The final rank and weight regression run passed nine
+tests in each profile. The numeric rank unit check, Clippy, formatting
+and the module dependency check also passed.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |
@@ -1449,7 +1475,7 @@ check, workflow lint, formatting and documentation checks passed.
 | 5. One workflow entry point | The builder, CLI and R bridge use `DeseqBuilder::run(&Analysis)`. The [API migration](../design/run-entry-point.md) keeps deprecated wrappers in 0.6 and schedules removal in 0.7. |
 | 6. Real-data probability gates | The compact GTEx gate checks log-scale probability, nonfinite values, underflow and significance flips. The [full replay](#native-rlog-smoke-and-full-gtex-probability-replay) checks all 56,200 genes under both profiles, including log-scale error for p-values and adjusted p-values. |
 | 7. Shared checked arithmetic | `rcompat-numeric` owns the checked arithmetic, matrix allocation and validation primitives. The [summation rules](../summation-rules.md) specify the reduction used for each R primitive. |
-| 8. Structured errors | The non-exhaustive error enum carries domains, dimensions, indices and rejected values. The [diagnostics work](#structured-design-and-glm-diagnostics) covers the early input stages, GLM, contrasts and probability calculations. |
+| 8. Structured errors | The non-exhaustive error enum carries domains, dimensions, indices and rejected values. The [diagnostics work](#structured-design-and-glm-diagnostics) covers the early input stages, GLM, contrasts and probability calculations. [Weight errors](#observation-weight-rank-workspace-and-diagnostics) expose both gene and sample. |
 | 9. Rank and initial coefficients | `aaea914` implemented R's rank rule and `1977237` aligned rank-deficient starts. The independently generated rank reference includes scaled near-collinear designs. |
 | 10. Modules and dependency cycles | Core and R bridge use modules. The module checker reports zero mutual top-level dependency pairs. It runs in Rust CI. |
 | 11. Cargo features and workspace | The four Cargo packages separate numerical, formula, shrinkage and DESeq workflow code. Formula, shrinkage and CLI features are checked independently. The CLI ships from the workflow crate and the R native backend has its own package manifest. |

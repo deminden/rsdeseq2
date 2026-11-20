@@ -777,6 +777,13 @@ pub enum PosteriorArrayAxis {
 pub enum CalculationLocation {
     /// Zero-based row in an input of genes.
     Gene(usize),
+    /// A cell in a gene-by-sample matrix.
+    GeneSample {
+        /// Zero-based gene row.
+        gene: usize,
+        /// Zero-based sample column.
+        sample: usize,
+    },
     /// Zero-based element in an arithmetic reduction whose input is not a gene axis.
     ReductionElement(usize),
     /// Zero-based column in an input of coefficients.
@@ -1103,6 +1110,27 @@ pub fn invalid_calculation(
         location,
         value,
         message: format!("{}: {reason}", domain_prefix(domain)),
+    }
+}
+
+/// Preserve the diagnostic index while exposing both axes to Rust callers.
+#[doc(hidden)]
+pub fn nonfinite_gene_cell(
+    context: &'static str,
+    gene: usize,
+    sample: usize,
+    reported_index: usize,
+    value: f64,
+) -> Error {
+    Error::InvalidCalculation {
+        domain: ErrorKind::Numeric,
+        operation: context,
+        location: Some(CalculationLocation::GeneSample { gene, sample }),
+        value,
+        message: format!(
+            "{} value in {context} at index Some({reported_index}): {value}",
+            numeric_value_label(value)
+        ),
     }
 }
 
