@@ -1749,6 +1749,40 @@ pipeline with Cook's cutoff 1 reported 451 replacement candidates and
 zero non-finite covariance rows in both fits. Both profiles verified all
 three files through the completion record.
 
+### Batched model matrix, mixture and diagnostics release checks
+
+The macOS arm64 workspace passed 1,258 Rust unit and integration tests and
+one doctest under the `local` build profile. The batch updated the Wald and
+LRT help snapshots for the covariance summary flag. Both arithmetic
+profiles matched all 8,032 golden fields and passed the full 56,200-gene
+GTEx checks. The largest p-value and
+adjusted p-value log10 errors in the full replay were `7.167e-8` in the
+portable profile and `4.142e-7` in the R-host profile. Workspace Clippy and
+the locked Rust 1.96.0 all-targets check passed.
+
+The release CLI at `5d9f7ee` passed all 130 precision gates under each
+profile across eleven GTEx contrasts. Its 44 result and diagnostic TSVs
+matched the `c9aa13d` batch byte for byte. Both profiles had zero
+significance flips at adjusted p-value cutoffs 0.05 and 0.1, and identical
+top 100, 500 and 2,000 sets against the DESeq2 references.
+
+The R source archive at `5d9f7ee` has SHA-256
+`c292f65c445b0c0670686b62c068500aa4ff1b1b9717d25a6f2fa6f9b7837813`.
+It installed offline with Rust 1.96.0 and fresh Cargo homes. R 4.5.3 with
+DESeq2 1.50.2 and R 4.6.2 with DESeq2 1.52.0 each passed 150 tests
+and 2,874 expectations with zero skips or failures. Both passed the native
+smoke check and recovered from an actual SIGINT. The installed libraries
+exported only `R_init_rsdeseq2` and imported the Rust runtime's `abort`
+symbol. The R 4.6.2 cross-interface checks matched 189 primitive cases,
+33 complete formula fits and eight mixture prior fits bit for bit.
+
+The four Cargo archives at `e4e3202` passed 226 offline library tests.
+Their embedded revisions matched, and the rsdeseq2 archive contained
+both updated CLI help snapshots. All 76 Python tests passed under system
+Python 3.9 with the full GTEx inputs and the installed R package available.
+The two frozen-gene test modules now defer type annotation evaluation on
+Python 3.9.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |
