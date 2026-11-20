@@ -250,6 +250,7 @@ implemented fields rather than every Bioconductor convention.
 The package selects the host R numeric profile by default.
 The R package statically links the Rust core and requires Cargo for source
 installation. In a git checkout its configure step copies the core from
-`crates/`; the source package built by `scripts/release/build_r_source.sh`
-carries that copy and every third-party crate (`cargo vendor`), so it builds
-offline.
+`crates/`. The source package built by `scripts/release/build_r_source.sh`
+carries that copy and an XZ-compressed archive of the third-party crates and
+Cargo checksums. Configure extracts the archive and uses the included Cargo
+configuration to build offline.

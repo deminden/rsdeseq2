@@ -1,4 +1,5 @@
 ^src/rust/target$
+^src/rust/vendor-crates$
 ^src/Makevars$
 ^src/Makevars\.win$
 (^|/)\.DS_Store$

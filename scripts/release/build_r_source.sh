@@ -15,7 +15,7 @@ out_dir=$(CDPATH= cd -- "$out_dir" && pwd)
 rust_dir="$repo_root/r-pkg/rsdeseq2/src/rust"
 
 cleanup() {
-  rm -rf "$rust_dir/vendor-crates" "$rust_dir/cargo"
+  rm -rf "$rust_dir/vendor-crates" "$rust_dir/vendor-crates.tar.xz" "$rust_dir/cargo"
 }
 trap cleanup EXIT
 
@@ -26,4 +26,8 @@ python3 "$repo_root/scripts/release/sync_r_vendor.py"
 # a `.cargo/config.toml`, without shipping a hidden directory.
 mkdir -p "$rust_dir/cargo"
 (cd "$rust_dir" && cargo vendor --locked --versioned-dirs vendor-crates) > "$rust_dir/cargo/config.toml"
+# Keep the complete registry sources and Cargo checksums in a nested archive.
+# R's outer source archive then has no long or hidden registry paths.
+# Python's tar writer leaves out platform-specific filesystem metadata.
+(cd "$rust_dir" && python3 -m tarfile -c vendor-crates.tar.xz vendor-crates)
 (cd "$out_dir" && R CMD build "$repo_root/r-pkg/rsdeseq2")

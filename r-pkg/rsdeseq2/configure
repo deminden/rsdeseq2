@@ -26,6 +26,19 @@ if [ -f "$package_root/src/rust/cargo/config.toml" ]; then
 else
   cargo_offline=""
 fi
+if [ -f "$package_root/src/rust/vendor-crates.tar.xz" ]; then
+  if [ -z "$cargo_offline" ]; then
+    echo "rsdeseq2 configure: offline Cargo config is missing from the source archive" >&2
+    exit 1
+  fi
+  (cd "$package_root/src/rust" && tar -xf vendor-crates.tar.xz)
+fi
+if [ "${1:-}" = "--windows" ]; then
+  sed "s|@CARGO_OFFLINE@|$cargo_offline|g" "$package_root/src/Makevars.win.in" \
+    > "$package_root/src/Makevars.win"
+  echo "rsdeseq2 configure: enabled the Rust core static library."
+  exit 0
+fi
 case "$(uname -s)" in
   Linux)
     rust_link_libraries="-lpthread -lm -ldl"

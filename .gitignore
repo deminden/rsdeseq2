@@ -20,6 +20,7 @@ r-pkg/*/src/symbols.rds
 # Generated at build time (scripts/release/build_r_source.sh, configure).
 r-pkg/rsdeseq2/src/rust/vendor/
 r-pkg/rsdeseq2/src/rust/vendor-crates/
+r-pkg/rsdeseq2/src/rust/vendor-crates.tar.xz
 r-pkg/rsdeseq2/src/rust/cargo/
 /results/
 __pycache__/

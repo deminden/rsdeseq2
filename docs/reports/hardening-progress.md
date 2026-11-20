@@ -1164,6 +1164,28 @@ The archive build still warns about long filenames in vendored
 dependencies. The hosted release matrix and native Intel macOS and
 Windows runtime results remain open.
 
+### Portable R source archive
+
+The source package stores registry dependencies and their Cargo checksums
+in an XZ archive, as recommended by the [CRAN Rust packaging guidance](https://cran.r-project.org/web/packages/using_rust.html).
+Configure extracts the archive and builds with the bundled offline
+configuration. The Windows configure entry point generates the offline
+Rtools makefile through the same extraction step.
+
+The outer archive fell from 15,897,994 to 8,616,840 bytes. None of its
+540 paths exceeded 100 bytes or had hidden components. All 4,308
+previously shipped registry files matched byte for byte, and three
+registry metadata files survived packaging that the old build had
+omitted. Linux arm64 unpacked the archive and resolved the locked
+dependencies offline. The Windows configure script was exercised
+under a macOS shell. Native Windows compilation remains open.
+
+On macOS arm64, R 4.6.2 passed the hidden-file and portable-filename
+checks and retained one compiled-code warning for the Rust runtime's
+`abort` symbol. Examples and tests were disabled for that package
+check. The same archive installed offline on R 4.5.3 and passed all
+80 selected native-boundary and row-preparation expectations.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
