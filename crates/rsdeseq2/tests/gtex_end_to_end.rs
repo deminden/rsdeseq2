@@ -66,10 +66,17 @@ fn compare(
             continue;
         }
         match (a, e) {
-            (Some(a), Some(e)) => {
+            (Some(a), Some(e)) if a.is_finite() && e.is_finite() => {
                 gap.abs = gap.abs.max((a - e).abs());
-                if log_scale && *a > 0.0 && *e > 0.0 {
-                    gap.log10 = gap.log10.max((a.log10() - e.log10()).abs());
+                if log_scale {
+                    let log_gap = match (*a, *e) {
+                        (0.0, 0.0) => 0.0,
+                        (a, e) if a > 0.0 && a <= 1.0 && e > 0.0 && e <= 1.0 => {
+                            (a.log10() - e.log10()).abs()
+                        }
+                        _ => f64::INFINITY,
+                    };
+                    gap.log10 = gap.log10.max(log_gap);
                 }
             }
             (None, None) => {}
@@ -77,6 +84,20 @@ fn compare(
         }
     }
     gap
+}
+
+#[test]
+fn log_scale_gate_rejects_underflow_and_nonfinite_values() {
+    let keep = |_| true;
+    let zero = [Some(0.0)];
+    let tiny = [Some(1e-310)];
+    assert!(compare(&zero, &tiny, true, &keep).log10.is_infinite());
+    assert!(compare(&tiny, &zero, true, &keep).log10.is_infinite());
+    assert_eq!(compare(&zero, &zero, true, &keep).log10, 0.0);
+    assert_eq!(
+        compare(&[Some(f64::NAN)], &tiny, true, &keep).missing_mismatches,
+        1,
+    );
 }
 
 #[test]

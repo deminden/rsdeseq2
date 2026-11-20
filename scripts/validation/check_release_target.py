@@ -44,7 +44,7 @@ def main():
     )
     subprocess.run(
         ['cargo', 'test', *build, '--test', 'integration', '--',
-         'bounded_posterior::', 'beta_prior_run::'],
+         'bounded_posterior::', 'beta_prior_run::', 'gtex_end_to_end::'],
         cwd=ROOT, check=True, env=portable_env,
     )
     subprocess.run(
