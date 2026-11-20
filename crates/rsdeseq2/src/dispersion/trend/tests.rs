@@ -2,13 +2,28 @@
 
 use super::numerics::{checked_add_assign, checked_product_difference, stable_midpoint};
 use super::parametric::{
-    ParametricDispersionTrend, ParametricDispersionTrendOptions, fitted_values_are_positive,
-    gamma_deviance, interpolate_parametric_coefficient, parametric_coefficient_change,
-    robust_parametric_trend_rows, weighted_gamma_identity_least_squares,
+    ParametricDispersionTrend, ParametricDispersionTrendOptions, fit_parametric_dispersion_trend,
+    fitted_values_are_positive, gamma_deviance, interpolate_parametric_coefficient,
+    parametric_coefficient_change, robust_parametric_trend_rows,
+    weighted_gamma_identity_least_squares,
 };
+use crate::errors::{CalculationLocation, DeseqError};
 use crate::numeric::checked::{self, CheckedExt};
 use crate::numeric::math::ProfileMath;
 use approx::assert_relative_eq;
+
+#[track_caller]
+fn assert_arithmetic_failure(
+    error: DeseqError,
+    expected_context: &str,
+    expected_location: Option<CalculationLocation>,
+) {
+    std::assert_matches!(
+        error,
+        DeseqError::InvalidDispersionArithmetic { context, location, value: f64::INFINITY }
+            if context == expected_context && location == expected_location
+    );
+}
 
 #[test]
 fn gamma_deviance_keeps_near_perfect_fit_precision() {
@@ -44,9 +59,10 @@ fn gamma_deviance_rejects_nonfinite_accumulation() {
 
     let err = gamma_deviance(&means, &disps, &good, trend).unwrap_err();
 
-    assert!(
-        err.to_string()
-            .contains("parametric dispersion gamma deviance")
+    assert_arithmetic_failure(
+        err,
+        "parametric dispersion gamma deviance",
+        Some(CalculationLocation::Gene(0)),
     );
 }
 
@@ -59,8 +75,9 @@ fn checked_div2_rejects_zero_and_nonfinite_quotients() {
         .invalid_dispersion("test division")
         .unwrap_err();
 
-    assert!(zero_err.to_string().contains("test division"));
-    assert!(overflow_err.to_string().contains("test division"));
+    for error in [zero_err, overflow_err] {
+        assert_arithmetic_failure(error, "test division", None);
+    }
 }
 
 #[test]
@@ -118,9 +135,10 @@ fn weighted_gamma_identity_least_squares_rejects_nonfinite_weights() {
 
     let err = weighted_gamma_identity_least_squares(&means, &disps, &good, trend).unwrap_err();
 
-    assert!(
-        err.to_string()
-            .contains("parametric dispersion weighted least-squares")
+    assert_arithmetic_failure(
+        err,
+        "parametric dispersion weighted least-squares weights",
+        Some(CalculationLocation::Gene(0)),
     );
 }
 
@@ -136,9 +154,10 @@ fn weighted_gamma_identity_least_squares_rejects_nonfinite_determinant_product()
 
     let err = weighted_gamma_identity_least_squares(&means, &disps, &good, trend).unwrap_err();
 
-    assert!(
-        err.to_string()
-            .contains("parametric dispersion weighted least-squares determinant")
+    assert_arithmetic_failure(
+        err,
+        "parametric dispersion weighted least-squares determinant",
+        None,
     );
 }
 
@@ -154,9 +173,10 @@ fn weighted_gamma_identity_least_squares_rejects_nonfinite_numerator_product() {
 
     let err = weighted_gamma_identity_least_squares(&means, &disps, &good, trend).unwrap_err();
 
-    assert!(
-        err.to_string()
-            .contains("parametric dispersion weighted least-squares coefficient numerator")
+    assert_arithmetic_failure(
+        err,
+        "parametric dispersion weighted least-squares coefficient numerator",
+        Some(CalculationLocation::Coefficient(0)),
     );
 }
 
@@ -164,22 +184,23 @@ fn weighted_gamma_identity_least_squares_rejects_nonfinite_numerator_product() {
 fn checked_add_assign_rejects_nonfinite_sum() {
     let mut total = f64::MAX;
 
-    let err = checked_add_assign(&mut total, f64::MAX, "test accumulation").unwrap_err();
+    let location = CalculationLocation::Gene(7);
+    let err = checked_add_assign(&mut total, f64::MAX, "test accumulation", location).unwrap_err();
 
-    assert!(err.to_string().contains("test accumulation"));
+    assert_arithmetic_failure(err, "test accumulation", Some(location));
     assert_eq!(total, f64::MAX);
 }
 
 #[test]
 fn checked_product_difference_rejects_nonfinite_product() {
-    let err = checked_product_difference(f64::MAX, 2.0, 1.0, 1.0, "test product").unwrap_err();
+    let err = checked_product_difference(f64::MAX, 2.0, 1.0, 1.0).unwrap_err();
 
-    assert!(err.to_string().contains("test product"));
+    assert_eq!(err.value, f64::INFINITY);
 }
 
 #[test]
 fn checked_product_difference_matches_finite_difference() {
-    let observed = checked_product_difference(6.0, 7.0, 5.0, 3.0, "test product").unwrap();
+    let observed = checked_product_difference(6.0, 7.0, 5.0, 3.0).unwrap();
 
     assert_eq!(observed, 27.0);
 }
@@ -204,9 +225,10 @@ fn parametric_coefficient_change_rejects_nonfinite_ratio() {
 
     let err = parametric_coefficient_change(old, new).unwrap_err();
 
-    assert!(
-        err.to_string()
-            .contains("parametric dispersion coefficient change")
+    assert_arithmetic_failure(
+        err,
+        "parametric dispersion coefficient change",
+        Some(CalculationLocation::Coefficient(0)),
     );
 }
 
@@ -225,4 +247,20 @@ fn parametric_coefficient_change_matches_log_squared_update() {
     let expected = 2.0 * 2.0_f64.ln_p().powi(2);
 
     assert_relative_eq!(observed, expected, epsilon = 1e-15);
+}
+
+#[test]
+fn parametric_residual_failure_reports_the_original_gene_after_selection() {
+    let options = ParametricDispersionTrendOptions {
+        initial_asympt_disp: f64::MIN_POSITIVE,
+        initial_extra_pois: f64::MIN_POSITIVE,
+        ..ParametricDispersionTrendOptions::default()
+    };
+    let error = fit_parametric_dispersion_trend(&[0.0, 1.0, 2.0], &[0.1, f64::MAX, 0.1], options)
+        .unwrap_err();
+    assert_arithmetic_failure(
+        error,
+        "parametric dispersion residual filter",
+        Some(CalculationLocation::Gene(1)),
+    );
 }

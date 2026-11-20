@@ -238,7 +238,9 @@ impl OutputTransaction {
                 .sync_all()?;
             let (bytes, sha256) = hash_file(&file.temporary.0)?;
             if bytes == 0 {
-                return Err(invalid_options("requested output was not written"));
+                return Err(DeseqError::UnwrittenOutput {
+                    path: file.destination.clone(),
+                });
             }
             completed.push(CompletedFile {
                 path: file.destination.clone(),
@@ -402,13 +404,16 @@ mod tests {
         let error = transaction
             .publish_with(|index, from, to| {
                 if index == 1 {
-                    Err(std::io::Error::other("injected rename failure"))
+                    Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied))
                 } else {
                     fs::rename(from, to)
                 }
             })
             .unwrap_err();
-        assert!(error.to_string().contains("injected rename failure"));
+        std::assert_matches!(
+            error,
+            DeseqError::Io(source) if source.kind() == std::io::ErrorKind::PermissionDenied
+        );
         assert_eq!(fs::read_to_string(first_final).unwrap(), "new first");
         assert_eq!(fs::read_to_string(second_final).unwrap(), "old second");
         assert!(!marker.exists());
@@ -451,12 +456,9 @@ mod tests {
         fs::write(&marker, "old marker").unwrap();
         let mut output = final_path.clone();
         let transaction = OutputTransaction::prepare(&[], &mut [&mut output]).unwrap();
-        assert!(
-            transaction
-                .publish()
-                .unwrap_err()
-                .to_string()
-                .contains("not written")
+        std::assert_matches!(
+            transaction.publish().unwrap_err(),
+            DeseqError::UnwrittenOutput { path } if path == final_path.canonicalize().unwrap()
         );
         assert_eq!(fs::read_to_string(final_path).unwrap(), "old result");
         assert_eq!(fs::read_to_string(marker).unwrap(), "old marker");

@@ -80,8 +80,15 @@ fn intercept_working_weights_reject_nonfinite_weight_scaling() {
 fn weighted_mean_rejects_nonfinite_products() {
     let err = weighted_mean(&[f64::MAX], &[2.0], 0, &mut Vec::new()).unwrap_err();
 
-    assert!(
-        err.to_string()
-            .contains("gene 0 has non-finite weighted normalized mean")
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidGeneValue {
+            domain: crate::errors::ErrorKind::Counts,
+            operation: "weighted normalized mean",
+            gene: 0,
+            sample: Some(0),
+            value: f64::INFINITY,
+            ..
+        }
     );
 }

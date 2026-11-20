@@ -176,6 +176,12 @@ versions live in [docs/releases](docs/releases/).
   Stored LRT requests, replacement plans, sample metadata and
   beta-binomial parameters expose structured validation details.
 
+- Checked dispersion arithmetic reports the failed operation, value and
+  available gene, coefficient or reduction index. Invalid p-values,
+  unwritten output files and conflicting LRT normalization offsets expose
+  their corresponding indices, output path or sample values. Existing
+  messages and error kinds are preserved.
+
 - Missing-prerequisite errors ("Wald fitting requires MAP dispersions") are
   `DeseqError::MissingPrerequisite { domain, operation, prerequisite }`
   (119 sites). 57 of these messages were reworded into the one form

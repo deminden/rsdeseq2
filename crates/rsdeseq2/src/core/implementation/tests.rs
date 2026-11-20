@@ -12,7 +12,11 @@ use std::assert_matches;
 #[test]
 fn count_matrix_rejects_bad_length() {
     let err = CountMatrix::from_row_major_u32(2, 3, vec![1, 2]).unwrap_err();
-    assert!(err.to_string().contains("invalid dimensions"));
+    assert_matches!(
+        err,
+        DeseqError::InvalidDimensions { context, expected: 6, actual: 2 }
+            if context == "count matrix values"
+    );
 }
 
 #[test]

@@ -45,14 +45,10 @@ fn original_bh_adjust_handles_ties_endpoints_and_omitted_values() {
 #[test]
 fn bh_adjust_rejects_invalid_f64_input() {
     for pvalues in [[0.1, f64::NAN], [0.1, 1.2]] {
-        assert!(matches!(
-            bh_adjust_f64(&pvalues),
-            Err(rsdeseq2::DeseqError::InvalidOptions { .. }
-                | rsdeseq2::DeseqError::InvalidParameter {
-                    domain: rsdeseq2::errors::ErrorKind::Options,
-                    ..
-                }
-                | rsdeseq2::DeseqError::InvalidFormula { .. })
-        ));
+        std::assert_matches!(
+            bh_adjust_f64(&pvalues).unwrap_err(),
+            rsdeseq2::DeseqError::InvalidPValue { context: "p-value", index: 1, value }
+                if value.to_bits() == pvalues[1].to_bits()
+        );
     }
 }

@@ -179,7 +179,8 @@ pub fn fit_parametric_dispersion_trend(
         extra_pois: options.initial_extra_pois,
     };
     let restore_gene_index = |mut error| {
-        if let DeseqError::InvalidCalculation { location, .. } = &mut error
+        if let DeseqError::InvalidCalculation { location, .. }
+        | DeseqError::InvalidDispersionArithmetic { location, .. } = &mut error
             && let Some(CalculationLocation::Gene(row)) = *location
         {
             *location = use_for_fit
@@ -236,8 +237,10 @@ pub(super) fn robust_parametric_trend_rows(
         validate_positive_mean(mean, Some(idx))?;
         validate_positive_dispersion(disp, Some(idx))?;
         let fitted = trend.evaluate_validated(mean, Some(idx))?;
-        let residual = checked::try_div(disp, fitted)
-            .invalid_dispersion("parametric dispersion residual filter")?;
+        let residual = checked::try_div(disp, fitted).invalid_dispersion_at(
+            "parametric dispersion residual filter",
+            CalculationLocation::Gene(idx),
+        )?;
         good.push(
             residual.is_finite()
                 && residual > options.min_residual
@@ -316,35 +319,46 @@ pub(super) fn weighted_gamma_identity_least_squares(
         validate_positive_mean(mean, Some(idx))?;
         validate_positive_dispersion(disp, Some(idx))?;
         let fitted = trend.evaluate_validated(mean, Some(idx))?;
-        let inv_fitted =
-            checked::try_div(1.0, fitted).invalid_dispersion(PARAMETRIC_WLS_SUM_CONTEXT)?;
-        let weight = checked::try_mul(inv_fitted, inv_fitted)
-            .invalid_dispersion("parametric dispersion weighted least-squares weights")?;
+        let location = CalculationLocation::Gene(idx);
+        let inv_fitted = checked::try_div(1.0, fitted)
+            .invalid_dispersion_at(PARAMETRIC_WLS_SUM_CONTEXT, location)?;
+        let weight = checked::try_mul(inv_fitted, inv_fitted).invalid_dispersion_at(
+            "parametric dispersion weighted least-squares weights",
+            location,
+        )?;
         let x = mean.recip();
-        checked_add_assign(&mut s00, weight, PARAMETRIC_WLS_SUM_CONTEXT)?;
+        checked_add_assign(&mut s00, weight, PARAMETRIC_WLS_SUM_CONTEXT, location)?;
         checked_add_assign(
             &mut s01,
-            checked::try_mul(weight, x).invalid_dispersion(PARAMETRIC_WLS_SUM_CONTEXT)?,
+            checked::try_mul(weight, x)
+                .invalid_dispersion_at(PARAMETRIC_WLS_SUM_CONTEXT, location)?,
             PARAMETRIC_WLS_SUM_CONTEXT,
+            location,
         )?;
         checked_add_assign(
             &mut s11,
-            checked_product3(weight, x, x, PARAMETRIC_WLS_SUM_CONTEXT)?,
+            checked_product3(weight, x, x)
+                .invalid_dispersion_at(PARAMETRIC_WLS_SUM_CONTEXT, location)?,
             PARAMETRIC_WLS_SUM_CONTEXT,
+            location,
         )?;
         checked_add_assign(
             &mut t0,
-            checked::try_mul(weight, disp).invalid_dispersion(PARAMETRIC_WLS_SUM_CONTEXT)?,
+            checked::try_mul(weight, disp)
+                .invalid_dispersion_at(PARAMETRIC_WLS_SUM_CONTEXT, location)?,
             PARAMETRIC_WLS_SUM_CONTEXT,
+            location,
         )?;
         checked_add_assign(
             &mut t1,
-            checked_product3(weight, x, disp, PARAMETRIC_WLS_SUM_CONTEXT)?,
+            checked_product3(weight, x, disp)
+                .invalid_dispersion_at(PARAMETRIC_WLS_SUM_CONTEXT, location)?,
             PARAMETRIC_WLS_SUM_CONTEXT,
+            location,
         )?;
     }
-    let determinant =
-        checked_product_difference(s00, s11, s01, s01, PARAMETRIC_WLS_DETERMINANT_CONTEXT)?;
+    let determinant = checked_product_difference(s00, s11, s01, s01)
+        .invalid_dispersion(PARAMETRIC_WLS_DETERMINANT_CONTEXT)?;
     if !determinant.is_finite() || determinant.abs() <= f64::EPSILON {
         return Err(DeseqError::InvalidDimensions {
             context: "parametric dispersion trend weighted design".to_string(),
@@ -352,15 +366,23 @@ pub(super) fn weighted_gamma_identity_least_squares(
             actual: 0,
         });
     }
-    let asympt_numerator =
-        checked_product_difference(t0, s11, t1, s01, PARAMETRIC_WLS_NUMERATOR_CONTEXT)?;
-    let extra_pois_numerator =
-        checked_product_difference(s00, t1, s01, t0, PARAMETRIC_WLS_NUMERATOR_CONTEXT)?;
+    let asympt_numerator = checked_product_difference(t0, s11, t1, s01).invalid_dispersion_at(
+        PARAMETRIC_WLS_NUMERATOR_CONTEXT,
+        CalculationLocation::Coefficient(0),
+    )?;
+    let extra_pois_numerator = checked_product_difference(s00, t1, s01, t0).invalid_dispersion_at(
+        PARAMETRIC_WLS_NUMERATOR_CONTEXT,
+        CalculationLocation::Coefficient(1),
+    )?;
     let target = ParametricDispersionTrend {
-        asympt_disp: checked::try_div(asympt_numerator, determinant)
-            .invalid_dispersion("parametric dispersion weighted least-squares coefficients")?,
-        extra_pois: checked::try_div(extra_pois_numerator, determinant)
-            .invalid_dispersion("parametric dispersion weighted least-squares coefficients")?,
+        asympt_disp: checked::try_div(asympt_numerator, determinant).invalid_dispersion_at(
+            "parametric dispersion weighted least-squares coefficients",
+            CalculationLocation::Coefficient(0),
+        )?,
+        extra_pois: checked::try_div(extra_pois_numerator, determinant).invalid_dispersion_at(
+            "parametric dispersion weighted least-squares coefficients",
+            CalculationLocation::Coefficient(1),
+        )?,
     };
     if !target.asympt_disp.is_finite() || !target.extra_pois.is_finite() {
         return Err(DeseqError::InvalidDispersion {
@@ -455,12 +477,15 @@ pub(super) fn gamma_deviance(
         validate_positive_mean(mean, Some(idx))?;
         validate_positive_dispersion(disp, Some(idx))?;
         let fitted = trend.evaluate_validated(mean, Some(idx))?;
-        let ratio = disp / fitted;
+        let context = "parametric dispersion gamma deviance";
+        let location = CalculationLocation::Gene(idx);
+        let ratio = checked::try_div(disp, fitted).invalid_dispersion_at(context, location)?;
         let relative_delta = ratio - 1.0;
         checked_add_assign(
             &mut deviance,
             2.0 * (relative_delta - relative_delta.ln_1p_p()),
-            "parametric dispersion gamma deviance",
+            context,
+            location,
         )?;
     }
     Ok(deviance)
@@ -501,14 +526,16 @@ pub(super) fn parametric_coefficient_change(
     new.validate_fit()?;
     let context = "parametric dispersion coefficient change";
     let asympt_change = checked::try_div(new.asympt_disp, old.asympt_disp)
-        .invalid_dispersion(context)?
+        .invalid_dispersion_at(context, CalculationLocation::Coefficient(0))?
         .ln_p();
     let extra_pois_change = checked::try_div(new.extra_pois, old.extra_pois)
-        .invalid_dispersion(context)?
+        .invalid_dispersion_at(context, CalculationLocation::Coefficient(1))?
         .ln_p();
     checked::try_add(
-        checked::try_mul(asympt_change, asympt_change).invalid_dispersion(context)?,
-        checked::try_mul(extra_pois_change, extra_pois_change).invalid_dispersion(context)?,
+        checked::try_mul(asympt_change, asympt_change)
+            .invalid_dispersion_at(context, CalculationLocation::Coefficient(0))?,
+        checked::try_mul(extra_pois_change, extra_pois_change)
+            .invalid_dispersion_at(context, CalculationLocation::Coefficient(1))?,
     )
     .invalid_dispersion(context)
 }

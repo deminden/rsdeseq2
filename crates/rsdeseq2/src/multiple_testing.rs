@@ -1,5 +1,4 @@
 use crate::errors::DeseqError;
-use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 
 /// Benjamini-Hochberg adjusted p-values with missing-value support.
 ///
@@ -81,11 +80,11 @@ impl PreparedBh {
 pub fn bh_adjust_f64(pvalues: &[f64]) -> Result<Vec<f64>, DeseqError> {
     for (idx, value) in pvalues.iter().copied().enumerate() {
         if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-            return Err(invalid_parameter(
-                ErrorKind::Options,
-                format!("p-value at index {idx}"),
-                Requirement::FiniteInUnitInterval,
-            ));
+            return Err(DeseqError::InvalidPValue {
+                context: "p-value",
+                index: idx,
+                value,
+            });
         }
     }
     let adjusted = bh_adjust(&pvalues.iter().copied().map(Some).collect::<Vec<_>>());
@@ -152,11 +151,11 @@ mod tests {
     fn bh_adjust_f64_names_each_invalid_pvalue() {
         for bad in [1.5, -0.1, f64::NAN, f64::INFINITY] {
             let error = bh_adjust_f64(&[0.2, bad]).unwrap_err();
-            assert!(
-                error
-                    .to_string()
-                    .contains("p-value at index 1 must be finite and within [0, 1]"),
-                "{bad}: {error}"
+            std::assert_matches!(
+                error,
+                crate::errors::DeseqError::InvalidPValue { context: "p-value", index: 1, value }
+                    if value.to_bits() == bad.to_bits(),
+                "{bad}"
             );
         }
         assert_eq!(bh_adjust_f64(&[0.01, 0.04]).unwrap(), vec![0.02, 0.04]);

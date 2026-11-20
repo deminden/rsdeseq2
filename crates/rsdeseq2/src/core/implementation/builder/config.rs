@@ -405,9 +405,16 @@ impl DeseqBuilder {
     ) -> Result<DesignMatrix, DeseqError> {
         let reduced = self.formula_design_for_fitting(reduced)?;
         if !reduced.offsets.is_empty() && reduced.offsets != full.offsets {
-            return Err(DeseqError::InvalidOptions {
-                reason: "LRT full and reduced formulas must use the same normalization offsets"
-                    .into(),
+            let sample = full
+                .offsets
+                .iter()
+                .zip(&reduced.offsets)
+                .position(|(full, reduced)| full != reduced)
+                .unwrap_or_else(|| full.offsets.len().min(reduced.offsets.len()));
+            return Err(DeseqError::LrtOffsetsMismatch {
+                sample,
+                full: full.offsets.get(sample).copied(),
+                reduced: reduced.offsets.get(sample).copied(),
             });
         }
         Ok(reduced.design.standard_design)

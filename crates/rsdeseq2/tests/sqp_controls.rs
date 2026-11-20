@@ -220,7 +220,7 @@ fn nearly_unit_backtracking_factors_terminate_with_visible_nonconvergence() {
     )
     .unwrap();
     assert!(!fit.converged);
-    assert!(fit.message.contains("line search iteration limit"));
+    assert_eq!(fit.message, "SQP line search iteration limit reached");
     assert!(fit.function_evaluations < 20_000);
     assert!((fit.weights[0] - (1.0 / 1.3 + 0.2 / 1.2 + 0.7 / 1.1 + 0.5 / 1.5) / 4.0).abs() < 1e-14);
 }

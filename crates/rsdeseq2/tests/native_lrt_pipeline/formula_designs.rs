@@ -68,10 +68,28 @@ fn top_level_lrt_formula_helpers_build_full_and_reduced_designs() {
     let offset_err = builder
         .fit_lrt_formula_with_results(&counts, "~ condition", "~ offset(exposure)")
         .unwrap_err();
-    let DeseqError::InvalidOptions { reason } = offset_err else {
-        panic!("mismatched reduced offsets should be rejected, got {offset_err:?}");
-    };
-    assert!(reason.contains("same normalization offsets"));
+    std::assert_matches!(
+        offset_err,
+        DeseqError::LrtOffsetsMismatch {
+            sample: 0,
+            full: None,
+            reduced: Some(0.0)
+        }
+    );
+    std::assert_matches!(
+        builder
+            .fit_lrt_formula_with_results(
+                &counts,
+                "~ condition + offset(exposure)",
+                "~ offset(I(exposure + 1))",
+            )
+            .unwrap_err(),
+        DeseqError::LrtOffsetsMismatch {
+            sample: 0,
+            full: Some(0.0),
+            reduced: Some(1.0)
+        }
+    );
     let (matching_fit, matching_results) = builder
         .fit_lrt_formula_with_results(
             &counts,

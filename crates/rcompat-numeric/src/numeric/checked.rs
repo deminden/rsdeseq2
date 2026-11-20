@@ -25,7 +25,7 @@
 //! A zero divisor with finite operands already yields an infinite or NaN
 //! quotient, so the explicit zero test in [`try_div`] never changes a result.
 
-use crate::errors::Error;
+use crate::errors::{CalculationLocation, Error};
 
 /// A rejected value, with the reduction index that produced it when known.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -198,8 +198,28 @@ pub trait CheckedExt {
     /// `NonFiniteValue` with an explicit index, replacing any recorded one.
     fn nonfinite_at(self, context: &str, index: Option<usize>) -> Result<f64, Error>;
 
-    /// `InvalidDispersion` with the reason "`{context}` must remain finite".
+    /// A dispersion arithmetic error retaining the rejected value.
     fn invalid_dispersion(self, context: &str) -> Result<f64, Error>;
+
+    /// A dispersion arithmetic error with an explicit input position.
+    fn invalid_dispersion_at(
+        self,
+        context: &str,
+        location: CalculationLocation,
+    ) -> Result<f64, Error>
+    where
+        Self: Sized,
+    {
+        self.invalid_dispersion(context).map_err(|mut error| {
+            if let Error::InvalidDispersionArithmetic {
+                location: actual, ..
+            } = &mut error
+            {
+                *actual = Some(location);
+            }
+            error
+        })
+    }
 }
 
 #[cold]
@@ -214,9 +234,11 @@ fn nonfinite_error(context: &str, index: Option<usize>, value: f64) -> Error {
 
 #[cold]
 #[inline(never)]
-fn dispersion_error(context: &str) -> Error {
-    Error::InvalidDispersion {
-        reason: format!("{context} must remain finite"),
+fn dispersion_error(context: &str, location: Option<CalculationLocation>, value: f64) -> Error {
+    Error::InvalidDispersionArithmetic {
+        context: context.into(),
+        location,
+        value,
     }
 }
 
@@ -233,7 +255,22 @@ impl CheckedExt for Checked {
 
     #[inline(always)]
     fn invalid_dispersion(self, context: &str) -> Result<f64, Error> {
-        self.map_err(|_| dispersion_error(context))
+        self.map_err(|error| {
+            dispersion_error(
+                context,
+                error.index.map(CalculationLocation::ReductionElement),
+                error.value,
+            )
+        })
+    }
+
+    #[inline(always)]
+    fn invalid_dispersion_at(
+        self,
+        context: &str,
+        location: CalculationLocation,
+    ) -> Result<f64, Error> {
+        self.map_err(|error| dispersion_error(context, Some(location), error.value))
     }
 }
 
@@ -336,10 +373,24 @@ mod tests {
             Error::NonFiniteValue { index: Some(0), value, .. } if value == f64::INFINITY
         ));
         let error = try_div(1.0, 0.0).invalid_dispersion("trend").unwrap_err();
-        assert!(matches!(
+        assert_eq!(
+            error.to_string(),
+            "invalid dispersion: trend must remain finite"
+        );
+        std::assert_matches!(
             error,
-            Error::InvalidDispersion { ref reason } if reason == "trend must remain finite"
-        ));
+            Error::InvalidDispersionArithmetic { context, location: None, value: f64::INFINITY }
+                if context == "trend"
+        );
+        let error = try_sum([1.0, f64::MAX, f64::MAX])
+            .invalid_dispersion("trend sum")
+            .unwrap_err();
+        std::assert_matches!(
+            error,
+            Error::InvalidDispersionArithmetic {
+                context, location: Some(CalculationLocation::ReductionElement(2)), value: f64::INFINITY,
+            } if context == "trend sum"
+        );
         let error = try_mean(&[1.0, f64::NEG_INFINITY])
             .nonfinite_at("mean", None)
             .unwrap_err();

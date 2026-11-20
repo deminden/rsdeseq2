@@ -300,6 +300,7 @@ fn dnrm2(values: &[f64]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::matrix_rank;
+    use crate::errors::Error;
 
     #[test]
     fn matrix_rank_rejects_nonfinite_elimination_update() {
@@ -312,6 +313,10 @@ mod tests {
 
         let err = matrix_rank(&values, 2, 2, 0.0).unwrap_err();
 
-        assert!(err.to_string().contains("rank elimination update"));
+        std::assert_matches!(
+            err,
+            Error::NonFiniteValue { context, index: Some(3), value: f64::INFINITY }
+                if context == "rank elimination update"
+        );
     }
 }

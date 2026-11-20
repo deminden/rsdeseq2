@@ -68,6 +68,28 @@ pub enum Error {
         message: String,
     },
 
+    /// Dispersion arithmetic rejected a non-finite result.
+    #[error("invalid dispersion: {context} must remain finite")]
+    InvalidDispersionArithmetic {
+        /// The calculation that failed.
+        context: String,
+        /// The input position, when known.
+        location: Option<CalculationLocation>,
+        /// The actual rejected value.
+        value: f64,
+    },
+
+    /// A supplied p-value is non-finite or outside the unit interval.
+    #[error("invalid options: {context} at index {index} must be finite and within [0, 1]")]
+    InvalidPValue {
+        /// The p-value input.
+        context: &'static str,
+        /// Zero-based position in that input.
+        index: usize,
+        /// The rejected p-value.
+        value: f64,
+    },
+
     /// No gene passed the dispersion trend's eligibility rule.
     #[error(
         "invalid dispersion: all gene-wise dispersion estimates are within 2 orders of magnitude from the minimum value"
@@ -164,6 +186,13 @@ pub enum Error {
         row: usize,
         /// Sample label on the row.
         sample: String,
+    },
+
+    /// A requested output was empty when publication was attempted.
+    #[error("invalid options: requested output was not written")]
+    UnwrittenOutput {
+        /// Destination of the unwritten file.
+        path: std::path::PathBuf,
     },
 
     /// Compiled EM received text for its numeric method control.
@@ -520,6 +549,19 @@ pub enum Error {
         combined_rank: usize,
     },
 
+    /// The reduced LRT formula uses offsets different from the full formula.
+    #[error(
+        "invalid options: LRT full and reduced formulas must use the same normalization offsets"
+    )]
+    LrtOffsetsMismatch {
+        /// Zero-based position of the first difference.
+        sample: usize,
+        /// Full-model offset, absent if that formula has no offset at this position.
+        full: Option<f64>,
+        /// Reduced-model offset, absent if that formula has no offset at this position.
+        reduced: Option<f64>,
+    },
+
     /// An internal consistency check failed: a state that earlier validation
     /// rules out was reached. This is a bug; please report it.
     #[error("invalid options: internal invariant violated: {what}")]
@@ -735,6 +777,8 @@ pub enum PosteriorArrayAxis {
 pub enum CalculationLocation {
     /// Zero-based row in an input of genes.
     Gene(usize),
+    /// Zero-based element in an arithmetic reduction whose input is not a gene axis.
+    ReductionElement(usize),
     /// Zero-based column in an input of coefficients.
     Coefficient(usize),
     /// An observation in a mixture fit.
@@ -974,10 +1018,12 @@ impl Error {
             Self::InvalidSizeFactors { .. } | Self::NoUsableGenesForSizeFactors => {
                 ErrorKind::Normalization
             }
-            Self::InvalidDispersion { .. } | Self::NoUsableDispersionTrendRows { .. } => {
-                ErrorKind::Dispersion
-            }
+            Self::InvalidDispersion { .. }
+            | Self::NoUsableDispersionTrendRows { .. }
+            | Self::InvalidDispersionArithmetic { .. } => ErrorKind::Dispersion,
             Self::InvalidOptions { .. }
+            | Self::InvalidPValue { .. }
+            | Self::UnwrittenOutput { .. }
             | Self::InvalidRun { .. }
             | Self::WaldOptionsOnStoredLrt { .. }
             | Self::ReplacementRowOutOfBounds { .. }
@@ -1019,6 +1065,7 @@ impl Error {
             Self::CoefficientNotFound { .. }
             | Self::AmbiguousCoefficient { .. }
             | Self::DesignRankDeficient { .. }
+            | Self::LrtOffsetsMismatch { .. }
             | Self::LrtDesignNotNested { .. } => ErrorKind::Options,
             Self::Internal { .. } => ErrorKind::Internal,
         }

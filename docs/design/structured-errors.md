@@ -104,6 +104,7 @@ exact phrase. `domain` is an `ErrorKind` limited to `Options`, `Dispersion`,
 | `AllZeroGene` | Zero-based fit row and original count-matrix row | `Counts` |
 | `InvalidGeneValue` | Operation, zero-based gene and optional sample, rejected value | Original domain |
 | `InvalidCalculation` | Operation, rejected value and available gene or coefficient position | Original domain |
+| `InvalidDispersionArithmetic` | Calculation context, rejected value and optional zero-based gene, coefficient or reduction element | `Dispersion` |
 | `NoUsableDispersionTrendRows` | Minimum dispersion and number of rows checked | `Dispersion` |
 | `InvalidNegativeBinomialValue` | Likelihood stage, optional zero-based gene and sample, rejected value | `Numeric` for means and weights, `Dispersion` for the other stages |
 | `CoxReidColumnSumOverflow` | Zero-based gene, sample and design column, finite term and overflowing partial sum | `Numeric` |
@@ -186,6 +187,13 @@ contrast.
 row. Beta-binomial validation reports the gene and sample for invalid
 concentrations, successes or trial counts and the expected parameter shape
 for mismatched matrices.
+
+`InvalidPValue` retains the adjustment or filtering context, zero-based
+index and rejected value. `UnwrittenOutput` retains the final output path
+when an output transaction detects a missing staged write.
+`LrtOffsetsMismatch` reports the zero-based sample of the first difference
+and each formula's offset there, when available. These variants preserve
+the previous messages and error kinds.
 
 ## Not in this step
 - `scoped_invalid_options` sites keep their `"{scope}: {reason}"` text.

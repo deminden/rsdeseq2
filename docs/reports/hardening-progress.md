@@ -842,6 +842,15 @@ the six run and beta-prior tests, and workspace Clippy passed. The
 run-equivalence generator reproduced the test source byte for byte
 after formatting.
 
+Checked dispersion operations now expose the failed value and the
+available gene, coefficient or reduction index. The residual diagnostic
+recovers the original gene index after selection. Invalid p-values,
+unwritten output files and mismatched LRT offsets retain their relevant
+indices, paths and values. Native error assertions now match structured
+fields, and the CLI stderr tests continue to check the user-facing text.
+Six targeted numeric tests, 25 application unit tests, 91 integration
+tests and workspace Clippy passed.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
