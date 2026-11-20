@@ -14,8 +14,6 @@ pub(super) struct QrScratch {
     sqrt_weights: Vec<f64>,
     diagonal: Vec<f64>,
     basis_column: DVector<f64>,
-    basis: DMatrix<f64>,
-    transposed_basis: DMatrix<f64>,
     triangular: DMatrix<f64>,
     coefficients: DVector<f64>,
 }
@@ -52,8 +50,7 @@ pub(super) fn solve_weighted_least_squares_qr(
     let n = x.nrows();
     let p = x.ncols();
     let m = n + p;
-    // The one-column projection reduced time for the two- and four-term
-    // GTEx designs. The batched projection retains throughput for wider fits.
+    // Preserve the established projection order for narrow GLM designs.
     let column_basis = p <= 4;
     if scratch.augmented_design.shape() != (m, p) {
         scratch.augmented_design = DMatrix::zeros(m, p);
@@ -62,9 +59,6 @@ pub(super) fn solve_weighted_least_squares_qr(
         scratch.diagonal.resize(p, 0.0);
         if column_basis {
             scratch.basis_column = DVector::zeros(m);
-        } else {
-            scratch.basis = DMatrix::zeros(m, p);
-            scratch.transposed_basis = DMatrix::zeros(p, m);
         }
         scratch.triangular = DMatrix::zeros(p, p);
         scratch.coefficients = DVector::zeros(p);
@@ -76,8 +70,6 @@ pub(super) fn solve_weighted_least_squares_qr(
         sqrt_weights,
         diagonal,
         basis_column,
-        basis,
-        transposed_basis,
         triangular,
         coefficients,
     } = scratch;
@@ -136,18 +128,18 @@ pub(super) fn solve_weighted_least_squares_qr(
                 .unwrap_or(0.0);
         }
     } else {
-        basis.fill(0.0);
-        basis.fill_diagonal(1.0);
-        for (col, signed_norm) in diagonal.iter().copied().enumerate().rev() {
+        // The augmented ridge rows contribute zero to the response.
+        augmented_response.as_mut_slice()[n..].fill(0.0);
+        // Apply Q^T to the response in reflector order without forming Q.
+        for (col, signed_norm) in diagonal.iter().copied().enumerate() {
             let axis = augmented_design.view_range(col.., col);
             let reflection = Reflection::new(Unit::new_unchecked(axis), 0.0);
             reflection.reflect_with_sign(
-                &mut basis.view_range_mut(col.., col..),
+                &mut augmented_response.rows_mut(col, m - col),
                 ComplexField::signum(signed_norm),
             );
         }
-        basis.transpose_to(transposed_basis);
-        coefficients.gemv(1.0, transposed_basis, augmented_response, 0.0);
+        coefficients.copy_from(&augmented_response.rows(0, p));
     }
     if !solve_qr_triangle(augmented_design, diagonal, triangular, coefficients) {
         return None;
