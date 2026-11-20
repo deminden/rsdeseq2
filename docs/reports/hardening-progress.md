@@ -1868,6 +1868,45 @@ libraries and binaries type-checked, and its integration target requires
 Windows SDK headers unavailable on this host. Native Intel macOS and Windows
 x64 runtime results remain open.
 
+### Batched acceptance after the portable arithmetic changes
+
+The exact `a0808b2` source passed the release-profile checks below. The
+Linux guest's tracked files were checked against the candidate by SHA-256.
+All six golden replays matched 8,032 fields apiece.
+
+| Target | R-host tests | Portable tests |
+| --- | ---: | ---: |
+| macOS arm64 | 128 | 37 |
+| Linux arm64 | 145 | 37 |
+| Linux x86_64, QEMU 10.0.13 | 128 | 37 |
+
+Both 56,200-gene replays passed. On macOS arm64, the release CLI passed
+130 precision gates in each profile across eleven GTEx contrasts. Its 44
+result and fit-diagnostic TSVs matched the `5d9f7ee` release replay byte for
+byte. Significance metrics against DESeq2 found zero adjusted p-value flips
+at thresholds 0.05 and 0.1 in both profiles.
+
+One paired four-worker run over those contrasts took 15.85 s for the
+portable candidate and 17.04 s for the `5d9f7ee` executable. All result
+TSVs matched byte for byte. Peak RSS was 259.41 and 260.89 MiB,
+respectively.
+
+The four Rust source archives embed `a0808b2`, reproduced byte for byte and
+passed 226 library tests from locked vendored dependencies. The workspace
+also passed Clippy and the locked Rust 1.96.0 all-targets check. The Python
+suite passed all 76 tests, including the full-GTEx test enabled separately.
+
+The R source archive has SHA-256
+`f931d3c7b10adc57b7df84dd723f770b1c5579975765b4f6d277cf1c8069f3e7`.
+Both R reference environments checked it with Rust 1.96.0 and clean, offline
+Cargo homes. R 4.5.3 with DESeq2 1.50.2 reported `Status: OK`. R 4.6.2
+with DESeq2 1.52.0 reported the known compiled-code warning for the Rust
+runtime's `_abort` import. Each environment passed 150 tests and 2,874
+expectations with zero skips, native installation checks and recovery after
+an actual SIGINT. R 4.6.2 also matched the standalone Rust results for 33
+formula fits, 54 native formulas, eight mixture fits, ten uniform profiles,
+ten adaptive batches and 26 estimated-mode batches.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |
@@ -1875,7 +1914,7 @@ x64 runtime results remain open.
 | 1. Golden harness | The [golden harness](../development.md) covers 8,032 fields. Portable hashes have replayed on macOS arm64, Linux arm64 and emulated Linux x86_64. |
 | 2. Per-gene parallelism | MAP, Cook's distance, robust dispersion and replacement, and the rlog prior run in parallel with ordered errors and results. See the [thread-scaling probe](#local-verification-and-benchmark). |
 | 3. Borrowed offsets | Sample factors stay in a sample vector through fitting. Selected dispersion, Wald, LRT, beta-prior and rlog fits borrow source rows. Where the API returns gene-by-sample factors, the matrix is created for that output. |
-| 4. Numerical profiles | The crate and CLI default to portable arithmetic. The R bridge selects its host profile. The [platform workflow](../../.github/workflows/platform-checks.yml) checks the release panel and portable golden hashes on five targets. Native Intel macOS and Windows x64 runtime results are still open. |
+| 4. Numerical profiles | The crate and CLI default to portable arithmetic. The R bridge selects its host profile. The [platform workflow](../../.github/workflows/platform-checks.yml) checks the release panel and portable golden hashes on five targets. The [batched release checks](#batched-acceptance-after-the-portable-arithmetic-changes) cover macOS arm64 and both Linux targets. Native Intel macOS and Windows x64 runtime results are still open. |
 | 5. One workflow entry point | The builder, CLI and R bridge use `DeseqBuilder::run(&Analysis)`. The [API migration](../design/run-entry-point.md) keeps deprecated wrappers in 0.6 and schedules removal in 0.7. |
 | 6. Real-data probability gates | The [compact GTEx end-to-end gate](../reproducibility.md#compact-and-full-gene-replay) estimates normalization and dispersions with default filtering. It checks Cook's replacement, log-scale probability, nonfinite values, underflow and significance flips. The [full replay](#native-rlog-smoke-and-full-gtex-probability-replay) checks all 56,200 genes under both profiles, including log-scale error for p-values and adjusted p-values. |
 | 7. Shared checked arithmetic | `rcompat-numeric` owns the checked arithmetic, matrix allocation and validation primitives. The [summation rules](../summation-rules.md) specify the reduction used for each R primitive. |
