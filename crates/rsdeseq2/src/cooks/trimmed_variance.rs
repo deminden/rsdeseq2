@@ -1,83 +1,120 @@
 use super::*;
-use crate::numeric::checked::{self, CheckedExt};
 
-pub(super) fn trimmed_cell_variance(
-    normalized_counts: &RowMajorMatrix<f64>,
-    model_matrix: &DesignMatrix,
-) -> Result<Vec<f64>, DeseqError> {
-    let groups = model_matrix_groups(model_matrix)?;
-    let mut group_ids = unique_group_ids(&groups);
-    group_ids.retain(|group| {
-        groups
-            .iter()
-            .filter(|candidate| *candidate == group)
-            .count()
-            >= 3
-    });
+#[derive(Clone, Copy)]
+struct TrimmedVariance {
+    trim: f64,
+    scale: f64,
+    mean: &'static str,
+    residual_square: &'static str,
+    variance_mean: &'static str,
+    variance: &'static str,
+}
 
-    let mut variances = Vec::with_capacity(normalized_counts.n_rows());
-    for gene in 0..normalized_counts.n_rows() {
-        let row = normalized_counts.row(gene)?;
-        let mut group_variances = Vec::with_capacity(group_ids.len());
-        for group in &group_ids {
-            let values = groups
-                .iter()
-                .enumerate()
-                .filter_map(|(sample, candidate)| (candidate == group).then_some(row[sample]))
-                .collect::<Vec<_>>();
-            let bin = trim_bin(values.len());
-            let mean =
-                trimmed_scaled_mean(values.clone(), trim_ratio(bin), "Cook's trimmed cell mean")?;
-            let sq_errors = values
-                .into_iter()
-                .enumerate()
-                .map(|(sample, value)| {
-                    let residual = value - mean;
-                    checked::try_mul(residual, residual)
-                        .nonfinite_at("Cook's trimmed cell residual square", Some(sample))
-                })
-                .collect::<Result<Vec<_>, DeseqError>>()?;
-            group_variances.push(
-                checked::try_mul(
-                    trim_scale(bin),
-                    trimmed_scaled_mean(
-                        sq_errors,
-                        trim_ratio(bin),
-                        "Cook's trimmed cell variance mean",
-                    )?,
-                )
-                .nonfinite_at("Cook's trimmed cell variance", Some(gene))?,
+impl TrimmedVariance {
+    const ALL_SAMPLES: Self = Self {
+        trim: 1.0 / 8.0,
+        scale: 1.51,
+        mean: "Cook's trimmed mean",
+        residual_square: "Cook's trimmed residual square",
+        variance_mean: "Cook's trimmed variance mean",
+        variance: "Cook's trimmed variance",
+    };
+
+    fn for_cell(samples: usize) -> Self {
+        let (trim, scale) = if samples <= 3 {
+            (1.0 / 3.0, 2.04)
+        } else if samples <= 23 {
+            (1.0 / 4.0, 1.86)
+        } else {
+            (1.0 / 8.0, 1.51)
+        };
+        Self {
+            trim,
+            scale,
+            mean: "Cook's trimmed cell mean",
+            residual_square: "Cook's trimmed cell residual square",
+            variance_mean: "Cook's trimmed cell variance mean",
+            variance: "Cook's trimmed cell variance",
+        }
+    }
+
+    fn evaluate(
+        self,
+        values: impl Iterator<Item = f64> + Clone,
+        sorted: &mut Vec<f64>,
+        gene: usize,
+    ) -> Result<f64, DeseqError> {
+        sorted.clear();
+        sorted.extend(values.clone());
+        let mean = trimmed_scaled_mean(sorted, self.trim, self.mean)?;
+        sorted.clear();
+        // Keep the original sample traversal for residual errors before sorting.
+        for (sample, value) in values.enumerate() {
+            let residual = value - mean;
+            sorted.push(
+                checked::try_mul(residual, residual)
+                    .nonfinite_at(self.residual_square, Some(sample))?,
             );
         }
-        variances.push(row_max(&group_variances));
+        checked::try_mul(
+            self.scale,
+            trimmed_scaled_mean(sorted, self.trim, self.variance_mean)?,
+        )
+        .nonfinite_at(self.variance, Some(gene))
+    }
+}
+
+pub(super) fn trimmed_variances(
+    normalized_counts: &RowMajorMatrix<f64>,
+    groups: &[Vec<usize>],
+) -> Result<Vec<f64>, DeseqError> {
+    let mut replicated = try_alloc_matrix(groups.len(), 1, "Cook's replicated cells")?;
+    replicated.extend(
+        groups
+            .iter()
+            .filter(|group| group.len() >= 3)
+            .map(|group| (group.as_slice(), TrimmedVariance::for_cell(group.len()))),
+    );
+    let samples = normalized_counts.n_cols();
+    let mut variances = try_filled_vec(normalized_counts.n_rows(), f64::NAN, "Cook's variances")?;
+    let first_error = variances
+        .par_iter_mut()
+        .zip(normalized_counts.as_slice().par_chunks(samples))
+        .enumerate()
+        .map_init(
+            || None,
+            |scratch, (gene, (variance, row))| -> Result<(), DeseqError> {
+                let sorted = cooks_row_buffer(scratch, samples)?;
+                *variance = if replicated.is_empty() {
+                    TrimmedVariance::ALL_SAMPLES.evaluate(row.iter().copied(), sorted, gene)?
+                } else {
+                    let mut maximum = f64::NEG_INFINITY;
+                    for &(group, rule) in &replicated {
+                        let values = group.iter().map(|&sample| row[sample]);
+                        maximum = maximum.max(rule.evaluate(values, sorted, gene)?);
+                    }
+                    maximum
+                };
+                Ok(())
+            },
+        )
+        .find_map_first(Result::err);
+    if let Some(error) = first_error {
+        return Err(error);
     }
     Ok(variances)
 }
 
-pub(super) fn trimmed_variance(
-    normalized_counts: &RowMajorMatrix<f64>,
-) -> Result<Vec<f64>, DeseqError> {
-    let mut variances = Vec::with_capacity(normalized_counts.n_rows());
-    for gene in 0..normalized_counts.n_rows() {
-        let row = normalized_counts.row(gene)?;
-        let mean = trimmed_scaled_mean(row.to_vec(), 1.0 / 8.0, "Cook's trimmed mean")?;
-        let sq_errors = row
-            .iter()
-            .copied()
-            .enumerate()
-            .map(|(sample, value)| {
-                let residual = value - mean;
-                checked::try_mul(residual, residual)
-                    .nonfinite_at("Cook's trimmed residual square", Some(sample))
-            })
-            .collect::<Result<Vec<_>, DeseqError>>()?;
-        variances.push(
-            checked::try_mul(
-                1.51,
-                trimmed_scaled_mean(sq_errors, 1.0 / 8.0, "Cook's trimmed variance mean")?,
-            )
-            .nonfinite_at("Cook's trimmed variance", Some(gene))?,
-        );
+/// Trim the sorted central values without applying R's full-trim median rule.
+fn trimmed_scaled_mean(values: &mut [f64], trim: f64, context: &str) -> Result<f64, DeseqError> {
+    if values.is_empty() || values.iter().any(|value| value.is_nan()) {
+        return Ok(f64::NAN);
     }
-    Ok(variances)
+    values.sort_unstable_by(f64::total_cmp);
+    let trim_count = (values.len() as f64 * trim).floor() as usize;
+    let end = values.len().saturating_sub(trim_count);
+    if trim_count >= end {
+        return Ok(f64::NAN);
+    }
+    checked::try_mean(&values[trim_count..end]).nonfinite_at(context, None)
 }

@@ -6,7 +6,7 @@ fn samples_for_cooks_matches_model_matrix_cells() {
     let design = DesignMatrix::from_row_major(
         5,
         2,
-        vec![1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0],
+        vec![1.0, 0.0, 1.0, -0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0],
         None,
     )
     .unwrap();
@@ -36,6 +36,25 @@ fn robust_dispersion_keeps_large_finite_row_mean() {
     let dispersion = robust_method_of_moments_dispersion(&normalized, &design).unwrap();
 
     assert_eq!(dispersion[0], 0.04);
+}
+
+#[test]
+fn robust_dispersion_reports_first_variance_error_across_workers() {
+    let normalized =
+        RowMajorMatrix::from_row_major(2, 3, vec![1.0, 1.0, 1e200, 1e200, 1.0, 1.0]).unwrap();
+    let design = DesignMatrix::from_row_major(3, 1, vec![1.0; 3], None).unwrap();
+    for workers in [1, 4] {
+        let error = DeseqBuilder::new()
+            .threads(workers)
+            .with_execution_context(|| robust_method_of_moments_dispersion(&normalized, &design))
+            .unwrap()
+            .unwrap_err();
+        std::assert_matches!(
+            error,
+            DeseqError::NonFiniteValue { context, index: Some(2), value: f64::INFINITY }
+                if context == "Cook's trimmed cell residual square"
+        );
+    }
 }
 
 #[test]
@@ -475,7 +494,31 @@ fn prepare_cooks_replacement_refit_identifies_refit_rows_and_base_metadata() {
 
 #[test]
 fn max_cooks_after_replacement_refit_zeros_replaceable_columns() {
-    let cooks = RowMajorMatrix::from_row_major(1, 6, vec![9.0, 2.0, 3.0, 8.0, 4.0, 5.0]).unwrap();
+    let cooks = RowMajorMatrix::from_row_major(
+        3,
+        6,
+        vec![
+            9.0,
+            2.0,
+            3.0,
+            8.0,
+            4.0,
+            5.0,
+            f64::NAN,
+            -1.0,
+            -2.0,
+            f64::NAN,
+            -3.0,
+            -4.0,
+            9.0,
+            f64::NAN,
+            3.0,
+            8.0,
+            4.0,
+            5.0,
+        ],
+    )
+    .unwrap();
     let design =
         DesignMatrix::from_row_major(6, 1, vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], None).unwrap();
 
@@ -486,7 +529,11 @@ fn max_cooks_after_replacement_refit_zeros_replaceable_columns() {
     )
     .unwrap();
 
-    assert_eq!(max_cooks, vec![Some(5.0)]);
+    assert_eq!(max_cooks, vec![Some(5.0), Some(0.0), None]);
+    assert_eq!(
+        max_cooks_after_replacement_refit(&cooks, &design, &[true; 6]).unwrap(),
+        vec![None; 3]
+    );
     assert!(max_cooks_after_replacement_refit(&cooks, &design, &[true, true]).is_err());
 }
 

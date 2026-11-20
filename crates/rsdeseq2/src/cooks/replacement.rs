@@ -50,37 +50,43 @@ pub fn replace_outlier_counts(
         .zip(outlier_values.par_chunks_mut(samples))
         .zip(replaced_values.par_chunks_mut(samples))
         .enumerate()
-        .map(|(gene, ((candidate, outlier), replaced))| {
-            let trim_mean = r_trimmed_mean(normalized_counts.row(gene)?.to_vec(), options.trim);
-            let scales = match normalization_factors {
-                Some(factors) => factors.row(gene)?,
-                None => size_factors,
-            };
-            let cooks_row = cooks.row(gene)?;
-            let mut has_outlier = false;
-            let mut has_missing = false;
-            for sample in 0..samples {
-                let scaled_mean = checked::try_mul(trim_mean, scales[sample])
-                    .nonfinite_at("replacement scaled mean", Some(gene * samples + sample))?;
-                candidate[sample] = replacement_count_from_scaled_mean(scaled_mean)?;
+        .map_init(
+            || None,
+            |scratch, (gene, ((candidate, outlier), replaced))| {
+                let values = cooks_row_buffer(scratch, samples)?;
+                values.clear();
+                values.extend_from_slice(normalized_counts.row(gene)?);
+                let trim_mean = r_trimmed_mean(values, options.trim);
+                let scales = match normalization_factors {
+                    Some(factors) => factors.row(gene)?,
+                    None => size_factors,
+                };
+                let cooks_row = cooks.row(gene)?;
+                let mut has_outlier = false;
+                let mut has_missing = false;
+                for sample in 0..samples {
+                    let scaled_mean = checked::try_mul(trim_mean, scales[sample])
+                        .nonfinite_at("replacement scaled mean", Some(gene * samples + sample))?;
+                    candidate[sample] = replacement_count_from_scaled_mean(scaled_mean)?;
 
-                let cook = cooks_row[sample];
-                let finite = cook.is_finite();
-                outlier[sample] = finite && cook > options.cooks_cutoff;
-                has_outlier |= outlier[sample];
-                has_missing |= !finite;
-                if outlier[sample] && replaceable_samples[sample] {
-                    replaced[sample] = candidate[sample];
+                    let cook = cooks_row[sample];
+                    let finite = cook.is_finite();
+                    outlier[sample] = finite && cook > options.cooks_cutoff;
+                    has_outlier |= outlier[sample];
+                    has_missing |= !finite;
+                    if outlier[sample] && replaceable_samples[sample] {
+                        replaced[sample] = candidate[sample];
+                    }
                 }
-            }
-            Ok(if has_outlier {
-                Some(true)
-            } else if has_missing {
-                None
-            } else {
-                Some(false)
-            })
-        })
+                Ok(if has_outlier {
+                    Some(true)
+                } else if has_missing {
+                    None
+                } else {
+                    Some(false)
+                })
+            },
+        )
         .collect::<Vec<_>>();
     // Collect in row order so concurrent failures report the same first gene
     // and sample as the serial implementation.

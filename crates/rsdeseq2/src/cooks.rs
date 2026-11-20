@@ -3,7 +3,7 @@ use crate::errors::{DeseqError, invalid_dimensions};
 use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
-use crate::matrix::try_alloc_matrix;
+use crate::matrix::{try_alloc_matrix, try_filled_vec};
 use crate::normalization::{
     base_mean, base_variance, normalized_counts_with_factors, validate_normalization_factors,
     validate_size_factors,
@@ -219,7 +219,8 @@ pub fn calculate_cooks_distance(
     model_matrix: &DesignMatrix,
 ) -> Result<CooksOutput, DeseqError> {
     validate_cooks_inputs(counts, normalized_counts, mu, hat_diagonal, model_matrix)?;
-    let robust_dispersion = robust_method_of_moments_dispersion(normalized_counts, model_matrix)?;
+    let groups = model_matrix_groups(model_matrix)?;
+    let robust_dispersion = robust_dispersion_for_groups(normalized_counts, &groups)?;
     let p = model_matrix.n_coefficients() as f64;
 
     // Genes are independent: fill each gene's row in parallel and report the
@@ -227,7 +228,7 @@ pub fn calculate_cooks_distance(
     let n_samples = counts.n_samples();
     let mut values = try_alloc_matrix(counts.n_genes(), n_samples, "Cook's distances")?;
     values.resize(counts.n_genes() * n_samples, f64::NAN);
-    let rows = values
+    let first_error = values
         .par_chunks_mut(n_samples.max(1))
         .zip(robust_dispersion.par_iter().copied())
         .enumerate()
@@ -278,11 +279,13 @@ pub fn calculate_cooks_distance(
             }
             Ok(())
         })
-        .collect::<Vec<_>>();
-    rows.into_iter().collect::<Result<(), _>>()?;
+        .find_map_first(Result::err);
+    if let Some(error) = first_error {
+        return Err(error);
+    }
 
     let cooks = RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values)?;
-    let samples_for_cooks = samples_for_cooks(model_matrix, 3)?;
+    let samples_for_cooks = eligible_samples(&groups, model_matrix.n_samples(), 3)?;
     let max_cooks = record_max_cooks(&cooks, model_matrix, &samples_for_cooks)?;
     Ok(CooksOutput {
         cooks,
@@ -326,21 +329,11 @@ pub fn max_cooks_after_replacement_refit(
         ));
     }
     if replaceable_samples.iter().all(|value| *value) {
-        return Ok(vec![None; cooks.n_rows()]);
+        return try_filled_vec(cooks.n_rows(), None, "post-refit maxCooks");
     }
 
-    let mut values = cooks.as_slice().to_vec();
-    for gene in 0..cooks.n_rows() {
-        let row_start = gene * cooks.n_cols();
-        for (sample, replaceable) in replaceable_samples.iter().copied().enumerate() {
-            if replaceable {
-                values[row_start + sample] = 0.0;
-            }
-        }
-    }
-    let replace_cooks = RowMajorMatrix::from_row_major(cooks.n_rows(), cooks.n_cols(), values)?;
     let samples = samples_for_cooks(model_matrix, 3)?;
-    record_max_cooks(&replace_cooks, model_matrix, &samples)
+    record_max_cooks_masked(cooks, model_matrix, &samples, Some(replaceable_samples))
 }
 
 /// Robust method-of-moments dispersion used by DESeq2 for Cook's distances.
@@ -356,20 +349,21 @@ pub fn robust_method_of_moments_dispersion(
         ));
     }
 
-    let samples_with_three_or_more = samples_for_cooks(model_matrix, 3)?;
-    let variance = if samples_with_three_or_more.iter().any(|value| *value) {
-        trimmed_cell_variance(normalized_counts, model_matrix)?
-    } else {
-        trimmed_variance(normalized_counts)?
-    };
+    let groups = model_matrix_groups(model_matrix)?;
+    robust_dispersion_for_groups(normalized_counts, &groups)
+}
 
-    let mut dispersions = Vec::with_capacity(normalized_counts.n_rows());
-    for (gene, variance) in variance.iter().copied().enumerate() {
+fn robust_dispersion_for_groups(
+    normalized_counts: &RowMajorMatrix<f64>,
+    groups: &[Vec<usize>],
+) -> Result<Vec<f64>, DeseqError> {
+    let mut dispersions = trimmed_variances(normalized_counts, groups)?;
+    for (gene, variance) in dispersions.iter_mut().enumerate() {
         let row = normalized_counts.row(gene)?;
         let mean = checked::try_mean(row).nonfinite_at("Cook's robust dispersion mean", None)?;
         let alpha = if mean > 0.0 {
             let inv_mean = mean.recip();
-            let centered = variance - mean;
+            let centered = *variance - mean;
             if !centered.is_finite() {
                 return Err(DeseqError::NonFiniteValue {
                     context: "Cook's robust dispersion centered variance".to_string(),
@@ -386,11 +380,11 @@ pub fn robust_method_of_moments_dispersion(
         } else {
             f64::NAN
         };
-        dispersions.push(if alpha.is_nan() {
+        *variance = if alpha.is_nan() {
             f64::NAN
         } else {
             alpha.max(MIN_COOKS_DISPERSION)
-        });
+        };
     }
     Ok(dispersions)
 }
@@ -398,10 +392,21 @@ pub fn robust_method_of_moments_dispersion(
 /// Return samples belonging to model-matrix cells with at least `n` replicates.
 pub fn samples_for_cooks(model_matrix: &DesignMatrix, n: usize) -> Result<Vec<bool>, DeseqError> {
     let groups = model_matrix_groups(model_matrix)?;
-    Ok(groups
-        .iter()
-        .map(|group| groups.iter().filter(|other| *other == group).count() >= n)
-        .collect())
+    eligible_samples(&groups, model_matrix.n_samples(), n)
+}
+
+fn eligible_samples(
+    groups: &[Vec<usize>],
+    samples: usize,
+    minimum: usize,
+) -> Result<Vec<bool>, DeseqError> {
+    let mut eligible = try_filled_vec(samples, false, "Cook's eligible samples")?;
+    for group in groups.iter().filter(|group| group.len() >= minimum) {
+        for &sample in group {
+            eligible[sample] = true;
+        }
+    }
+    Ok(eligible)
 }
 
 /// Record maximum Cook's distance over eligible samples.
@@ -424,14 +429,24 @@ pub fn record_max_cooks(
             samples_for_cooks.len(),
         ));
     }
+    record_max_cooks_masked(cooks, model_matrix, samples_for_cooks, None)
+}
+
+fn record_max_cooks_masked(
+    cooks: &RowMajorMatrix<f64>,
+    model_matrix: &DesignMatrix,
+    samples_for_cooks: &[bool],
+    zero_samples: Option<&[bool]>,
+) -> Result<Vec<Option<f64>>, DeseqError> {
     if model_matrix.n_samples() <= model_matrix.n_coefficients()
         || !samples_for_cooks.iter().any(|value| *value)
     {
-        return Ok(vec![None; cooks.n_rows()]);
+        return try_filled_vec(cooks.n_rows(), None, "maxCooks");
     }
 
     // Row maxima are independent; rows are contiguous in the row-major matrix.
-    let max_values = cooks
+    let mut max_values = try_alloc_matrix(cooks.n_rows(), 1, "maxCooks")?;
+    cooks
         .as_slice()
         .par_chunks(cooks.n_cols())
         .map(|row| {
@@ -440,7 +455,11 @@ pub fn record_max_cooks(
                 if !use_sample {
                     continue;
                 }
-                let value = row[sample];
+                let value = if zero_samples.is_some_and(|mask| mask[sample]) {
+                    0.0
+                } else {
+                    row[sample]
+                };
                 if value.is_nan() {
                     row_max = None;
                     break;
@@ -449,7 +468,7 @@ pub fn record_max_cooks(
             }
             row_max
         })
-        .collect::<Vec<_>>();
+        .collect_into_vec(&mut max_values);
     Ok(max_values)
 }
 
@@ -566,68 +585,43 @@ fn validate_gene_sample_matrix(
 
 // Robust dispersion statistics.
 mod trimmed_variance;
-use trimmed_variance::{trimmed_cell_variance, trimmed_variance};
+use trimmed_variance::trimmed_variances;
 
-fn model_matrix_groups(model_matrix: &DesignMatrix) -> Result<Vec<Vec<f64>>, DeseqError> {
-    let mut groups = Vec::with_capacity(model_matrix.n_samples());
-    for sample in 0..model_matrix.n_samples() {
-        groups.push(model_matrix.matrix().row(sample)?.to_vec());
+fn model_matrix_groups(model_matrix: &DesignMatrix) -> Result<Vec<Vec<usize>>, DeseqError> {
+    let samples = model_matrix.n_samples();
+    let columns = model_matrix.n_coefficients();
+    let values = model_matrix.matrix().as_slice();
+    let mut groups: Vec<Vec<usize>> = try_alloc_matrix(samples, 1, "Cook's model matrix cells")?;
+    for (sample, row) in values.chunks_exact(columns).enumerate() {
+        if let Some(group) = groups.iter_mut().find(|group| {
+            let start = group[0] * columns;
+            &values[start..start + columns] == row
+        }) {
+            group.push(sample);
+        } else {
+            groups.push(vec![sample]);
+        }
     }
     Ok(groups)
 }
 
-fn unique_group_ids(groups: &[Vec<f64>]) -> Vec<Vec<f64>> {
-    let mut unique = Vec::new();
-    for group in groups {
-        if !unique.iter().any(|candidate| candidate == group) {
-            unique.push(group.clone());
-        }
+fn cooks_row_buffer(
+    scratch: &mut Option<Vec<f64>>,
+    samples: usize,
+) -> Result<&mut Vec<f64>, DeseqError> {
+    match scratch {
+        Some(values) => Ok(values),
+        None => Ok(scratch.insert(try_alloc_matrix(samples, 1, "Cook's row scratch")?)),
     }
-    unique
-}
-
-fn trim_bin(n: usize) -> usize {
-    if n <= 3 {
-        0
-    } else if n <= 23 {
-        1
-    } else {
-        2
-    }
-}
-
-fn trim_ratio(bin: usize) -> f64 {
-    [1.0 / 3.0, 1.0 / 4.0, 1.0 / 8.0][bin]
-}
-
-fn trim_scale(bin: usize) -> f64 {
-    [2.04, 1.86, 1.51][bin]
-}
-
-/// Trimmed mean of the central values using the scale-normalized mean; NaN
-/// for empty, NaN-containing or fully trimmed input. No `trim >= 0.5` median
-/// rule (compare [`r_trimmed_mean`]).
-fn trimmed_scaled_mean(mut values: Vec<f64>, trim: f64, context: &str) -> Result<f64, DeseqError> {
-    if values.is_empty() || values.iter().any(|value| value.is_nan()) {
-        return Ok(f64::NAN);
-    }
-    values.sort_by(f64::total_cmp);
-    let trim_count = (values.len() as f64 * trim).floor() as usize;
-    let end = values.len().saturating_sub(trim_count);
-    if trim_count >= end {
-        return Ok(f64::NAN);
-    }
-    let kept = &values[trim_count..end];
-    checked::try_mean(kept).nonfinite_at(context, None)
 }
 
 /// R `mean(x, trim)`: median for `trim >= 0.5`, otherwise a plain sum of the
 /// central values divided by their count; NaN for non-finite input.
-fn r_trimmed_mean(mut values: Vec<f64>, trim: f64) -> f64 {
+fn r_trimmed_mean(values: &mut [f64], trim: f64) -> f64 {
     if values.is_empty() || values.iter().any(|value| !value.is_finite()) {
         return f64::NAN;
     }
-    values.sort_by(f64::total_cmp);
+    values.sort_unstable_by(f64::total_cmp);
     if trim >= 0.5 {
         return if values.len().is_multiple_of(2) {
             let upper = values.len() / 2;
@@ -679,15 +673,4 @@ fn no_replacement_output(counts: &CountMatrix) -> Result<CooksReplacementOutput,
         replace: vec![Some(false); counts.n_genes()],
         replaceable_samples: vec![false; counts.n_samples()],
     })
-}
-
-fn row_max(values: &[f64]) -> f64 {
-    let mut max_value = f64::NEG_INFINITY;
-    for value in values {
-        if value.is_nan() {
-            return f64::NAN;
-        }
-        max_value = max_value.max(*value);
-    }
-    max_value
 }

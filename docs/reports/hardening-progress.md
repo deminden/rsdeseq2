@@ -1519,12 +1519,38 @@ five- and six-sample probes and varied by less than 3% on the eight-
 and eleven-sample probes. The accepted release checks above cover
 the nalgebra implementation.
 
+### Cook's robust dispersion and post-refit masking
+
+Cook's distance groups samples once from borrowed design rows. The
+trimmed variance pass processes independent genes in parallel with
+one sort buffer per Rayon task. It traverses cells and samples in the
+original order when checking for arithmetic errors. Replacement uses
+the same scratch allocation pattern for trimmed means. Post-refit
+`maxCooks` substitutes zero during the scan and avoids a full copy of
+the Cook's distance matrix.
+
+A paired macOS arm64 probe used 20,000 genes, 100 samples, four
+replicated design cells and the portable profile. With four workers,
+the median over three runs for robust dispersion fell from 44.6 to
+7.8 ms against `67370a4`. Cook's distance, replacement and masked
+maxima together fell from 55.9 to 17.1 ms. Their allocation and
+reallocation calls fell from 440,453 to 192, and median peak RSS
+fell from 107.14 to 91.58 MiB. Checksums matched under one and four
+workers for every pair.
+
+Each numeric profile passed 107 focused Cook's, replacement,
+thread-invariance and end-to-end GTEx checks, and both 8,032-field
+golden manifests matched. The regression covers the first failing
+gene, masked and unmasked NaNs, all-sample masking and signed zero
+in model-matrix cells. Integration Clippy, formatting, documentation
+and the module dependency check passed.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |
 | --- | --- |
 | 1. Golden harness | The [golden harness](../development.md) covers 8,032 fields. Portable hashes have replayed on macOS arm64, Linux arm64 and emulated Linux x86_64. |
-| 2. Per-gene parallelism | MAP, Cook's distance and replacement, and the rlog prior run in parallel with ordered errors and results. See the [thread-scaling probe](#local-verification-and-benchmark). |
+| 2. Per-gene parallelism | MAP, Cook's distance, robust dispersion and replacement, and the rlog prior run in parallel with ordered errors and results. See the [thread-scaling probe](#local-verification-and-benchmark). |
 | 3. Borrowed offsets | Sample factors stay in a sample vector through fitting. Selected dispersion, Wald, LRT, beta-prior and rlog fits borrow source rows. Where the API returns gene-by-sample factors, the matrix is created for that output. |
 | 4. Numerical profiles | The crate and CLI default to portable arithmetic. The R bridge selects its host profile. The [platform workflow](../../.github/workflows/platform-checks.yml) checks the release panel and portable golden hashes on five targets. Native Intel macOS and Windows x64 runtime results are still open. |
 | 5. One workflow entry point | The builder, CLI and R bridge use `DeseqBuilder::run(&Analysis)`. The [API migration](../design/run-entry-point.md) keeps deprecated wrappers in 0.6 and schedules removal in 0.7. |
