@@ -107,6 +107,9 @@ versions live in [docs/releases](docs/releases/).
 
 ### Changed
 
+- The macOS R shared library exports its registration hook and strips
+  unused Rust code at link time.
+
 - The minimum supported Rust version is 1.96.0 for the workspace and R
   source package.
 

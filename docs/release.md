@@ -34,8 +34,8 @@ journals, OS metadata and machine-specific paths. Both package inventories must
 exclude `.DS_Store`. Preserve measurement/reference identities rather than
 relabelling them as measurements of a new binary.
 
-R package checks retain the documented compiled-symbol warning for Rust runtime
-`abort`/`exit` entry points. Passing CI is not a warning-free or CRAN-acceptance claim.
+The macOS arm64 R compiled-code check still reports the Rust runtime
+`abort` import. Record package-check warnings with the release results.
 
 ## CI and artifact binding
 

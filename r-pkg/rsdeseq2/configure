@@ -33,7 +33,9 @@ case "$(uname -s)" in
     ;;
   Darwin)
     rust_link_libraries="-lpthread -lm"
-    rust_linker_flags="-Wl,-x"
+    # R reaches the C entry points through R_init_rsdeseq2's registered table.
+    # Keep the initialization symbol public so unused Rust code can be stripped.
+    rust_linker_flags="-Wl,-x,-dead_strip,-exported_symbol,_R_init_rsdeseq2"
     ;;
   *)
     rust_link_libraries="-lpthread -lm"

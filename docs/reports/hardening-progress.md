@@ -1019,6 +1019,18 @@ replays. Intel macOS test executables linked, and Windows MSVC libraries
 and binaries type-checked. Native runtime results for those two targets
 and the hosted release run remain open.
 
+### macOS R shared-library linking
+
+The macOS package exposes the R initialization symbol and strips unused code.
+The `.Call` registration table retains all 30 routines with the same arities.
+A paired arm64 build with R 4.6.2 and Rust 1.96.0 reduced the shared library
+from 9,151,320 to 5,934,904 bytes. R's compiled-code checker stopped reporting
+the two `exit` imports and still reported the Rust runtime `abort` import.
+
+The stripped build passed all 2,874 R expectations with zero failures
+or skips. A SIGINT interrupted a posterior grid, and the same R process
+then completed a second native fit.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
