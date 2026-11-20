@@ -285,6 +285,64 @@ with zero skips on Linux arm64 R 4.6.2 and on macOS R 4.6.2 and R 4.5.3.
 Both R 4.6.2 checks recorded the existing compiled-symbol warning and
 vendoring notes. The R 4.5.3 check recorded the vendoring notes.
 
+### Portable GLM fallback finite differences
+
+The portable fallback evaluates the per-sample negative-binomial loss
+change across the bounded L-BFGS-B stencil. The loss change cancels
+terms that depend only on the count and dispersion. The optimizer keeps
+the R finite-difference step and uses the direct objective difference
+for wide stencils or extreme means. An 80-digit decimal calculation
+checks the one-sided stencil at a coefficient bound and the two-sided
+stencil in a weighted design with a four-billion-count row.
+
+The `96ae0c7` portable run passed 117 of 121 per-contrast gates and all
+nine global gates with the original frozen references and tolerances.
+The maximum fold-change error decreased from `1.50e-6` to `1.13e-6`
+in blocked random split 03, clearing the gate. In blocked random split
+04 it decreased from `5.63e-6` to `2.60e-6`. The remaining failures are
+that fold-change gate, the blocked condition's p-value and fitted
+dispersion gates, and blocked split 01's fitted dispersion gate. There
+were zero significance flips and complete top-set overlap across the
+eleven contrasts. The host profile passed all 130 gates. All 22 host
+result and diagnostic TSVs matched `adc4027` byte for byte.
+
+The change updates 620 of 8,032 portable field hashes. The Cargo
+archives built offline and reproduced byte for byte. The R source
+archive passed all 2,874 expectations with zero skips under macOS
+R 4.5.3 and 4.6.2 and Linux arm64 R 4.6.2. The checks recorded the
+same compiled-symbol warning and vendoring notes as `adc4027`.
+
+In `e8b8969`, compensated summation of the signed loss changes brought
+the portable release build to 118 of 121 per-contrast gates and all
+nine global gates. Blocked split 04 cleared its fold-change gate at
+`1.01e-6`, and the split 03 maximum decreased further to `1.07e-6`.
+The remaining comparisons are the blocked condition's p-value and
+fitted dispersion and blocked split 01's fitted dispersion. The
+significance panel found zero flips and complete top-set overlap. The
+host release build passed all 130 gates and matched the 22 archived
+host TSVs byte for byte. All 8,032 portable field hashes matched on
+macOS arm64, Linux arm64 and QEMU Linux x86_64. The workspace tests and
+both full 56,200-gene replay tests passed on macOS and Linux arm64.
+All four `e8b8969` Cargo archives built offline and reproduced byte for
+byte. Each of the three local R checks again passed 2,874 expectations
+with zero skips and recorded the same package-check notes and warning
+profile as `96ae0c7`.
+
+One paired four-worker run over the eleven contrasts took 17.12 s with
+`e8b8969` and 16.98 s with `adc4027`. Peak RSS was 258.06 MiB and 259.47
+MiB, respectively. The paired result files matched the precision runs.
+
+Compensating the dispersion likelihood reduction introduced six new
+failures across a separate four-contrast trial. A centered derivative
+reduced the median error from about 418 million binary64 ulps to one
+ulp on 200 cases against an 80-digit digamma recurrence. At count
+and mean 1 and log dispersion −25, it recovered the negative derivative
+`-6.943971932417719e-12` from the existing positive result `2.7800684085535026e-5`.
+Applying that derivative at shape greater than 10 increased the
+blocked-condition p-value error. Cutoffs at 1,024 and 65,536 left the
+three gaps in the two blocked contrasts. The dispersion trials were
+kept in local experiment worktrees.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
