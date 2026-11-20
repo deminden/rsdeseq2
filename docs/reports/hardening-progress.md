@@ -1074,6 +1074,19 @@ R 4.6.2 passed all 2,874 package expectations without failures or skips.
 The 40 posterior batches still matched the standalone Rust output
 exactly, and a second native fit succeeded after SIGINT cancellation.
 
+### Sample offsets in R contrast shrinkage
+
+Expanded-model normal shrinkage passes sample size factors directly to
+the GLM. This removes the genes × samples copy and lets IRLS compute
+the log offsets once per sample. Per-cell normalization factors retain
+precedence when supplied.
+
+All 72 selected R 4.6.2 expectations passed. A 128-gene test matched
+all baseline output bytes with shared, weighted, and varying per-cell
+offsets. In one paired synthetic run with 20,000 genes and 100 samples,
+both builds produced byte-identical output in 0.21 s, and peak RSS
+fell from 194.5 to 178.9 MiB.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

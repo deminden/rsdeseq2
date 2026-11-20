@@ -16,7 +16,7 @@ use rsdeseq2::prelude::{
     TestType, WaldAlternative, WaldTestOptions, base_mean, base_mean_with_weights, base_variance,
     base_variance_with_weights, estimate_beta_prior_variance, estimate_size_factors_with_options,
     local_vst_inverse_factor_mean,
-    normalization_factors_from_size_factors, normalized_counts, normalized_counts_with_factors,
+    normalized_counts, normalized_counts_with_factors,
     preprocess_observation_weights, vst_local_from_dispersion_grid, vst_mean, vst_parametric,
     wald_test_coefficient_with_options, wald_test_contrast_with_options,
 };

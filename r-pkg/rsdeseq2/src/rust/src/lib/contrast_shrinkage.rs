@@ -102,17 +102,17 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
         if !lfc_threshold.is_finite() || lfc_threshold < 0.0 {
             return Err("lfcThreshold must be finite and non-negative".into());
         }
-        let normalization_factors = if !normalization_factors_values.is_null() {
+        let factors;
+        let offsets = if !normalization_factors_values.is_null() {
             // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
-            unsafe {
+            factors = unsafe {
                 row_major_from_column_major(n_genes, n_samples, normalization_factors_values)?
-            }
+            };
+            Offsets::PerCell(&factors)
         } else {
-            let size_factors =
-                // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
-                unsafe { input_slice(size_factors_values, n_samples, "size factors")? };
-            normalization_factors_from_size_factors(&counts, size_factors)
-                .map_err(|error| error.to_string())?
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
+            let size_factors = unsafe { input_slice(size_factors_values, n_samples, "size factors")? };
+            Offsets::PerSample(size_factors)
         };
         let weights = if observation_weights_values.is_null() {
             None
@@ -237,7 +237,7 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
                 "expanded model prior variances could not be mapped to every coefficient".into(),
             );
         }
-        let mut input = GlmInput::new(&counts, Offsets::PerCell(&normalization_factors), dispersions);
+        let mut input = GlmInput::new(&counts, offsets, dispersions);
         if let Some(weights) = weights.as_ref() {
             input = input.weights(weights);
         }
