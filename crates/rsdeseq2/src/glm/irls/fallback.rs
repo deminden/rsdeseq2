@@ -2,7 +2,7 @@ use super::*;
 // Bounded-optimizer fallback, starting values and acceptance checks.
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn refit_optim_fallback_rows(
+pub(super) fn refit_optim_fallback_rows<const SELECTED: bool>(
     rows: &[usize],
     beta_values: &mut [f64],
     beta_var_values: &mut [f64],
@@ -15,7 +15,7 @@ pub(super) fn refit_optim_fallback_rows(
     beta_optim_start_objective: &mut [f64],
     beta_optim_objective: &mut [f64],
     beta_optim_gradient_norm: &mut [f64],
-    input: OptimFallbackInput<'_>,
+    input: OptimFallbackInput<'_, SELECTED>,
 ) -> Result<(), DeseqError> {
     let p = input.x.ncols();
     let n = input.x.nrows();

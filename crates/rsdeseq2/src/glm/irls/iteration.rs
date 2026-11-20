@@ -12,9 +12,9 @@ pub(super) struct IrlsScratch {
     covariance: Vec<f64>,
 }
 
-pub(super) fn fit_fixed_dispersion_irls_row(
+pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
     scratch: &mut IrlsScratch,
-    input: IrlsRowInput<'_>,
+    input: IrlsRowInput<'_, SELECTED>,
     output: IrlsRowOutput<'_>,
 ) -> Result<IrlsRowStatus, DeseqError> {
     let gene = input.gene;

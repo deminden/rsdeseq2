@@ -13,7 +13,9 @@ use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::NbinomGlmFit;
 use crate::glm::beta::{GlmInput, fit_intercept_only_glm};
 use crate::glm::fallback::requires_optim_fallback;
-use crate::glm::nb::{FixedDispersionLikelihood, nbinom_log_likelihood_weighted};
+use crate::glm::nb::{
+    FixedDispersionLikelihood, nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted,
+};
 use crate::glm::r_arithmetic::{nbinom_log, normal_log};
 use crate::math::optim::BoundedOptimizationOutput;
 use crate::matrix::CountMatrix;
@@ -375,9 +377,9 @@ pub(crate) fn fit_offsets_irls_for_output(
         weights,
     };
     fit_irls_rows(
-        IrlsRows {
+        IrlsRows::<false> {
             input,
-            selection: None,
+            selection: &[],
         },
         design,
         options,
@@ -395,9 +397,9 @@ pub(crate) fn fit_selected_irls_means(
         validate_size_factor_offsets(input.counts, factors)?;
     }
     fit_irls_rows(
-        IrlsRows {
+        IrlsRows::<true> {
             input,
-            selection: Some(genes),
+            selection: genes,
         },
         design,
         options,
@@ -407,20 +409,23 @@ pub(crate) fn fit_selected_irls_means(
 }
 
 #[derive(Clone, Copy)]
-struct IrlsRows<'a> {
+struct IrlsRows<'a, const SELECTED: bool> {
     input: GlmInput<'a>,
     /// Source gene indices in fit order. Output and error positions are compact.
-    selection: Option<&'a [usize]>,
+    selection: &'a [usize],
 }
 
-impl<'a> IrlsRows<'a> {
+impl<'a, const SELECTED: bool> IrlsRows<'a, SELECTED> {
     fn len(self) -> usize {
-        self.selection
-            .map_or(self.input.counts.n_genes(), <[usize]>::len)
+        if SELECTED {
+            self.selection.len()
+        } else {
+            self.input.counts.n_genes()
+        }
     }
 
     fn source(self, gene: usize) -> usize {
-        self.selection.map_or(gene, |indices| indices[gene])
+        if SELECTED { self.selection[gene] } else { gene }
     }
 
     fn weights(self, source_gene: usize) -> Result<Option<&'a [f64]>, DeseqError> {
@@ -431,8 +436,8 @@ impl<'a> IrlsRows<'a> {
     }
 }
 
-fn fit_irls_rows(
-    rows: IrlsRows<'_>,
+fn fit_irls_rows<const SELECTED: bool>(
+    rows: IrlsRows<'_, SELECTED>,
     design: &DesignMatrix,
     options: IrlsOptions,
     requirements: OutputRequirements,
@@ -577,16 +582,29 @@ fn fit_irls_rows(
     };
     let mu = RowMajorMatrix::from_row_major(genes, samples, mu_values)?;
     let hat_diagonal = RowMajorMatrix::from_row_major(genes, samples, hat_values)?;
-    let mut log_like = Vec::with_capacity(genes);
-    for (gene, optimized) in optim_log_like.into_iter().enumerate() {
-        let source_gene = rows.source(gene);
-        let raw = nbinom_log_likelihood_weighted(
-            rows.input.counts.row(source_gene)?,
-            mu.row(gene)?,
-            rows.input.dispersions[source_gene],
-            rows.weights(source_gene)?,
-        )?;
-        log_like.push(optimized.unwrap_or(raw));
+    let mut log_like = if SELECTED {
+        let mut result = Vec::with_capacity(genes);
+        for (gene, &source_gene) in rows.selection.iter().enumerate() {
+            result.push(nbinom_log_likelihood_weighted(
+                rows.input.counts.row(source_gene)?,
+                mu.row(gene)?,
+                rows.input.dispersions[source_gene],
+                rows.weights(source_gene)?,
+            )?);
+        }
+        result
+    } else {
+        nbinom_log_likelihood_matrix(
+            rows.input.counts,
+            &mu,
+            rows.input.dispersions,
+            rows.input.weights,
+        )?
+    };
+    for (likelihood, optimized) in log_like.iter_mut().zip(optim_log_like) {
+        if let Some(value) = optimized {
+            *likelihood = value;
+        }
     }
 
     Ok(NbinomGlmFit {
@@ -618,18 +636,18 @@ fn checked_output_elements(rows: usize, columns: usize) -> Result<usize, DeseqEr
         })
 }
 
-struct OptimFallbackInput<'a> {
-    rows: IrlsRows<'a>,
+struct OptimFallbackInput<'a, const SELECTED: bool> {
+    rows: IrlsRows<'a, SELECTED>,
     x: &'a DMatrix<f64>,
     ridge_lambda: &'a [f64],
     options: &'a IrlsOptions,
 }
 
-struct IrlsRowInput<'a> {
+struct IrlsRowInput<'a, const SELECTED: bool> {
     gene: usize,
     /// `ln` of the size factors when every gene shares them.
     shared_log_offsets: Option<&'a [f64]>,
-    rows: IrlsRows<'a>,
+    rows: IrlsRows<'a, SELECTED>,
     x: &'a DMatrix<f64>,
     initial_lu: &'a LU<f64, Dyn, Dyn>,
     initial_beta: InitialBeta,
