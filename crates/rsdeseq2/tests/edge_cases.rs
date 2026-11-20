@@ -1,6 +1,5 @@
 //! Degenerate inputs must return a typed error or a well-formed result, never
-//! panic. Where DESeq2 1.52 stops with a specific message, the message is
-//! checked too.
+//! panic. The validation cases check the error fields exposed to callers.
 
 use rsdeseq2::prelude::*;
 
@@ -27,9 +26,8 @@ fn varied(genes: usize, samples: usize) -> CountMatrix {
     })
 }
 
-fn kind<T: std::fmt::Debug>(result: Result<T, DeseqError>) -> (ErrorKind, String) {
-    let error = result.unwrap_err();
-    (error.kind(), error.to_string())
+fn kind<T: std::fmt::Debug>(result: Result<T, DeseqError>) -> ErrorKind {
+    result.unwrap_err().kind()
 }
 
 fn fit(
@@ -39,28 +37,26 @@ fn fit(
     DeseqBuilder::new().fit_with_results(counts, design)
 }
 
-const WITHIN_TWO_ORDERS: &str = "within 2 orders of magnitude from the minimum value";
-
 #[test]
 fn empty_and_mismatched_shapes_are_rejected() {
     assert_eq!(
-        kind(CountMatrix::from_row_major_u32(0, 6, vec![])).0,
+        kind(CountMatrix::from_row_major_u32(0, 6, vec![])),
         ErrorKind::Counts
     );
     assert_eq!(
-        kind(CountMatrix::from_row_major_u32(5, 0, vec![])).0,
+        kind(CountMatrix::from_row_major_u32(5, 0, vec![])),
         ErrorKind::Counts
     );
     assert_eq!(
-        kind(CountMatrix::from_row_major_u32(2, 3, vec![1; 5])).0,
+        kind(CountMatrix::from_row_major_u32(2, 3, vec![1; 5])),
         ErrorKind::Shape
     );
     assert_eq!(
-        kind(DesignMatrix::from_row_major(0, 2, vec![], None)).0,
+        kind(DesignMatrix::from_row_major(0, 2, vec![], None)),
         ErrorKind::Shape
     );
     assert_eq!(
-        kind(fit(&varied(50, 6), &design(&[0, 0, 1, 1]))).0,
+        kind(fit(&varied(50, 6), &design(&[0, 0, 1, 1]))),
         ErrorKind::Shape
     );
 }
@@ -69,13 +65,15 @@ fn empty_and_mismatched_shapes_are_rejected() {
 fn designs_without_replicates_or_full_rank_are_rejected() {
     let counts = varied(50, 6);
     let constant = DesignMatrix::from_row_major(6, 2, vec![1.0; 12], None).unwrap();
-    let (error_kind, message) = kind(fit(&counts, &constant));
-    assert_eq!(error_kind, ErrorKind::Options);
-    assert!(message.contains("not full rank"), "{message}");
-    assert_eq!(kind(fit(&counts, &design(&[1; 6]))).0, ErrorKind::Options);
+    std::assert_matches!(
+        fit(&counts, &constant).unwrap_err(),
+        DeseqError::DesignRankDeficient { rank: 1, columns: 2, zero_columns, .. }
+            if zero_columns.is_empty()
+    );
+    assert_eq!(kind(fit(&counts, &design(&[1; 6]))), ErrorKind::Options);
     // DESeq2: "the same number of samples and coefficients to fit".
     assert_eq!(
-        kind(fit(&varied(50, 2), &design(&[0, 1]))).0,
+        kind(fit(&varied(50, 2), &design(&[0, 1]))),
         ErrorKind::Shape
     );
     assert_eq!(
@@ -84,8 +82,7 @@ fn designs_without_replicates_or_full_rank_are_rejected() {
             1,
             vec![1.0, f64::NAN],
             None
-        ))
-        .0,
+        )),
         ErrorKind::Numeric
     );
 }
@@ -103,9 +100,10 @@ fn size_factors_need_a_gene_without_zeros() {
         }
     });
     for counts in [one_zero_each, counts(50, 6, |_, _| 0)] {
-        let (error_kind, message) = kind(fit(&counts, &design));
-        assert_eq!(error_kind, ErrorKind::Normalization);
-        assert!(message.contains("no usable genes"), "{message}");
+        std::assert_matches!(
+            fit(&counts, &design).unwrap_err(),
+            DeseqError::NoUsableGenesForSizeFactors
+        );
     }
 }
 
@@ -118,15 +116,13 @@ fn flat_dispersions_stop_before_any_trend() {
     });
     for counts in [&flat, &near_max, &varied(1, 6)] {
         for fit_type in [FitType::Parametric, FitType::Local, FitType::Mean] {
-            let (error_kind, message) = kind(
+            std::assert_matches!(
                 DeseqBuilder::new()
                     .fit_type(fit_type)
-                    .fit_with_results(counts, &design),
-            );
-            assert_eq!(error_kind, ErrorKind::Dispersion, "{fit_type:?}");
-            assert!(
-                message.contains(WITHIN_TWO_ORDERS),
-                "{fit_type:?}: {message}"
+                    .fit_with_results(counts, &design).unwrap_err(),
+                DeseqError::NoUsableDispersionTrendRows { min_disp: 1e-8, genes_checked }
+                    if genes_checked == counts.n_genes(),
+                "{fit_type:?}"
             );
         }
     }
@@ -171,24 +167,26 @@ fn invalid_user_supplied_factors_and_dispersions_are_rejected() {
         let result = DeseqBuilder::new()
             .size_factors(factors)
             .fit_with_results(&counts, &design);
-        assert_eq!(kind(result).0, ErrorKind::Normalization);
+        assert_eq!(kind(result), ErrorKind::Normalization);
     }
     let short = DeseqBuilder::new()
         .size_factors(vec![1.0; 5])
         .fit_with_results(&counts, &design);
-    assert_eq!(kind(short).0, ErrorKind::Shape);
+    assert_eq!(kind(short), ErrorKind::Shape);
 
     let small = varied(5, 6);
     let wald = |dispersions: &[f64], coefficient| {
         DeseqBuilder::new().fit_fixed_dispersion_wald(&small, &design, dispersions, coefficient)
     };
-    let (negative_kind, negative) = kind(wald(&[0.1, -0.1, 0.1, 0.1, 0.1], 1));
-    assert_eq!(negative_kind, ErrorKind::Numeric);
-    assert!(negative.starts_with("out-of-range value"), "{negative}");
-    let (_, nan) = kind(wald(&[0.1, f64::NAN, 0.1, 0.1, 0.1], 1));
-    assert!(nan.starts_with("non-finite value"), "{nan}");
-    assert_eq!(kind(wald(&[0.1; 4], 1)).0, ErrorKind::Shape);
-    assert_eq!(kind(wald(&[0.1; 5], 2)).0, ErrorKind::Shape);
+    for rejected in [-0.1, f64::NAN] {
+        std::assert_matches!(
+            wald(&[0.1, rejected, 0.1, 0.1, 0.1], 1).unwrap_err(),
+            DeseqError::NonFiniteValue { context, index: Some(1), value }
+                if context == "dispersion" && value.to_bits() == rejected.to_bits()
+        );
+    }
+    assert_eq!(kind(wald(&[0.1; 4], 1)), ErrorKind::Shape);
+    assert_eq!(kind(wald(&[0.1; 5], 2)), ErrorKind::Shape);
 }
 
 #[test]
@@ -198,12 +196,12 @@ fn invalid_contrasts_and_threads_are_rejected() {
     let contrast = |weights: &[f64]| {
         DeseqBuilder::new().fit_fixed_dispersion_wald_contrast(&small, &design, &[0.1; 5], weights)
     };
-    assert_eq!(kind(contrast(&[0.0, 1.0, 0.0])).0, ErrorKind::Shape);
-    assert_eq!(kind(contrast(&[0.0, 0.0])).0, ErrorKind::Options);
+    assert_eq!(kind(contrast(&[0.0, 1.0, 0.0])), ErrorKind::Shape);
+    assert_eq!(kind(contrast(&[0.0, 0.0])), ErrorKind::Options);
     let threads = DeseqBuilder::new()
         .threads(0)
         .fit_with_results(&varied(50, 6), &design);
-    assert_eq!(kind(threads).0, ErrorKind::Options);
+    assert_eq!(kind(threads), ErrorKind::Options);
 }
 
 #[test]

@@ -8,7 +8,7 @@ use super::{
     prior::{CauchyCoefficientPrior, ERROR_SCOPE},
     regression_expression::RestrictedRegressionLikelihood,
 };
-use crate::errors::scoped_invalid_options;
+use crate::errors::{ErrorKind, PosteriorArray, PosteriorArrayAxis, scoped_invalid_options};
 use crate::numeric::math::ProfileMath;
 use crate::{Error, matrix::MatrixView};
 use nalgebra::DMatrix;
@@ -172,9 +172,9 @@ fn fit_regression_impl(
             "random-start regression requires a native RNG",
         ));
     }
-    if input.parameters.is_none() {
-        return Err(Error::MissingRegressionLikelihoodParameters);
-    }
+    let parameters = input
+        .parameters
+        .ok_or(Error::MissingRegressionLikelihoodParameters)?;
     if options.prior_df.is_nan()
         || options.prior_df <= 0.0
         || !options.prior_noncentrality.is_finite()
@@ -185,19 +185,21 @@ fn fit_regression_impl(
             "invalid general prior parameters",
         ));
     }
-    if let Some(parameters) = input.parameters
-        && parameters.n_rows() != input.observations.n_rows()
-    {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
+    if parameters.n_rows() != input.observations.n_rows() {
+        return Err(parameter_shape_mismatch(
+            PosteriorArrayAxis::Rows,
+            input.observations.n_rows(),
+            parameters.n_rows(),
             "likelihood parameters must match observation rows",
         ));
     }
     if matches!(options.likelihood, RegressionLikelihood::NegativeBinomial)
-        && input.parameters.is_none_or(|p| p.n_cols() != 1)
+        && parameters.n_cols() != 1
     {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
+        return Err(parameter_shape_mismatch(
+            PosteriorArrayAxis::Columns,
+            1,
+            parameters.n_cols(),
             "negative-binomial likelihood requires one dispersion per row",
         ));
     }
@@ -215,30 +217,51 @@ fn fit_regression_impl(
                 "beta-binomial method requires its matching likelihood",
             ));
         }
-        let parameters = input
-            .parameters
-            .ok_or_else(|| crate::errors::invariant("value present"))?;
-        if parameters.n_cols() != input.observations.n_cols() + 1 {
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
+        let samples = input.observations.n_cols();
+        let columns = samples.checked_add(1).ok_or_else(|| {
+            scoped_invalid_options(ERROR_SCOPE, "beta-binomial parameter dimensions overflow")
+        })?;
+        if parameters.n_cols() != columns {
+            return Err(parameter_shape_mismatch(
+                PosteriorArrayAxis::Columns,
+                columns,
+                parameters.n_cols(),
                 "beta-binomial parameters require concentration and one trial count per sample",
             ));
         }
-        for i in 0..parameters.n_rows() {
-            if !parameters.at(i, 0).is_finite() || *parameters.at(i, 0) <= 0.0 {
-                return Err(scoped_invalid_options(
-                    ERROR_SCOPE,
-                    "beta-binomial concentration must be positive and finite",
-                ));
+        for gene in 0..parameters.n_rows() {
+            let concentration = *parameters.at(gene, 0);
+            if !concentration.is_finite() || concentration <= 0.0 {
+                return Err(Error::InvalidGeneValue {
+                    domain: ErrorKind::Options,
+                    operation: "beta-binomial concentration",
+                    gene,
+                    sample: None,
+                    value: concentration,
+                    reason: format!(
+                        "{ERROR_SCOPE}: beta-binomial concentration must be positive and finite"
+                    ),
+                });
             }
-            for j in 0..input.observations.n_cols() {
-                let n = *parameters.at(i, j + 1);
-                let y = *input.observations.at(i, j);
+            for sample in 0..samples {
+                let n = *parameters.at(gene, sample + 1);
+                let y = *input.observations.at(gene, sample);
                 if !n.is_finite() || n < 0.0 || y < 0.0 || y > n {
-                    return Err(scoped_invalid_options(
-                        ERROR_SCOPE,
-                        "beta-binomial successes must lie between zero and finite trial counts",
-                    ));
+                    let (operation, value) = if !n.is_finite() || n < 0.0 {
+                        ("beta-binomial trial count", n)
+                    } else {
+                        ("beta-binomial successes", y)
+                    };
+                    return Err(Error::InvalidGeneValue {
+                        domain: ErrorKind::Options,
+                        operation,
+                        gene,
+                        sample: Some(sample),
+                        value,
+                        reason: format!(
+                            "{ERROR_SCOPE}: beta-binomial successes must lie between zero and finite trial counts"
+                        ),
+                    });
                 }
             }
         }
@@ -319,6 +342,21 @@ fn fit_regression_impl(
         Some((input.parameters, options)),
         random,
     )
+}
+
+fn parameter_shape_mismatch(
+    axis: PosteriorArrayAxis,
+    expected: usize,
+    actual: usize,
+    reason: &'static str,
+) -> Error {
+    Error::PosteriorShapeMismatch {
+        array: PosteriorArray::LikelihoodParameters,
+        axis,
+        expected,
+        actual,
+        reason,
+    }
 }
 pub(super) struct GeneralRow<'a> {
     pub y: &'a [f64],

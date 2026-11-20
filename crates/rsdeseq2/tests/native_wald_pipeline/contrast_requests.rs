@@ -477,10 +477,11 @@ fn top_level_formula_contrast_request_uses_formula_derived_factor_metadata() {
             None,
         )
         .unwrap_err();
-    assert!(
-        missing_metadata
-            .to_string()
-            .contains("use wald_results_factor_level_contrast")
+    std::assert_matches!(
+        missing_metadata,
+        DeseqError::MissingPrerequisite { domain: ErrorKind::Options, operation, prerequisite }
+            if operation == "character results contrast"
+                && prerequisite == "stored formula model-frame metadata; use wald_results_factor_level_contrast when supplying explicit sample levels"
     );
     assert_eq!(
         formula_results.metadata.result_name.as_deref(),

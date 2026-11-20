@@ -5,6 +5,7 @@
 use std::path::PathBuf;
 
 use rsdeseq2::design::{FormulaFactorColumn, FormulaModelFrame};
+use rsdeseq2::errors::RunConflict;
 use rsdeseq2::io::{read_count_matrix_tsv, read_labeled_design_matrix_tsv};
 use rsdeseq2::prelude::*;
 
@@ -155,9 +156,11 @@ fn beta_prior_needs_a_formula_wald_run() {
     let error = builder
         .run(&Analysis::new(&counts, &design).beta_prior(true))
         .unwrap_err();
-    assert!(
-        error.to_string().contains("needs a formula design"),
-        "{error}"
+    std::assert_matches!(
+        error,
+        DeseqError::InvalidRun {
+            conflict: RunConflict::BetaPriorNeedsFormula
+        }
     );
     let error = builder
         .run(
@@ -166,5 +169,22 @@ fn beta_prior_needs_a_formula_wald_run() {
                 .beta_prior(true),
         )
         .unwrap_err();
-    assert!(error.to_string().contains("Wald test"), "{error}");
+    std::assert_matches!(
+        error,
+        DeseqError::InvalidRun {
+            conflict: RunConflict::BetaPriorNeedsWald
+        }
+    );
+    let error = builder
+        .run(
+            &Analysis::formula(&counts, "~ condition")
+                .beta_prior(true)
+                .result(ResultColumn::Coefficient(usize::MAX)),
+        )
+        .unwrap_err();
+    std::assert_matches!(
+        error,
+        DeseqError::InvalidDimensions { context, expected: 1, actual: usize::MAX }
+            if context == "beta-prior coefficient index"
+    );
 }

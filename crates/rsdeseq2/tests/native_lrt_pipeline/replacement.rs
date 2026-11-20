@@ -136,12 +136,11 @@ fn native_glm_mu_lrt_cooks_replacement_refit_merges_refit_rows() {
     }
     let mut invalid = output;
     invalid.refit_plan.new_all_zero_rows.push(counts.n_genes());
-    assert!(
+    std::assert_matches!(
         CooksReplacementTestOutput::Lrt(invalid)
-            .into_merged_fit()
-            .unwrap_err()
-            .to_string()
-            .contains("out of range")
+            .into_merged_fit().unwrap_err(),
+        DeseqError::ReplacementRowOutOfBounds { row, rows }
+            if row == counts.n_genes() && rows == counts.n_genes()
     );
 }
 

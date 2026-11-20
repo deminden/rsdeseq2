@@ -1,5 +1,6 @@
 //! Compare builder presentation with shared stored-query policy on the same fit.
 //! The independent original-DESeq2 origin/row oracle lives in cooks_policy_reference.
+use rsdeseq2::errors::NameScope;
 use rsdeseq2::prelude::*;
 
 fn frame() -> FormulaModelFrame {
@@ -345,20 +346,31 @@ fn invalid_frame_is_rejected_before_normalization_even_when_filtering_is_disable
     });
     let mut wrong_samples = original;
     wrong_samples.factors[0].sample_levels.pop();
-    for (bad, message) in [
-        (ambiguous, "resolves ambiguously"),
-        (wrong_samples, "formula model frame samples"),
-        (FormulaModelFrame::default(), "requires at least one column"),
-    ] {
-        // Invalid size factors would fail first if frame preflight were lost.
-        let error = builder(bad)
+    // Invalid size factors would fail first if frame preflight were lost.
+    let reject = |bad| {
+        builder(bad)
             .size_factors(vec![0.; 6])
             .disable_cooks_cutoff()
             .fit_fixed_dispersion_wald(&counts, &design, &[0.2; 3], 0)
             .unwrap_err()
-            .to_string();
-        assert!(error.contains(message), "{error}");
-    }
+    };
+    crate::support::assert_ambiguous_name(
+        reject(ambiguous),
+        ErrorKind::Formula,
+        NameScope::FormulaVariable,
+        "cell-type",
+        &["cell type", "cell-type"],
+    );
+    std::assert_matches!(
+        reject(wrong_samples),
+        DeseqError::InvalidDimensions { context, expected: 6, actual: 5 }
+            if context == "formula model frame samples"
+    );
+    std::assert_matches!(
+        reject(FormulaModelFrame::default()),
+        DeseqError::MissingPrerequisite { domain: ErrorKind::Formula, operation, prerequisite }
+            if operation == "formula model frame" && prerequisite == "at least one column"
+    );
 }
 
 #[test]

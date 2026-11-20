@@ -130,6 +130,42 @@ pub enum Error {
         reason: String,
     },
 
+    /// Analysis settings cannot be used together.
+    #[error("invalid options: run: {}", conflict.message())]
+    InvalidRun {
+        /// The incompatible settings.
+        conflict: RunConflict,
+    },
+
+    /// Wald-specific settings were supplied for an existing LRT.
+    #[error("invalid options: Wald threshold/t options cannot change a stored LRT test")]
+    WaldOptionsOnStoredLrt {
+        /// Whether a t reference distribution was requested.
+        use_t: bool,
+        /// The requested fold-change threshold.
+        lfc_threshold: f64,
+        /// Whether the Wald alternative differs from its default.
+        nondefault_alternative: bool,
+    },
+
+    /// An all-zero row in a replacement plan is outside the fit.
+    #[error("invalid options: replacement new all-zero row is out of range")]
+    ReplacementRowOutOfBounds {
+        /// Zero-based input row.
+        row: usize,
+        /// Number of rows available in every affected buffer.
+        rows: usize,
+    },
+
+    /// A sample-level table contains an empty level.
+    #[error("invalid options: sample levels must not be empty")]
+    EmptySampleLevel {
+        /// Zero-based data row, excluding the header.
+        row: usize,
+        /// Sample label on the row.
+        sample: String,
+    },
+
     /// Compiled EM received text for its numeric method control.
     #[error("invalid options: compiled-style EM requires a numeric method control")]
     CompiledEmNumericMethodRequired {
@@ -493,6 +529,68 @@ pub enum Error {
     },
 }
 
+/// Combinations rejected by the analysis entry point.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum RunConflict {
+    /// A later stage was requested without a design.
+    DesignRequired,
+    /// An LRT has no reduced design.
+    ReducedDesignRequired,
+    /// A reduced formula was paired with a full matrix.
+    ReducedFormulaNeedsFullFormula,
+    /// An estimation stage was requested with fixed dispersions.
+    FixedDispersionEarlyStop,
+    /// A mean model was requested with fixed dispersions.
+    FixedDispersionMeanModel,
+    /// A beta prior needs a formula to define the expanded model.
+    BetaPriorNeedsFormula,
+    /// A beta prior was requested for a likelihood-ratio test.
+    BetaPriorNeedsWald,
+    /// A beta prior requires the dispersion trend.
+    BetaPriorNeedsEstimatedDispersion,
+    /// A beta prior cannot stop before results.
+    BetaPriorEarlyStop,
+    /// Cook's replacement cannot stop before results.
+    ReplacementEarlyStop,
+    /// A result column was requested with an early stop.
+    ResultColumnEarlyStop,
+    /// An LRT was requested with an early stop.
+    LrtEarlyStop,
+    /// Both sources of sample-level metadata were supplied.
+    DuplicateContrastMetadata,
+}
+
+impl RunConflict {
+    fn message(self) -> &'static str {
+        match self {
+            Self::DesignRequired => "a run without a design must stop after size factors",
+            Self::ReducedDesignRequired => "an LRT needs a reduced design",
+            Self::ReducedFormulaNeedsFullFormula => {
+                "an LRT reduced formula needs a formula full design"
+            }
+            Self::FixedDispersionEarlyStop => {
+                "fixed dispersions cannot stop at an estimation stage"
+            }
+            Self::FixedDispersionMeanModel => "fixed dispersions do not use a mean model",
+            Self::BetaPriorNeedsFormula => {
+                "the beta prior needs a formula design (its factors define the expanded model)"
+            }
+            Self::BetaPriorNeedsWald => "the beta prior is only used by the Wald test",
+            Self::BetaPriorNeedsEstimatedDispersion => {
+                "the beta prior needs estimated dispersions (their trend weights the prior)"
+            }
+            Self::BetaPriorEarlyStop => "the beta prior needs a full run",
+            Self::ReplacementEarlyStop => "Cook's replacement needs a full run",
+            Self::ResultColumnEarlyStop => "a result column needs a full run",
+            Self::LrtEarlyStop => "an LRT needs a full run",
+            Self::DuplicateContrastMetadata => {
+                "results contrast takes either sample levels or a model frame"
+            }
+        }
+    }
+}
+
 /// Bounded resources used by the formula parser, evaluator and transport.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
@@ -595,6 +693,8 @@ fn posterior_optimizer_message(refinement_method: Option<&str>) -> String {
 pub enum PosteriorArray {
     /// Input contrasts.
     Contrasts,
+    /// Parameters supplied to a regression likelihood.
+    LikelihoodParameters,
     /// Scalar parameter uncertainties.
     ParameterStandardErrors,
     /// Coefficient standard deviations.
@@ -878,6 +978,10 @@ impl Error {
                 ErrorKind::Dispersion
             }
             Self::InvalidOptions { .. }
+            | Self::InvalidRun { .. }
+            | Self::WaldOptionsOnStoredLrt { .. }
+            | Self::ReplacementRowOutOfBounds { .. }
+            | Self::EmptySampleLevel { .. }
             | Self::CompiledEmNumericMethodRequired { .. }
             | Self::InvalidOptimizerCount { .. }
             | Self::WeightedEmRequired { .. }

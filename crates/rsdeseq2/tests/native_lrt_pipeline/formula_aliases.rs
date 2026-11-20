@@ -142,10 +142,11 @@ fn top_level_lrt_formula_contrast_request_uses_cleaned_stored_model_frame_factor
             None,
         )
         .unwrap_err();
-    assert!(
-        missing_metadata
-            .to_string()
-            .contains("use lrt_results_factor_level_contrast")
+    std::assert_matches!(
+        missing_metadata,
+        DeseqError::MissingPrerequisite { domain: ErrorKind::Options, operation, prerequisite }
+            if operation == "character results contrast"
+                && prerequisite == "stored formula model-frame metadata; use lrt_results_factor_level_contrast when supplying explicit sample levels"
     );
     assert_eq!(formula_replacement.results, explicit_replacement.results);
     assert_eq!(

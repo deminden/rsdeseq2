@@ -92,6 +92,9 @@ fn fixed_dispersion_wald_pipeline_validates_per_gene_t_df_length() {
         .fit_fixed_dispersion_wald(&counts, &design, &[0.1, 0.2], 0)
         .unwrap_err();
 
-    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Shape);
-    assert!(err.to_string().contains("degrees of freedom"));
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidDimensions { context, expected: 2, actual: 1 }
+            if context == "Wald per-gene degrees of freedom"
+    );
 }

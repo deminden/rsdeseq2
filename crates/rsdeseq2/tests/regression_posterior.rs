@@ -1,6 +1,8 @@
 //! Independent original-apeglm profiles, retaining the public numerical gates.
 use crate::support::json_fixture;
 use crate::support::posterior as support;
+use rsdeseq2::DeseqError;
+use rsdeseq2::errors::{ErrorKind, PosteriorArray, PosteriorArrayAxis};
 use support::*;
 #[test]
 fn regression_density_expressions_preserve_independent_precision() {
@@ -74,23 +76,64 @@ fn beta_binomial_domain_and_parameter_shapes_are_rejected_before_fitting() {
         serde_json::from_str(include_str!("data/beta_binomial_posterior_r462.json")).unwrap();
     let case =
         || serde_json::from_value::<regression::Case>(reference["cases"][0].clone()).unwrap();
-    let reject = |c: &regression::Case, reason: &str| {
-        let error = regression::run(c).unwrap_err().to_string();
-        assert!(error.contains(reason), "{error}");
+    let reject = |c: &regression::Case| {
+        *regression::run(c)
+            .unwrap_err()
+            .downcast::<DeseqError>()
+            .unwrap()
     };
     for theta in ["0", "-1", "NaN"] {
         let mut c = case();
         c.parameters.as_mut().unwrap().values[0] = theta.into();
-        reject(&c, "concentration");
+        let expected = theta.parse::<f64>().unwrap();
+        std::assert_matches!(
+            reject(&c),
+            DeseqError::InvalidGeneValue {
+                domain: ErrorKind::Options, operation: "beta-binomial concentration",
+                gene: 0, sample: None, value, ..
+            } if value.to_bits() == expected.to_bits() || (value.is_nan() && expected.is_nan())
+        );
     }
     let mut c = case();
     c.observations.values[0] = "11".into();
-    reject(&c, "successes");
+    std::assert_matches!(
+        reject(&c),
+        DeseqError::InvalidGeneValue {
+            domain: ErrorKind::Options,
+            operation: "beta-binomial successes",
+            gene: 0,
+            sample: Some(0),
+            value: 11.0,
+            ..
+        }
+    );
+    let mut c = case();
+    c.parameters.as_mut().unwrap().values[10] = "-1".into();
+    std::assert_matches!(
+        reject(&c),
+        DeseqError::InvalidGeneValue {
+            domain: ErrorKind::Options,
+            operation: "beta-binomial trial count",
+            gene: 2,
+            sample: Some(1),
+            value: -1.0,
+            ..
+        }
+    );
     let mut c = case();
     let m = c.parameters.as_mut().unwrap();
     m.columns -= 1;
     m.values.truncate(m.rows * m.columns);
-    reject(&c, "one trial count");
+    std::assert_matches!(
+        reject(&c),
+        DeseqError::PosteriorShapeMismatch {
+            array: PosteriorArray::LikelihoodParameters,
+            axis: PosteriorArrayAxis::Columns,
+            expected: 9,
+            actual: 8,
+            ..
+        }
+    );
 }
 
 #[test]

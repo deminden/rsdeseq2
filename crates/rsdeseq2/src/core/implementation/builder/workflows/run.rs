@@ -3,7 +3,7 @@
 //! `run` validates an [`Analysis`] once, resolves the design and the result
 //! request to a canonical form, and dispatches to the leaf workflows.
 
-use crate::errors::{ErrorKind, missing_prerequisite};
+use crate::errors::{ErrorKind, RunConflict, invalid_dimensions, missing_prerequisite};
 use std::borrow::Cow;
 
 use super::super::{
@@ -23,10 +23,8 @@ enum Column<'a> {
     FactorLevel(FactorLevelContrast<'a>),
 }
 
-fn options_error(reason: &str) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("run: {reason}"),
-    }
+fn invalid_run(conflict: RunConflict) -> DeseqError {
+    DeseqError::InvalidRun { conflict }
 }
 
 fn unsupported(feature: &str) -> DeseqError {
@@ -91,9 +89,7 @@ impl DeseqBuilder {
                         reduced: DesignInput::Matrix(reduced),
                     } => Some(reduced),
                     TestRequest::Lrt { .. } => {
-                        return Err(options_error(
-                            "an LRT reduced formula needs a formula full design",
-                        ));
+                        return Err(invalid_run(RunConflict::ReducedFormulaNeedsFullFormula));
                     }
                 };
                 self.run_matrix(analysis, design, reduced)
@@ -112,7 +108,7 @@ impl DeseqBuilder {
                         reduced: DesignInput::Matrix(reduced),
                     } => Some(Cow::Borrowed(reduced)),
                     TestRequest::Lrt { .. } => {
-                        return Err(options_error("an LRT needs a reduced design"));
+                        return Err(invalid_run(RunConflict::ReducedDesignRequired));
                     }
                 };
                 self.with_formula_offsets(counts, &full)?.run_matrix(
@@ -139,7 +135,13 @@ impl DeseqBuilder {
         let contrast = match column {
             Column::Coefficient(index) => {
                 let mut unit = vec![0.0; design.n_coefficients()];
-                unit[index] = 1.0;
+                *unit.get_mut(index).ok_or_else(|| {
+                    invalid_dimensions(
+                        "beta-prior coefficient index",
+                        design.n_coefficients().saturating_sub(1),
+                        index,
+                    )
+                })? = 1.0;
                 unit
             }
             Column::Numeric(values) => values.to_vec(),
@@ -253,9 +255,6 @@ impl DeseqBuilder {
                 builder.run_fixed(counts, design, reduced, dispersions, column, replacement)
             }
             (DispersionRequest::Estimate, MeanModel::LinearMu) => {
-                if replacement.is_some() {
-                    return Err(unsupported("Cook's replacement with linear-mu dispersions"));
-                }
                 if parametric_leaves {
                     return builder.run_linear_mu_parametric(counts, design, reduced, column);
                 }
@@ -314,9 +313,7 @@ impl DeseqBuilder {
                 let from_frame = match (model_frame, sample_levels) {
                     (Some(frame), None) => factor_level_contrast_from_model_frame(contrast, frame)?,
                     (Some(_), Some(_)) => {
-                        return Err(options_error(
-                            "results contrast takes either sample levels or a model frame",
-                        ));
+                        return Err(invalid_run(RunConflict::DuplicateContrastMetadata));
                     }
                     (None, None) => self.model_frame_factor_level_contrast(contrast)?,
                     (None, Some(_)) => None,
@@ -686,9 +683,7 @@ fn results(output: Result<(DeseqFit, DeseqResults), DeseqError>) -> Result<RunOu
 fn validate_analysis(analysis: &Analysis<'_>) -> Result<(), DeseqError> {
     let early = analysis.stop_after != Stage::Results;
     if matches!(analysis.design, DesignInput::None) && analysis.stop_after != Stage::SizeFactors {
-        return Err(options_error(
-            "a run without a design must stop after size factors",
-        ));
+        return Err(invalid_run(RunConflict::DesignRequired));
     }
     if matches!(
         analysis.test,
@@ -696,16 +691,14 @@ fn validate_analysis(analysis: &Analysis<'_>) -> Result<(), DeseqError> {
             reduced: DesignInput::None
         }
     ) {
-        return Err(options_error("an LRT needs a reduced design"));
+        return Err(invalid_run(RunConflict::ReducedDesignRequired));
     }
     if let DispersionRequest::Fixed(dispersions) = analysis.dispersion {
         if early {
-            return Err(options_error(
-                "fixed dispersions cannot stop at an estimation stage",
-            ));
+            return Err(invalid_run(RunConflict::FixedDispersionEarlyStop));
         }
         if analysis.means != MeanModel::Auto {
-            return Err(options_error("fixed dispersions do not use a mean model"));
+            return Err(invalid_run(RunConflict::FixedDispersionMeanModel));
         }
         if dispersions.len() != analysis.counts.n_genes() {
             return Err(DeseqError::InvalidDimensions {
@@ -717,22 +710,16 @@ fn validate_analysis(analysis: &Analysis<'_>) -> Result<(), DeseqError> {
     }
     if analysis.beta_prior {
         if !matches!(analysis.design, DesignInput::Formula(_)) {
-            return Err(options_error(
-                "the beta prior needs a formula design (its factors define the expanded model)",
-            ));
+            return Err(invalid_run(RunConflict::BetaPriorNeedsFormula));
         }
         if !matches!(analysis.test, TestRequest::Wald) {
-            return Err(options_error(
-                "the beta prior is only used by the Wald test",
-            ));
+            return Err(invalid_run(RunConflict::BetaPriorNeedsWald));
         }
         if !matches!(analysis.dispersion, DispersionRequest::Estimate) {
-            return Err(options_error(
-                "the beta prior needs estimated dispersions (their trend weights the prior)",
-            ));
+            return Err(invalid_run(RunConflict::BetaPriorNeedsEstimatedDispersion));
         }
         if early {
-            return Err(options_error("the beta prior needs a full run"));
+            return Err(invalid_run(RunConflict::BetaPriorEarlyStop));
         }
         if !matches!(analysis.replacement, Replacement::Off) {
             return Err(unsupported("Cook's replacement with the beta prior"));
@@ -740,14 +727,38 @@ fn validate_analysis(analysis: &Analysis<'_>) -> Result<(), DeseqError> {
     }
     if early {
         if !matches!(analysis.replacement, Replacement::Off) {
-            return Err(options_error("Cook's replacement needs a full run"));
+            return Err(invalid_run(RunConflict::ReplacementEarlyStop));
         }
         if !matches!(analysis.result, ResultColumn::Default) {
-            return Err(options_error("a result column needs a full run"));
+            return Err(invalid_run(RunConflict::ResultColumnEarlyStop));
         }
         if !matches!(analysis.test, TestRequest::Wald) {
-            return Err(options_error("an LRT needs a full run"));
+            return Err(invalid_run(RunConflict::LrtEarlyStop));
         }
+    }
+    if matches!(
+        (analysis.design, analysis.test),
+        (
+            DesignInput::Matrix(_),
+            TestRequest::Lrt {
+                reduced: DesignInput::Formula(_)
+            }
+        )
+    ) {
+        return Err(invalid_run(RunConflict::ReducedFormulaNeedsFullFormula));
+    }
+    if matches!(
+        analysis.result,
+        ResultColumn::Results {
+            sample_levels: Some(_),
+            model_frame: Some(_),
+            ..
+        }
+    ) {
+        return Err(invalid_run(RunConflict::DuplicateContrastMetadata));
+    }
+    if analysis.means == MeanModel::LinearMu && !matches!(analysis.replacement, Replacement::Off) {
+        return Err(unsupported("Cook's replacement with linear-mu dispersions"));
     }
     Ok(())
 }

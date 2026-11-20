@@ -586,10 +586,11 @@ fn read_sample_levels_tsv_records<R: Read>(
         reader,
         "sample-level",
         "sample names must not be empty",
-        |_, sample, level| {
+        |row, sample, level| {
             if level.is_empty() {
-                return Err(DeseqError::InvalidOptions {
-                    reason: "sample levels must not be empty".to_string(),
+                return Err(DeseqError::EmptySampleLevel {
+                    row,
+                    sample: sample.to_string(),
                 });
             }
             Ok(SampleLevel {

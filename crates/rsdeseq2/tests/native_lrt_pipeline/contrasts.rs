@@ -22,12 +22,15 @@ fn native_glm_mu_lrt_contrast_keeps_lrt_pvalues_and_reports_contrast_effect() {
         IndependentFilteringOptions::default(),
     )
     .unwrap();
-    assert!(
+    std::assert_matches!(
         contrast_fit
             .results_for_request(&counts, &invalid, None)
-            .unwrap_err()
-            .to_string()
-            .contains("cannot change a stored LRT")
+            .unwrap_err(),
+        DeseqError::WaldOptionsOnStoredLrt {
+            use_t: true,
+            lfc_threshold: 0.0,
+            nondefault_alternative: false,
+        }
     );
     let final_dispersions = coefficient_fit.dispersion.as_ref().unwrap().clone();
     let (fixed_contrast_fit, fixed_contrast_results) = builder

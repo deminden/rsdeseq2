@@ -11,7 +11,7 @@ use crate::filtering::{
     IndependentFilteringOptions, IndependentFilteringOutput, evaluate_independent_filtering,
     validate_alpha, validate_theta,
 };
-use crate::glm::{WaldTestOptions, wald::validate_wald_options};
+use crate::glm::{WaldPvalueType, WaldTestOptions, wald::validate_wald_options};
 use crate::options::CooksCutoff;
 use crate::{core::DeseqFit, matrix::CountMatrix};
 
@@ -130,8 +130,10 @@ impl DeseqFit {
                 self.lrt_results_contrast_request(counts, &request.contrast, gene_names)?
             }
             (false, true) => {
-                return Err(DeseqError::InvalidOptions {
-                    reason: "Wald threshold/t options cannot change a stored LRT test".into(),
+                return Err(DeseqError::WaldOptionsOnStoredLrt {
+                    use_t: matches!(request.wald.pvalue_type, WaldPvalueType::T { .. }),
+                    lfc_threshold: request.wald.lfc_threshold,
+                    nondefault_alternative: request.wald.alternative != Default::default(),
                 });
             }
             _ => {

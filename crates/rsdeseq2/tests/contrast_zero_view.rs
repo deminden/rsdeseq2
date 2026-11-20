@@ -65,11 +65,12 @@ fn borrowed_count_layouts_share_zero_flags_and_reusable_global_context() {
 fn primitive_zero_context_requires_only_inputs_needed_by_the_request() {
     let counts = [0, 0, 0, 2, 0, 1, 0, 0];
     let view = ContrastCounts::from_unsigned(matrix(2, 4, &counts, MatrixOrder::RowMajor));
-    assert!(
-        view.numeric_flags(None, &[-1., 1.])
-            .unwrap_err()
-            .to_string()
-            .contains("modelMatrix")
+    std::assert_matches!(
+        view.numeric_flags(None, &[-1., 1.]).unwrap_err(),
+        rsdeseq2::DeseqError::MissingPrerequisite { domain, operation, prerequisite }
+            if domain == rsdeseq2::errors::ErrorKind::Options
+                && operation == "numeric contrast all-zero handling"
+                && prerequisite == "modelMatrix"
     );
     assert!(view.numeric_flags(None, &[0., 0.]).is_err());
     assert!(view.numeric_flags(None, &[1., f64::NAN]).is_err());

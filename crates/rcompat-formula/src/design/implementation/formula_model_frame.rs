@@ -1,5 +1,7 @@
 use super::*;
-use crate::errors::{ErrorKind, FactorLevelRole, NameScope, ambiguous_name, invalid_formula};
+use crate::errors::{
+    ErrorKind, FactorLevelRole, NameScope, ambiguous_name, invalid_formula, missing_prerequisite,
+};
 // Model-frame construction, validation and alias resolution.
 
 pub(super) fn validate_formula_factor_name_collisions(
@@ -386,7 +388,9 @@ pub(super) fn formula_model_frame_sample_count(
         }
         return Ok(covariate.values.len());
     }
-    Err(invalid_formula(
-        "formula model frame requires at least one column",
+    Err(missing_prerequisite(
+        ErrorKind::Formula,
+        "formula model frame",
+        "at least one column",
     ))
 }

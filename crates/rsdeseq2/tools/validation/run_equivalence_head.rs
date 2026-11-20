@@ -261,32 +261,82 @@ fn every_fit_method_matches_its_run_request() {
 
 #[test]
 fn run_rejects_invalid_combinations_before_work() {
+    use rsdeseq2::errors::RunConflict;
     let f = Fixture::new();
     let b = f.builder("wald");
-    let message = |analysis: Analysis<'_>| b.run(&analysis).unwrap_err().to_string();
+    let reject = |analysis: Analysis<'_>| b.run(&analysis).unwrap_err();
     let base = || Analysis::new(&f.counts, &f.design);
     let checks = [
-        (base().fixed_dispersion(&f.dispersions).stop_after(Stage::Map), "fixed dispersions"),
-        (base().fixed_dispersion(&f.dispersions).means(MeanModel::LinearMu), "mean model"),
-        (base().fixed_dispersion(&f.dispersions[1..]), "run fixed dispersions"),
-        (base().stop_after(Stage::Trend).cooks_replacement(&f.cooks), "full run"),
-        (base().stop_after(Stage::Trend).result(ResultColumn::Coefficient(1)), "full run"),
-        (base().lrt(&f.reduced).stop_after(Stage::Map), "full run"),
-        (base().lrt_formula(f.reduced_formula), "formula full design"),
-        (base().means(MeanModel::LinearMu).cooks_replacement(&f.cooks), "linear-mu"),
-        (Analysis::without_design(&f.counts).stop_after(Stage::Results), "without a design"),
+        (
+            base()
+                .fixed_dispersion(&f.dispersions)
+                .stop_after(Stage::Map),
+            RunConflict::FixedDispersionEarlyStop,
+        ),
+        (
+            base()
+                .fixed_dispersion(&f.dispersions)
+                .means(MeanModel::LinearMu),
+            RunConflict::FixedDispersionMeanModel,
+        ),
+        (
+            base().stop_after(Stage::Trend).cooks_replacement(&f.cooks),
+            RunConflict::ReplacementEarlyStop,
+        ),
+        (
+            base()
+                .stop_after(Stage::Trend)
+                .result(ResultColumn::Coefficient(1)),
+            RunConflict::ResultColumnEarlyStop,
+        ),
+        (
+            base().lrt(&f.reduced).stop_after(Stage::Map),
+            RunConflict::LrtEarlyStop,
+        ),
+        (
+            base().lrt_formula(f.reduced_formula),
+            RunConflict::ReducedFormulaNeedsFullFormula,
+        ),
+        (
+            Analysis::without_design(&f.counts).stop_after(Stage::Results),
+            RunConflict::DesignRequired,
+        ),
     ];
     for (analysis, expected) in checks {
-        let message = message(analysis);
-        assert!(message.contains(expected), "{message:?} lacks {expected:?}");
+        std::assert_matches!(
+            reject(analysis), DeseqError::InvalidRun { conflict } if conflict == expected
+        );
+    }
+    std::assert_matches!(
+        reject(base().fixed_dispersion(&f.dispersions[1..])),
+        DeseqError::InvalidDimensions { context, expected, actual }
+            if context == "run fixed dispersions" && expected == f.counts.n_genes()
+                && actual == f.dispersions.len() - 1
+    );
+    for analysis in [base(), Analysis::formula(&f.counts, "~ invalid_metadata")] {
+        std::assert_matches!(
+            reject(analysis.means(MeanModel::LinearMu).cooks_replacement(&f.cooks)),
+            DeseqError::UnsupportedFeature { feature }
+                if feature == "run: Cook's replacement with linear-mu dispersions"
+        );
     }
     let character = f.character();
-    let both = base().result(ResultColumn::Results {
+    let both = ResultColumn::Results {
         contrast: &character,
         sample_levels: Some(&f.levels),
         model_frame: Some(&f.frame),
-    });
-    assert!(message(both).contains("either sample levels or a model frame"));
+    };
+    for analysis in [
+        base().result(both),
+        Analysis::formula(&f.counts, "~ invalid_metadata").result(both),
+    ] {
+        std::assert_matches!(
+            reject(analysis),
+            DeseqError::InvalidRun {
+                conflict: RunConflict::DuplicateContrastMetadata
+            }
+        );
+    }
 }
 
 #[test]

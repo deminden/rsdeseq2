@@ -86,11 +86,10 @@ fn labelled_readers_keep_their_value_rules() {
                 ..
             })
     ));
-    let levels = read_sample_levels_tsv_from_reader(&b"s\tl\nx\t\n"[..]).unwrap_err();
-    assert!(
-        levels
-            .to_string()
-            .contains("sample levels must not be empty")
+    let levels = read_sample_levels_tsv_from_reader(&b"s\tl\nx\tA\ny\t\n"[..]).unwrap_err();
+    std::assert_matches!(
+        levels,
+        DeseqError::EmptySampleLevel { row: 1, sample } if sample == "y"
     );
     let numeric = read_labeled_gene_numeric_tsv_from_reader(&b"g\tv\nx\tnope\n"[..], "dispersions");
     assert!(numeric.is_err());

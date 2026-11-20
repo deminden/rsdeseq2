@@ -171,6 +171,11 @@ versions live in [docs/releases](docs/releases/).
   model-matrix responses. They carry the observed resource use, declared
   transport length or response index while preserving prior messages.
 
+- Analysis preflight reports incompatible settings through `InvalidRun`.
+  Invalid beta-prior coefficient indices return a bounds error.
+  Stored LRT requests, replacement plans, sample metadata and
+  beta-binomial parameters expose structured validation details.
+
 - Missing-prerequisite errors ("Wald fitting requires MAP dispersions") are
   `DeseqError::MissingPrerequisite { domain, operation, prerequisite }`
   (119 sites). 57 of these messages were reworded into the one form

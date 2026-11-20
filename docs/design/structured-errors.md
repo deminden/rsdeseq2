@@ -173,6 +173,20 @@ reports the declared count, per-element minimum and remaining bytes.
 `InvalidModelMatrixResponse` distinguishes an out-of-range index from a
 factor supplied as a numeric response.
 
+## Analysis and results
+
+`InvalidRun` identifies the incompatible settings through `RunConflict`.
+The analysis checks incompatible contrast metadata and linear-mu
+replacement before evaluating a supplied formula. A beta-prior coefficient
+request is checked against the standard design before constructing its
+contrast.
+
+`WaldOptionsOnStoredLrt` identifies the incompatible Wald settings.
+`ReplacementRowOutOfBounds` and `EmptySampleLevel` retain the rejected
+row. Beta-binomial validation reports the gene and sample for invalid
+concentrations, successes or trial counts and the expected parameter shape
+for mismatched matrices.
+
 ## Not in this step
 - `scoped_invalid_options` sites keep their `"{scope}: {reason}"` text.
 - The free-text variants stay; nothing is deprecated.

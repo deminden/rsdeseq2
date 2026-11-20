@@ -5,7 +5,7 @@ pub use rcompat_numeric::errors::Error as DeseqError;
 pub use rcompat_numeric::errors::{
     CalculationLocation, ErrorKind, FactorLevelRole, FormulaResource, ModelMatrixResponseProblem,
     NameScope, NegativeBinomialStage, PosteriorArray, PosteriorArrayAxis, PosteriorControl,
-    Requirement,
+    Requirement, RunConflict,
 };
 #[doc(hidden)]
 pub use rcompat_numeric::errors::{

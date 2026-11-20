@@ -196,9 +196,12 @@ fn formula_offsets_use_effective_factors_without_dividing_by_tiny_base_factors()
     let error = DeseqBuilder::new()
         .model_frame(builder.current_model_frame().unwrap().clone())
         .fit_formula_with_results(&wrong_counts, "~condition+offset(exposure)")
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("formula offsets"), "{error}");
+        .unwrap_err();
+    std::assert_matches!(
+        error,
+        DeseqError::InvalidDimensions { context, expected: 2, actual: 6 }
+            if context == "formula offsets"
+    );
     let formula = builder
         .expanded_formula_design_with_offsets("~condition+offset(exposure)")
         .unwrap();

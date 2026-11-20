@@ -830,6 +830,18 @@ model-matrix response errors distinguish an invalid index from a factor.
 All 150 targeted formula, design and model-matrix tests and workspace
 Clippy passed.
 
+Analysis preflight now identifies incompatible settings by variant.
+Contradictory contrast metadata and linear-mu replacement are rejected
+before formula evaluation. A beta-prior coefficient outside the standard
+design now returns its bounds error. Stored LRT, replacement, sample-level
+and beta-binomial validation expose the rejected settings, row or value.
+The integration assertions on these paths now match variants and fields.
+
+The 226-test workflow batch passed. The final preflight update passed
+the six run and beta-prior tests, and workspace Clippy passed. The
+run-equivalence generator reproduced the test source byte for byte
+after formatting.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

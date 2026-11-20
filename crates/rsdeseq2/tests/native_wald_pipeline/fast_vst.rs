@@ -128,8 +128,11 @@ fn builder_default_fast_vst_uses_deseq2_nsub_default() {
         .unwrap_err();
 
     assert_eq!(DEFAULT_FAST_VST_NSUB, 1000);
-    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Shape);
-    assert!(err.to_string().contains("1000"));
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidDimensions { context, expected: DEFAULT_FAST_VST_NSUB, actual: 7 }
+            if context == "fast VST rows with mean normalized count above 5"
+    );
 }
 
 #[test]
@@ -439,19 +442,11 @@ fn builder_fast_vst_subset_trend_preserves_observation_weights() {
     let invalid_nsub = builder
         .fit_fast_vst_dispersion_trend_glm_mu(&counts, &design, 0)
         .unwrap_err();
-    assert!(matches!(
+    std::assert_matches!(
         invalid_nsub,
-        DeseqError::InvalidOptions { .. }
-            | DeseqError::InvalidParameter {
-                domain: rsdeseq2::errors::ErrorKind::Options,
-                ..
-            }
-            | DeseqError::InvalidFormula { .. }
-    ));
-    assert!(
-        invalid_nsub
-            .to_string()
-            .contains("fast VST subset size must be positive")
+        DeseqError::InvalidParameter {
+            domain: ErrorKind::Options, parameter, requirement: rsdeseq2::errors::Requirement::Positive,
+        } if parameter == "fast VST subset size"
     );
 
     let (subset_fit, subset) = builder

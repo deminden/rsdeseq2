@@ -220,12 +220,13 @@ impl CooksReplacementTestOutput {
                 "a refitted model",
             ));
         }
-        if plan.new_all_zero_rows.iter().any(|&i| {
-            i >= fit.base_mean.len() || i >= fit.base_var.len() || i >= fit.all_zero.len()
-        }) {
-            return Err(invalid_options(
-                "replacement new all-zero row is out of range",
-            ));
+        let rows = fit
+            .base_mean
+            .len()
+            .min(fit.base_var.len())
+            .min(fit.all_zero.len());
+        if let Some(&row) = plan.new_all_zero_rows.iter().find(|&&row| row >= rows) {
+            return Err(DeseqError::ReplacementRowOutOfBounds { row, rows });
         }
         for &i in &plan.new_all_zero_rows {
             fit.base_mean[i] = 0.0;
