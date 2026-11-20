@@ -188,6 +188,24 @@ pub fn visit_normalized_counts_column_major(
     normalization_factors: Option<MatrixView<'_, f64>>,
     write: impl FnMut(usize, f64),
 ) -> Result<(), DeseqError> {
+    let context = validate_count_factors(counts, size_factors, normalization_factors)?;
+    if let Some(factors) = normalization_factors {
+        visit_normalized_columns(
+            counts,
+            |gene, sample| *factors.at(gene, sample),
+            context,
+            write,
+        )
+    } else {
+        visit_normalized_columns(counts, |_, sample| size_factors[sample], context, write)
+    }
+}
+
+fn validate_count_factors(
+    counts: CountView<'_>,
+    size_factors: &[f64],
+    normalization_factors: Option<MatrixView<'_, f64>>,
+) -> Result<&'static str, DeseqError> {
     if let Some(factors) = normalization_factors {
         validate_normalization_factor_view(
             factors,
@@ -195,20 +213,10 @@ pub fn visit_normalized_counts_column_major(
             counts.n_samples(),
             "normalization factors",
         )?;
-        visit_normalized_columns(
-            counts,
-            |gene, sample| *factors.at(gene, sample),
-            "normalization-factor normalized count",
-            write,
-        )
+        Ok("normalization-factor normalized count")
     } else {
         validate_size_factors(size_factors, counts.n_samples())?;
-        visit_normalized_columns(
-            counts,
-            |_, sample| size_factors[sample],
-            "normalized count",
-            write,
-        )
+        Ok("normalized count")
     }
 }
 
@@ -286,26 +294,37 @@ fn validate_normalization_factor_view(
             actual: normalization_factors.as_slice().len(),
         });
     }
-    if let Some((index, &value)) = normalization_factors
+    if let Some((index, value)) = first_invalid_cell(normalization_factors, |value| {
+        !value.is_finite() || value <= 0.0
+    }) {
+        return validate_normalization_factor_value(value, index);
+    }
+    Ok(())
+}
+
+fn first_invalid_cell(
+    matrix: MatrixView<'_, f64>,
+    invalid: impl Fn(f64) -> bool,
+) -> Option<(usize, f64)> {
+    // Scan contiguous storage first. Only invalid column-major inputs need
+    // a second scan to find the earliest error in logical row order.
+    let (storage_index, &value) = matrix
         .as_slice()
         .iter()
         .enumerate()
-        .find(|(_, value)| !value.is_finite() || **value <= 0.0)
-    {
-        if normalization_factors.order() == MatrixOrder::RowMajor {
-            return validate_normalization_factor_value(value, index);
-        }
-        // On invalid input, find the first failing logical cell.
-        for gene in 0..n_genes {
-            for sample in 0..n_samples {
-                validate_normalization_factor_value(
-                    *normalization_factors.at(gene, sample),
-                    gene * n_samples + sample,
-                )?;
+        .find(|(_, value)| invalid(**value))?;
+    if matrix.order() == MatrixOrder::RowMajor {
+        return Some((storage_index, value));
+    }
+    for gene in 0..matrix.n_rows() {
+        for sample in 0..matrix.n_cols() {
+            let value = *matrix.at(gene, sample);
+            if invalid(value) {
+                return Some((gene * matrix.n_cols() + sample, value));
             }
         }
     }
-    Ok(())
+    None
 }
 
 /// Reject a normalization factor that is not finite and positive.
@@ -426,6 +445,89 @@ pub fn base_variance_with_weights(
     Ok(variances)
 }
 
+/// Compute base metadata from borrowed counts with one row of scratch.
+/// The caller discards emitted rows if any input or calculation fails.
+#[doc(hidden)]
+pub fn visit_base_metadata(
+    counts: CountView<'_>,
+    size_factors: &[f64],
+    factors: Option<MatrixView<'_, f64>>,
+    weights: Option<MatrixView<'_, f64>>,
+    mut write: impl FnMut(usize, f64, f64, bool),
+) -> Result<(), DeseqError> {
+    let context = validate_count_factors(counts, size_factors, factors)?;
+    let genes = counts.n_genes();
+    let samples = counts.n_samples();
+    let mut values = try_alloc_matrix(samples, 1, "base metadata row")?;
+    let factor = |gene, sample| match factors {
+        Some(factors) => *factors.at(gene, sample),
+        None => size_factors[sample],
+    };
+    // Keep error precedence across rows: normalization, weight validity,
+    // base means, and then base variances.
+    let mut mean_error =
+        weights.and_then(|weights| validate_base_weights(weights, genes, samples).err());
+    let mut variance_error = None;
+    for gene in 0..genes {
+        values.clear();
+        let mut all_zero = true;
+        for sample in 0..samples {
+            let count = counts.at(gene, sample);
+            all_zero &= count == 0;
+            values.push(
+                checked::try_div(f64::from(count), factor(gene, sample)).map_err(|error| {
+                    normalized_count_error(context, gene * samples + sample, error.value)
+                })?,
+            );
+        }
+        if mean_error.is_some() {
+            continue;
+        }
+        let mean = match base_row_mean(&mut values, weights, gene) {
+            Ok(mean) => mean,
+            Err(error) => {
+                mean_error = Some(error);
+                continue;
+            }
+        };
+        if variance_error.is_some() {
+            continue;
+        }
+        let variance = if samples == 1 {
+            Ok(f64::NAN)
+        } else {
+            let context = if weights.is_some() {
+                "weighted baseVar"
+            } else {
+                "baseVar"
+            };
+            checked_sample_variance(&values, mean).nonfinite_at(context, Some(gene))
+        };
+        match variance {
+            Ok(variance) => write(gene, mean, variance, all_zero),
+            Err(error) => variance_error = Some(error),
+        }
+    }
+    mean_error.or(variance_error).map_or(Ok(()), Err)
+}
+
+fn base_row_mean(
+    values: &mut [f64],
+    weights: Option<MatrixView<'_, f64>>,
+    gene: usize,
+) -> Result<f64, DeseqError> {
+    let context = if let Some(weights) = weights {
+        for (sample, value) in values.iter_mut().enumerate() {
+            *value = checked::try_mul(*value, *weights.at(gene, sample))
+                .nonfinite_at("weighted baseMean", Some(gene))?;
+        }
+        "weighted baseMean"
+    } else {
+        "baseMean"
+    };
+    checked::try_mean(values).nonfinite_at(context, Some(gene))
+}
+
 fn checked_weighted_values(
     values: &[f64],
     weights: &[f64],
@@ -486,23 +588,33 @@ fn validate_weighted_base_inputs(
     weights: &RowMajorMatrix<f64>,
 ) -> Result<(), DeseqError> {
     normalized_counts.validate_finite("normalized counts")?;
-    if weights.n_rows() != normalized_counts.n_rows()
-        || weights.n_cols() != normalized_counts.n_cols()
-    {
+    validate_base_weights(
+        weights.into(),
+        normalized_counts.n_rows(),
+        normalized_counts.n_cols(),
+    )
+}
+
+fn validate_base_weights(
+    weights: MatrixView<'_, f64>,
+    genes: usize,
+    samples: usize,
+) -> Result<(), DeseqError> {
+    if weights.n_rows() != genes || weights.n_cols() != samples {
         return Err(DeseqError::InvalidDimensions {
             context: "base metadata weights".to_string(),
-            expected: normalized_counts.len(),
-            actual: weights.len(),
+            expected: genes * samples,
+            actual: weights.as_slice().len(),
         });
     }
-    for (idx, value) in weights.as_slice().iter().copied().enumerate() {
-        if !value.is_finite() || value < 0.0 {
-            return Err(DeseqError::NonFiniteValue {
-                context: "base metadata weight".to_string(),
-                index: Some(idx),
-                value,
-            });
-        }
+    if let Some((index, value)) =
+        first_invalid_cell(weights, |value| !value.is_finite() || value < 0.0)
+    {
+        return Err(DeseqError::NonFiniteValue {
+            context: "base metadata weight".to_string(),
+            index: Some(index),
+            value,
+        });
     }
     Ok(())
 }

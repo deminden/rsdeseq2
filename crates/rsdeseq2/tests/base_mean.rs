@@ -85,6 +85,45 @@ fn column_major_normalization_reports_the_first_logical_row_error() {
 }
 
 #[test]
+fn borrowed_base_metadata_keeps_error_priority_across_genes() {
+    use rsdeseq2::normalization::visit_base_metadata;
+
+    let counts = CountMatrix::from_row_major_u32(2, 2, vec![1, 0, u32::MAX, 0]).unwrap();
+    let factors = [1e-200, 1.0, 1.0, 1.0];
+    let weights = [1.0, 1.0, f64::MAX, 1.0];
+    let view = |values| MatrixView::new(2, 2, values, MatrixOrder::RowMajor).unwrap();
+    let error = visit_base_metadata(
+        (&counts).into(),
+        &[],
+        Some(view(&factors)),
+        Some(view(&weights)),
+        |_, _, _, _| {},
+    )
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        DeseqError::NonFiniteValue { context, index: Some(1), .. }
+            if context == "weighted baseMean"
+    ));
+
+    let factors = [1e-200, 1.0, f64::MIN_POSITIVE, 1.0];
+    let weights = [1.0, -1.0, 1.0, 1.0];
+    let error = visit_base_metadata(
+        (&counts).into(),
+        &[],
+        Some(view(&factors)),
+        Some(view(&weights)),
+        |_, _, _, _| {},
+    )
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        DeseqError::NonFiniteValue { context, index: Some(2), .. }
+            if context == "normalization-factor normalized count"
+    ));
+}
+
+#[test]
 fn normalization_factors_validate_dimensions_and_positive_values() {
     let counts = CountMatrix::from_row_major_u32(1, 3, vec![10, 20, 30]).unwrap();
     let bad_dims = RowMajorMatrix::from_row_major(1, 2, vec![1.0, 2.0]).unwrap();

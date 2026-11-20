@@ -1100,6 +1100,21 @@ results. Peak RSS fell from 269.8 to 182.0 MiB with sample factors and
 from 387.0 to 240.6 MiB with per-cell factors. The smaller probe also
 matched all four error messages exactly.
 
+### Borrowed base metadata in R
+
+The R base mean and variance path borrows counts, factors and weights.
+It reuses one sample-sized row, computes the mean once, and writes the
+mean, variance and raw all-zero flag directly into the result buffers.
+Normalization and weight errors retain their precedence over failures
+in the row statistics.
+
+All 25 selected Rust tests and 264 R 4.6.2 expectations passed. Two
+paired 60,000-gene × 128-sample cases produced byte-identical output.
+Peak RSS fell from 212.2 to 182.0 MiB with sample factors and from
+388.1 to 299.3 MiB with per-cell factors and weights. The small-case
+comparison matched single-sample variance, raw-zero flags and all
+four error messages exactly.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
