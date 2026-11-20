@@ -564,6 +564,32 @@ The combined macOS R 4.6.2 package check passed 2,874 expectations with
 zero skips. It recorded the existing compiled-symbol warning and two
 vendoring notes.
 
+### CLI arguments and matrix storage
+
+In `1f1e817`, Wald and LRT use typed argument groups and share contrast
+resolution, path staging and sidecar writing. The supplied beta-prior
+routes also consume the grouped normalization and reporting inputs.
+All 52 focused CLI tests passed. Both subcommands retained their flag
+order and conflict diagnostics. A portable-profile replay matched the
+result table and five sidecars byte for byte for each subcommand.
+
+`34b7908` adds checked reservations to generated and expanded matrices.
+The shared allocator reports bytes requested when a reservation fails.
+All four public rlog design and prior constructors return a typed
+dimension error for an overflowing sample count. The affected transform,
+Cook's distance, matrix and GLM tests passed.
+
+In `9b83380`, fitted models share immutable design matrices and coefficient
+names when cloned. Weighted summaries and expanded coefficients reuse
+their per-row buffers. The focused design, weighted summary and GLM
+tests passed. Both 8,032-field macOS golden manifests matched across
+the three commits.
+
+The workspace follows the later crate-boundary decision in `e7ad144`.
+The three reusable `rcompat` crates are separate. The CLI remains in the
+`rsdeseq2` package so its installed binary and Rust entry point ship
+together.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
