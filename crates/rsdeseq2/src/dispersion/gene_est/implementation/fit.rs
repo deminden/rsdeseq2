@@ -414,6 +414,8 @@ pub fn line_search_dispersion(
     let mut iter_accept = 0_usize;
     let mut last_change = -1.0;
     let epsilon = 1.0e-4;
+    let recheck_map_gain =
+        prior.is_some() && crate::numeric_profile() == crate::NumericProfile::Portable;
 
     for _ in 0..options.maxit {
         iter += 1;
@@ -452,14 +454,44 @@ pub fn line_search_dispersion(
                 value: theta_hat_kappa,
             });
         }
-        if theta_kappa <= theta_hat_kappa {
+        let mut lp_new = -theta_kappa;
+        let accepted = theta_kappa <= theta_hat_kappa;
+        let recovered = if !accepted && recheck_map_gain {
+            let roundoff = f64::EPSILON * lp.abs().max(lp_new.abs());
+            // On short steps, integrating the score avoids subtracting two
+            // large rounded posterior values near the optimum.
+            if (theta_kappa - theta_hat_kappa).abs() <= 4.0 * roundoff
+                && (proposed_log_alpha - log_alpha).abs() <= 0.001
+            {
+                recover_map_step(
+                    objective,
+                    log_alpha,
+                    proposed_log_alpha,
+                    dlp,
+                    kappa * epsilon * dlp * dlp,
+                    roundoff,
+                )
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        if let Some((point, _)) = recovered
+            && point != proposed_log_alpha
+        {
+            kappa *= 0.5;
+            proposed_log_alpha = point;
+            lp_new = dispersion_log_posterior_objective(objective, point)?;
+        }
+        if accepted || recovered.is_some() {
             iter_accept += 1;
             log_alpha = proposed_log_alpha;
-            // The Armijo test already evaluated this exact point. Reuse its
-            // value without changing the accepted-step arithmetic.
-            let lp_new = -theta_kappa;
-            last_change = checked::try_sub(lp_new, lp)
-                .nonfinite_at("dispersion line-search accepted objective change", Some(0))?;
+            last_change = match recovered {
+                Some((_, gain)) => gain,
+                None => checked::try_sub(lp_new, lp)
+                    .nonfinite_at("dispersion line-search accepted objective change", Some(0))?,
+            };
             lp = lp_new;
             if last_change < options.disp_tol {
                 break;
@@ -493,6 +525,52 @@ pub fn line_search_dispersion(
         last_change,
         converged: iter < options.maxit && iter != 1,
     })
+}
+
+pub(super) fn recover_map_step(
+    objective: DispersionObjectiveInput<'_>,
+    start: f64,
+    end: f64,
+    start_slope: f64,
+    required_gain: f64,
+    roundoff: f64,
+) -> Option<(f64, f64)> {
+    let gain = integrated_dispersion_gain(objective, start, end)?;
+    if gain < required_gain {
+        return None;
+    }
+    // If the gain is still at the resolution of the posterior and the
+    // score changes sign, prefer a shorter step that meets the Armijo bound.
+    if gain <= 2.0 * roundoff
+        && let Ok(end_slope) = dispersion_log_posterior_derivative_objective(objective, end)
+        && start_slope * end_slope < 0.0
+    {
+        let midpoint = start + (end - start) * 0.5;
+        if let Some(half_gain) = integrated_dispersion_gain(objective, start, midpoint)
+            && half_gain >= required_gain * 0.5
+        {
+            return Some((midpoint, half_gain));
+        }
+    }
+    Some((end, gain))
+}
+
+fn integrated_dispersion_gain(
+    objective: DispersionObjectiveInput<'_>,
+    start: f64,
+    end: f64,
+) -> Option<f64> {
+    // Two-point Gauss–Legendre quadrature integrates cubic scores exactly.
+    const NODE: f64 = 0.288_675_134_594_812_87;
+    let width = end - start;
+    let left =
+        dispersion_log_posterior_derivative_objective(objective, start + width * (0.5 - NODE))
+            .ok()?;
+    let right =
+        dispersion_log_posterior_derivative_objective(objective, start + width * (0.5 + NODE))
+            .ok()?;
+    let gain = width * (0.5 * left + 0.5 * right);
+    gain.is_finite().then_some(gain)
 }
 
 #[cfg(test)]

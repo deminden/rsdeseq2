@@ -55,6 +55,34 @@ fn line_search_armijo_bound_matches_finite_formula() {
 }
 
 #[test]
+fn map_gain_recovery_prefers_a_shorter_step_across_the_optimum() {
+    let objective = DispersionObjectiveInput {
+        counts: &[75_000, 35_000, 140_000, 3_000],
+        mu: &[1_000.0, 500_000.0, 40_000.0, 1_000_000.0],
+        design: None,
+        use_cox_reid: false,
+        prior: Some(DispersionPrior {
+            log_mean: -11.810_025_026_149_821,
+            variance: 0.01,
+        }),
+        weights: None,
+        weight_threshold: 0.0,
+        prepared_cox: None,
+    };
+    let start = -2.5;
+    let end = -2.499_999_892_412_419;
+    let slope = dispersion_log_posterior_derivative_objective(objective, start).unwrap();
+    let roundoff = f64::EPSILON * dispersion_log_posterior_objective(objective, start).unwrap();
+    let (point, gain) = recover_map_step(objective, start, end, slope, 1e-15, roundoff).unwrap();
+
+    // Eighty-digit posterior differences are smaller than one binary64 ulp
+    // of either full posterior. The derivative changes sign across the step.
+    assert_eq!(point, -2.499_999_946_206_209_2);
+    assert_relative_eq!(gain, 3.900_049_847_955_011e-12, max_relative = 3e-7);
+    assert!(recover_map_step(objective, start, end, slope, 1e-11, roundoff).is_none());
+}
+
+#[test]
 fn dispersion_grid_linspace_rejects_nonfinite_arithmetic() {
     let endpoint_err = linspace(f64::INFINITY, 1.0, 3).unwrap_err();
     assert!(matches!(
