@@ -351,6 +351,53 @@ negative. The portable profile rounded the blocked condition gain
 negative. In each case the rejected step changed the final gene-wise
 estimate supplied to the trend fit.
 
+### Portable MAP posterior gain recovery
+
+When the portable MAP line search rejects a short step close to the
+rounded Armijo bound, it uses two-point Gauss–Legendre quadrature of
+the posterior score to estimate the gain. If that gain is close to the
+resolution of the posterior and the score changes sign, it checks
+whether a shorter step also meets the Armijo bound. A high-precision
+test checks a case in which the gain of either step is smaller than
+one binary64 ulp of the posterior.
+
+The `39af7c0` portable release build passed 119 of 121 per-contrast
+gates and all nine global gates using the frozen references. The
+blocked-condition maximum p-value error fell from `7.35e-7` to
+`4.35e-7`, clearing its gate. The two fitted-dispersion comparisons in
+the blocked condition and blocked split 01 remain open. The
+significance check found zero flips and full top-set overlap. All 130
+host gates passed, and the 22 result and diagnostic TSVs matched
+`e8b8969` byte for byte.
+
+The change updates 506 of the 8,032 portable field hashes. All portable
+hashes agree on macOS arm64, Linux arm64 and QEMU Linux x86_64. The host
+manifests also passed on those three environments. The Rust workspace
+and both full GTEx replay tests passed on macOS and Linux arm64. The
+macOS arm64 release panel passed 114 tests. Rust 1.97.1 and Clippy
+passed. The Intel macOS tests cross-linked, and the Windows MSVC
+libraries and binaries passed type checking. Their native runtime
+checks remain pending.
+
+All four Cargo archives built offline and reproduced byte for byte.
+The R archive passed all 2,874 expectations with zero skips on macOS
+R 4.5.3 and 4.6.2 and Linux arm64 R 4.6.2. Both R 4.6.2 checks recorded
+the existing compiled-symbol warning and vendoring notes. The R 4.5.3
+check recorded the vendoring notes.
+
+In one paired four-worker run, `39af7c0` took 18.07 s and `e8b8969`
+took 17.14 s. Peak RSS was 259.55 MiB and 259.22 MiB, respectively.
+
+Applying a stronger gain check in the gene-wise stage cleared the
+blocked-condition fitted-dispersion gate on trial. It introduced two
+other fitted-dispersion failures across the eleven-contrast panel.
+Each new failure followed the changed estimate of one gene. In both
+profiles, 80-digit replays found positive gains of about `1.6e-10`
+at the rejected full steps. Both profiles had previously accepted a
+shorter step for those rows. Centered scores and midpoint trials still
+left regressions on the frozen panel, so the MAP-specific change is
+the retained implementation.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
