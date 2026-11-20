@@ -455,27 +455,34 @@ pub fn line_search_dispersion(
             });
         }
         let mut lp_new = -theta_kappa;
-        let accepted = theta_kappa <= theta_hat_kappa;
-        let recovered = if !accepted && recheck_map_gain {
-            let roundoff = f64::EPSILON * lp.abs().max(lp_new.abs());
-            // On short steps, integrating the score avoids subtracting two
-            // large rounded posterior values near the optimum.
-            if (theta_kappa - theta_hat_kappa).abs() <= 4.0 * roundoff
-                && (proposed_log_alpha - log_alpha).abs() <= 0.001
-            {
-                recover_map_step(
-                    objective,
-                    log_alpha,
-                    proposed_log_alpha,
-                    dlp,
-                    kappa * epsilon * dlp * dlp,
-                    roundoff,
-                )
+        let rounded_acceptance = theta_kappa <= theta_hat_kappa;
+        let roundoff = f64::EPSILON * lp.abs().max(lp_new.abs());
+        // On short steps, integrating the score avoids subtracting two
+        // large rounded posterior values near the optimum.
+        let (accepted, recovered) = if recheck_map_gain
+            && (theta_kappa - theta_hat_kappa).abs() <= 4.0 * roundoff
+            && (proposed_log_alpha - log_alpha).abs() <= 0.001
+        {
+            let required_gain = kappa * epsilon * dlp * dlp;
+            if rounded_acceptance {
+                let accepted = integrated_dispersion_gain(objective, log_alpha, proposed_log_alpha)
+                    .is_none_or(|gain| gain >= required_gain);
+                (accepted, None)
             } else {
-                None
+                (
+                    false,
+                    recover_map_step(
+                        objective,
+                        log_alpha,
+                        proposed_log_alpha,
+                        dlp,
+                        required_gain,
+                        roundoff,
+                    ),
+                )
             }
         } else {
-            None
+            (rounded_acceptance, None)
         };
         if let Some((point, _)) = recovered
             && point != proposed_log_alpha
@@ -493,7 +500,13 @@ pub fn line_search_dispersion(
                     .nonfinite_at("dispersion line-search accepted objective change", Some(0))?,
             };
             lp = lp_new;
-            if last_change < options.disp_tol {
+            // A positive gain this close to the cutoff cannot reliably
+            // resolve convergence from the two rounded posterior values.
+            let unresolved_cutoff = recheck_map_gain
+                && recovered.is_none()
+                && last_change > 0.0
+                && options.disp_tol - last_change <= 2.0 * roundoff;
+            if last_change < options.disp_tol && !unresolved_cutoff {
                 break;
             }
             if log_alpha < min_log_alpha {

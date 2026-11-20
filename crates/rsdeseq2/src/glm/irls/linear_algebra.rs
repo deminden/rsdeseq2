@@ -50,8 +50,8 @@ pub(super) fn solve_weighted_least_squares_qr(
     let n = x.nrows();
     let p = x.ncols();
     let m = n + p;
-    // Preserve the established projection order for narrow GLM designs.
-    let column_basis = p <= 4;
+    // Preserve the R-host reduction order for narrow GLM designs.
+    let column_basis = p <= 4 && crate::numeric_profile() != crate::NumericProfile::Portable;
     if scratch.augmented_design.shape() != (m, p) {
         scratch.augmented_design = DMatrix::zeros(m, p);
         scratch.augmented_response = DVector::zeros(m);

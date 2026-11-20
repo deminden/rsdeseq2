@@ -1425,6 +1425,13 @@ on reject:
   halve kappa
 ```
 
+For short MAP proposals near the rounded Armijo bound, the portable
+profile integrates the posterior score with two-point Gauss–Legendre
+quadrature to estimate the gain. This can correct either rounded
+acceptance decision. A positive rounded gain within the roundoff band
+of `dispTol` can continue for another iteration so that subtraction
+error does not decide convergence.
+
 The shared bounded optimizer and the GLM beta fallback reject non-finite norm,
 dot-product, movement, directional-derivative, and objective-building
 accumulations. Overflow in optimizer control quantities
