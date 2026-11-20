@@ -460,6 +460,47 @@ from 1,692 to 67 across 200 cases checked at 80-digit precision. Every
 formulation introduced new failures when replayed through the two
 blocked fits. These formulations stay in the experiment worktree.
 
+### IRLS output retention
+
+In `1d54903`, inference keeps the fitted means, leverage and covariance
+outputs. Dispersion mean fitting returns its fitted means and rlog
+transforms return their fitted coefficients. These paths omit the
+leverage matrix and share reusable buffers for the covariance checks
+that determine optimizer fallback. Extreme inputs still run the same
+element-wise overflow checks. The public rlog fit functions keep their
+full diagnostics.
+
+All 44 GTEx result and diagnostic TSVs match `42075c0` byte for byte
+across both profiles. The host profile passed all 130 gates. Portable
+passed 119 of 121 per-contrast gates and all nine global gates. The
+workspace and both golden manifests passed on macOS and Linux arm64.
+The full macOS GTEx replay and all 47 portable transform tests passed.
+A host-reference formula test reproduced the same polynomial discrepancy
+when forced to run in the portable profile on the earlier executable.
+The targeted IRLS tests and portable golden panel passed on emulated
+Linux x86_64. Intel macOS tests linked and Windows MSVC libraries and
+binaries type-checked.
+
+Over two paired four-worker runs of all eleven contrasts, summed median
+time was 15.80 s versus 15.93 s. Median RSS was 256.61 versus 258.21 MiB
+and peak RSS was 259.97 versus 259.92 MiB. The 0.8% throughput increase
+is below the 2% threshold for a GTEx optimization round. Seven paired
+rlog runs per fixture produced identical output. Median RSS fell from
+12.33 to 11.83 MiB for 4,096 genes and 16 samples, and from 12.19 to
+11.45 MiB for 2,048 genes and 32 samples. Median throughput increased
+5.4% on the first fixture and decreased 0.1% on the second. The first
+fixture had one slower startup that reached 13.38 MiB, above the
+baseline's 12.61 MiB peak.
+
+All four Cargo archives built offline and reproduced byte for byte.
+All three local R package checks passed 2,874 expectations with zero
+skips. R 4.5.3 reported the existing two package notes. R 4.6.2 also
+reported the existing compiled-symbol warning.
+
+A 60-digit Newton step for the two remaining portable dispersion fits,
+with the final Gamma regression rows fixed, increased the maximum
+deviations from the independent DESeq2 references.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
