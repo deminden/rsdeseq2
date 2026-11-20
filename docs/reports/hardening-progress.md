@@ -650,6 +650,11 @@ was 0.6% lower for 4,096 genes and 16 samples and 3.2% higher for
 2,048 genes and 32 samples. Median RSS changed by −0.03 MiB and
 +0.08 MiB, respectively.
 
+In `14b2700`, IRLS keeps the transposed design and its factorization
+for the fit, and reuses the response and initial coefficients across
+rows. The 32 focused IRLS tests and both rank-deficient tests passed,
+as did Clippy and both 8,032-field golden checks.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
