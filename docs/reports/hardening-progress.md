@@ -398,6 +398,42 @@ shorter step for those rows. Centered scores and midpoint trials still
 left regressions on the frozen panel, so the MAP-specific change is
 the retained implementation.
 
+### Reusable IRLS QR workspace
+
+The default IRLS QR solver reuses its weighted design, response,
+reflectors, basis and coefficient buffers across iterations. It keeps
+the previous reduction order. The triangular solve preserves the LU
+signed-zero arithmetic and uses the original LU path for nonfinite
+entries and subnormal pivots. A separate allocation probe measured
+zero allocation or reallocation calls across 64 warmed 61 × 5 solves.
+The previous solver made 576 calls for the same inputs.
+
+The `3ef6e9c` release binary matched `39af7c0` byte for byte across all
+44 portable and host result and diagnostic TSVs. The portable run
+passed 119 of 121 per-contrast and all nine global gates. The host run
+passed all 130 gates. All 8,032 fields in each portable and host golden
+panel matched on macOS arm64, Linux arm64 and emulated Linux x86_64.
+The workspace tests and both full GTEx replay tests passed on macOS and
+Linux arm64. The Intel macOS tests cross-linked, and Windows MSVC
+libraries and binaries type-checked.
+
+The two-repeat, four-worker benchmark over the eleven GTEx contrasts
+took 21.55 s with reusable QR and 22.24 s with `39af7c0`. Throughput
+increased 3.2%. Peak RSS was 259.81 MiB and 260.83 MiB, respectively.
+The result files matched byte for byte. The earlier run overlapped
+the release build and background indexing.
+
+All four Cargo archives built offline and reproduced byte for byte.
+The R source archive passed 2,874 expectations with zero skips in each
+of the three local R environments and recorded the same R-version
+package-check warning and notes as `39af7c0`.
+
+The opt-in normal-equations solver uses an owned LU factorization in
+production. A detached trial reused its workspace and matched the
+existing coefficients across 64 solves
+with zero warmed allocation calls. The existing solver made 320 calls
+in that probe.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
