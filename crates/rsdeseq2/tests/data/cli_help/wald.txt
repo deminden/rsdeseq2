@@ -107,6 +107,8 @@ Options:
           Optional DESeq2-shaped fit diagnostics TSV for the original fit
       --refit-diagnostics-output <REFIT_DIAGNOSTICS_OUTPUT>
           Optional DESeq2-shaped fit diagnostics TSV for the replacement refit
+      --fit-diagnostics-summary-output <FIT_DIAGNOSTICS_SUMMARY_OUTPUT>
+          Optional TSV of non-finite covariance row counts for the fit and any refit
       --fit-beta-output <FIT_BETA_OUTPUT>
           Optional GLM beta matrix TSV for the original fit
       --fit-beta-se-output <FIT_BETA_SE_OUTPUT>
