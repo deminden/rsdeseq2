@@ -1,4 +1,5 @@
 use super::*;
+use crate::matrix::try_alloc_matrix;
 // Expanded-model coefficient, covariance and contrast collapse.
 
 /// Average expanded-model coefficients into standard model-term coefficients.
@@ -18,7 +19,11 @@ pub fn average_expanded_model_coefficients(
         "expanded beta coefficient groups",
     )?;
 
-    let mut values = Vec::with_capacity(expanded_beta.n_rows() * coefficient_groups.len());
+    let mut values = try_alloc_matrix(
+        expanded_beta.n_rows(),
+        coefficient_groups.len(),
+        "collapsed beta coefficients",
+    )?;
     for gene in 0..expanded_beta.n_rows() {
         let row = expanded_beta.row(gene)?;
         for group in coefficient_groups {
@@ -52,7 +57,14 @@ pub fn average_expanded_model_covariances(
     )?;
 
     let n_groups = coefficient_groups.len();
-    let mut values = Vec::with_capacity(expanded_covariance.n_rows() * n_groups * n_groups);
+    let n_columns = n_groups.checked_mul(n_groups).ok_or_else(|| {
+        invalid_dimensions("collapsed beta covariance columns", usize::MAX, n_groups)
+    })?;
+    let mut values = try_alloc_matrix(
+        expanded_covariance.n_rows(),
+        n_columns,
+        "collapsed beta covariance",
+    )?;
     for gene in 0..expanded_covariance.n_rows() {
         let covariance = expanded_covariance.row(gene)?;
         for left_group in coefficient_groups {
@@ -68,7 +80,7 @@ pub fn average_expanded_model_covariances(
         }
     }
 
-    RowMajorMatrix::from_row_major(expanded_covariance.n_rows(), n_groups * n_groups, values)
+    RowMajorMatrix::from_row_major(expanded_covariance.n_rows(), n_columns, values)
 }
 
 /// Collapse an expanded-model GLM fit to standard-design coefficients.

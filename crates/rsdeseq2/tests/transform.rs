@@ -19,6 +19,21 @@ use rsdeseq2::prelude::{
     vst_with_dispersion_trend_and_size_factors,
 };
 
+#[test]
+fn rlog_design_and_prior_reject_overflowing_sample_dimensions() {
+    for error in [
+        rlog_sample_design(usize::MAX).unwrap_err(),
+        rlog_sample_effect_design(usize::MAX).unwrap_err(),
+        rlog_beta_prior_variance(usize::MAX, 1.0).unwrap_err(),
+        rlog_sample_effect_prior_variance(usize::MAX, 1.0).unwrap_err(),
+    ] {
+        assert!(
+            matches!(error, DeseqError::InvalidDimensions { context, .. }
+            if context.contains("overflow"))
+        );
+    }
+}
+
 fn expected_mean_vst(q: f64, alpha: f64) -> f64 {
     (2.0 * (alpha * q).sqrt().asinh() - alpha.ln() - 4.0_f64.ln()) / std::f64::consts::LN_2
 }

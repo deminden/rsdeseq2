@@ -1,4 +1,5 @@
 use super::*;
+use crate::matrix::try_alloc_matrix;
 // Expanded-fit options, validation and covariance handling.
 
 pub(super) fn options_with_beta_prior_variance(
@@ -132,7 +133,7 @@ pub(super) fn validate_expanded_fit_collapse_inputs(
     {
         return Err(DeseqError::InvalidDimensions {
             context: "expanded fit hat diagonal matrix".to_string(),
-            expected: expanded_fit.beta.n_rows() * expanded_fit.mu.n_cols(),
+            expected: expanded_fit.mu.len(),
             actual: expanded_fit.hat_diagonal.len(),
         });
     }
@@ -228,7 +229,11 @@ pub(super) fn beta_se_from_covariance(
             covariance.n_cols(),
         ));
     }
-    let mut values = Vec::with_capacity(covariance.n_rows() * n_coefficients);
+    let mut values = try_alloc_matrix(
+        covariance.n_rows(),
+        n_coefficients,
+        "collapsed beta standard errors",
+    )?;
     for gene in 0..covariance.n_rows() {
         let row = covariance.row(gene)?;
         for coefficient in 0..n_coefficients {

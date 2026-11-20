@@ -1,5 +1,6 @@
 use super::*;
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
+use crate::matrix::try_alloc_matrix;
 
 /// Row-aligned subset for fast-VST trend fitting.
 ///
@@ -221,7 +222,8 @@ fn select_matrix_rows(
             actual: 0,
         });
     }
-    let mut values = Vec::with_capacity(row_indices.len() * matrix.n_cols());
+    let mut values =
+        try_alloc_matrix(row_indices.len(), matrix.n_cols(), "fast VST selected rows")?;
     for row in row_indices {
         values.extend_from_slice(matrix.row(*row)?);
     }

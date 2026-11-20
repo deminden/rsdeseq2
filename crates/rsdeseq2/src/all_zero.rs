@@ -1,7 +1,7 @@
 //! Helpers for expanding compact non-all-zero rows back to full gene order.
 
 use crate::errors::{DeseqError, invalid_dimensions};
-use crate::matrix::RowMajorMatrix;
+use crate::matrix::{RowMajorMatrix, try_alloc_matrix};
 
 /// Return indices for rows that should be fit or copied from compact outputs.
 pub(crate) fn nonzero_gene_indices(all_zero: &[bool]) -> Vec<usize> {
@@ -19,7 +19,8 @@ pub(crate) fn expand_matrix_with_nan_rows(
     all_zero: &[bool],
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
     let n_cols = matrix.n_cols();
-    let mut values = vec![f64::NAN; all_zero.len() * n_cols];
+    let mut values = try_alloc_matrix(all_zero.len(), n_cols, "expanded nonzero rows")?;
+    values.resize(all_zero.len() * n_cols, f64::NAN);
     let mut compact_row = 0_usize;
     for (row, is_zero) in all_zero.iter().copied().enumerate() {
         if is_zero {

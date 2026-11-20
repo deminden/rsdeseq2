@@ -408,7 +408,11 @@ pub fn linear_model_mu(
     };
     let hat = &x * xtx_inverse * x.transpose();
     let fitted = y * hat;
-    let mut values = Vec::with_capacity(normalized_counts.n_rows() * normalized_counts.n_cols());
+    let mut values = try_alloc_matrix(
+        normalized_counts.n_rows(),
+        normalized_counts.n_cols(),
+        "linear fitted means",
+    )?;
     for row in 0..normalized_counts.n_rows() {
         for col in 0..normalized_counts.n_cols() {
             values.push(fitted[(row, col)]);

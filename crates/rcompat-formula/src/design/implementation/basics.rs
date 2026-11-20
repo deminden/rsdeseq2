@@ -4,6 +4,7 @@ pub(super) use crate::errors::{Error, invalid_dimensions};
 use crate::errors::{ErrorKind, missing_prerequisite};
 pub(super) use crate::math::rank::{R_QR_TOLERANCE, matrix_rank, matrix_rank_r_qr};
 pub(super) use crate::matrix::RowMajorMatrix;
+use rcompat_numeric::matrix::try_alloc_matrix;
 
 /// A design matrix generated outside the Rust core or by the Rust design helpers.
 ///
@@ -370,12 +371,9 @@ impl DesignMatrix {
 
     /// Create an intercept-only design matrix with one all-ones coefficient.
     pub fn intercept_only(n_samples: usize) -> Result<Self, Error> {
-        Self::from_row_major(
-            n_samples,
-            1,
-            vec![1.0; n_samples],
-            Some(vec!["Intercept".to_string()]),
-        )
+        let mut values = try_alloc_matrix(n_samples, 1, "intercept-only design")?;
+        values.resize(n_samples, 1.0);
+        Self::from_row_major(n_samples, 1, values, Some(vec!["Intercept".to_string()]))
     }
 
     /// Create a design matrix from row-major values.

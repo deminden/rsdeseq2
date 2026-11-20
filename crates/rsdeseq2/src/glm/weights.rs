@@ -2,7 +2,7 @@ use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::math::rank::matrix_rank;
-use crate::matrix::RowMajorMatrix;
+use crate::matrix::{RowMajorMatrix, try_alloc_matrix};
 use crate::numeric::checked;
 use crate::numeric::validate::nonnegative_finite as validate_nonnegative_finite;
 
@@ -181,7 +181,8 @@ fn cox_reid_subset_full_rank(
         return Ok(false);
     }
 
-    let mut values = Vec::with_capacity(kept_rows.len() * keep_cols.len());
+    let mut values =
+        try_alloc_matrix(kept_rows.len(), keep_cols.len(), "Cox-Reid weighted design")?;
     for sample in &kept_rows {
         for col in &keep_cols {
             values.push(design.matrix().get(*sample, *col).copied().unwrap_or(0.0));
@@ -218,7 +219,11 @@ fn weighted_design_values(weights: &[f64], design: &DesignMatrix) -> Result<Vec<
             weights.len(),
         ));
     }
-    let mut values = Vec::with_capacity(design.n_samples() * design.n_coefficients());
+    let mut values = try_alloc_matrix(
+        design.n_samples(),
+        design.n_coefficients(),
+        "weighted design",
+    )?;
     for (sample, weight) in weights.iter().copied().enumerate() {
         for col in 0..design.n_coefficients() {
             let design_value = design.matrix().get(sample, col).copied().unwrap_or(0.0);

@@ -1,5 +1,6 @@
 use super::*;
 use crate::errors::{ErrorKind, missing_prerequisite};
+use crate::matrix::try_alloc_matrix;
 // Validate global LRT subspaces before any expensive fitting stage.
 pub(super) fn validate_lrt_designs(
     full: &DesignMatrix,
@@ -484,7 +485,7 @@ pub(super) fn compact_matrix_rows(
     matrix: &RowMajorMatrix<f64>,
     row_indices: &[usize],
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    let mut values = Vec::with_capacity(row_indices.len() * matrix.n_cols());
+    let mut values = try_alloc_matrix(row_indices.len(), matrix.n_cols(), "selected matrix rows")?;
     for row in row_indices {
         values.extend_from_slice(matrix.row(*row)?);
     }
@@ -521,7 +522,8 @@ pub(super) fn expand_rlog_output_with_all_zero_rows(
             compact_output.transformed.n_cols(),
         ));
     }
-    let mut values = vec![0.0; all_zero.len() * n_samples];
+    let mut values = try_alloc_matrix(all_zero.len(), n_samples, "expanded rlog output")?;
+    values.resize(all_zero.len() * n_samples, 0.0);
     let mut compact_row = 0_usize;
     for (gene, is_zero) in all_zero.iter().copied().enumerate() {
         if is_zero {
@@ -592,7 +594,7 @@ pub(super) fn expand_frozen_rlog_output_with_all_zero_rows(
             compact_output.transformed.n_cols(),
         ));
     }
-    let mut values = Vec::with_capacity(all_zero.len() * n_samples);
+    let mut values = try_alloc_matrix(all_zero.len(), n_samples, "expanded frozen rlog output")?;
     let mut compact_row = 0usize;
     for (gene, is_zero) in all_zero.iter().enumerate() {
         if *is_zero {

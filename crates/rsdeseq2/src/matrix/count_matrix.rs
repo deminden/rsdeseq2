@@ -1,7 +1,7 @@
 //! Validated genes x samples count storage.
 
 use crate::errors::{DeseqError, invalid_dimensions};
-use crate::matrix::normalize_index_range;
+use crate::matrix::{normalize_index_range, try_alloc_matrix};
 
 /// Row-major genes x samples count matrix.
 #[derive(Clone, Debug, PartialEq)]
@@ -218,7 +218,8 @@ impl CountMatrix {
                 actual: 0,
             });
         }
-        let mut values = Vec::with_capacity(gene_indices.len() * self.n_samples);
+        let mut values =
+            try_alloc_matrix(gene_indices.len(), self.n_samples, "selected count rows")?;
         for gene in gene_indices {
             values.extend_from_slice(self.row(*gene)?);
         }

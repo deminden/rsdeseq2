@@ -1,5 +1,6 @@
 use super::*;
 use crate::errors::{ErrorKind, missing_prerequisite};
+use crate::matrix::try_alloc_matrix;
 /// Align sample-level factor values to count-matrix sample order.
 pub fn align_sample_levels_to_samples(
     levels: &[SampleLevel],
@@ -154,7 +155,7 @@ pub fn align_labeled_assay_matrix_to_counts(
             });
         }
     }
-    let mut values = Vec::with_capacity(gene_names.len() * sample_names.len());
+    let mut values = try_alloc_matrix(gene_names.len(), sample_names.len(), context)?;
     for gene in gene_names {
         let row = gene_rows
             .get(gene.as_str())
@@ -201,7 +202,7 @@ pub fn align_design_matrix_to_samples(
         }
     }
     let n_coefficients = labeled.design.n_coefficients();
-    let mut values = Vec::with_capacity(sample_names.len() * n_coefficients);
+    let mut values = try_alloc_matrix(sample_names.len(), n_coefficients, "aligned design matrix")?;
     for sample in sample_names {
         let row = by_sample
             .get(sample.as_str())

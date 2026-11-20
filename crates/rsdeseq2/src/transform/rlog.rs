@@ -396,6 +396,12 @@ fn rlog_with_estimated_prior_and_normalization_factors_impl(
     })
 }
 
+fn rlog_coefficient_count(n_samples: usize) -> Result<usize, DeseqError> {
+    n_samples.checked_add(1).ok_or_else(|| {
+        invalid_dimensions("rlog coefficient count overflow", usize::MAX - 1, n_samples)
+    })
+}
+
 /// Build DESeq2's rlog sample design: an unpenalized intercept plus one
 /// regularized indicator coefficient per sample.
 pub fn rlog_sample_design(n_samples: usize) -> Result<DesignMatrix, DeseqError> {
@@ -406,8 +412,8 @@ pub fn rlog_sample_design(n_samples: usize) -> Result<DesignMatrix, DeseqError> 
             "at least one sample",
         ));
     }
-    let n_coefficients = n_samples + 1;
-    let mut values = Vec::with_capacity(n_samples * n_coefficients);
+    let n_coefficients = rlog_coefficient_count(n_samples)?;
+    let mut values = try_alloc_matrix(n_samples, n_coefficients, "rlog sample design")?;
     for sample in 0..n_samples {
         values.push(1.0);
         for candidate in 0..n_samples {
@@ -429,7 +435,7 @@ pub fn rlog_sample_effect_design(n_samples: usize) -> Result<DesignMatrix, Deseq
             "at least one sample",
         ));
     }
-    let mut values = Vec::with_capacity(n_samples * n_samples);
+    let mut values = try_alloc_matrix(n_samples, n_samples, "rlog sample effect design")?;
     for sample in 0..n_samples {
         for candidate in 0..n_samples {
             values.push((sample == candidate) as u8 as f64);
@@ -454,7 +460,8 @@ pub fn rlog_beta_prior_variance(
         ));
     }
     validate_rlog_sample_prior_variance(sample_prior_variance)?;
-    let mut beta_prior_variance = Vec::with_capacity(n_samples + 1);
+    let mut beta_prior_variance =
+        try_alloc_matrix(1, rlog_coefficient_count(n_samples)?, "rlog prior variance")?;
     beta_prior_variance.push(RLOG_INTERCEPT_PRIOR_VARIANCE);
     beta_prior_variance.extend(std::iter::repeat_n(sample_prior_variance, n_samples));
     Ok(beta_prior_variance)
@@ -473,7 +480,9 @@ pub fn rlog_sample_effect_prior_variance(
         ));
     }
     validate_rlog_sample_prior_variance(sample_prior_variance)?;
-    Ok(std::iter::repeat_n(sample_prior_variance, n_samples).collect())
+    let mut variances = try_alloc_matrix(1, n_samples, "rlog sample effect prior variance")?;
+    variances.resize(n_samples, sample_prior_variance);
+    Ok(variances)
 }
 
 fn rlog_transform_from_fit(
@@ -487,7 +496,7 @@ fn rlog_transform_from_fit(
             beta.n_cols(),
         ));
     }
-    let mut values = Vec::with_capacity(beta.n_rows() * n_samples);
+    let mut values = try_alloc_matrix(beta.n_rows(), n_samples, "rlog transformed values")?;
     for gene in 0..beta.n_rows() {
         let intercept = beta.get(gene, 0).copied().unwrap_or(f64::NAN);
         if !intercept.is_finite() {
@@ -525,7 +534,7 @@ fn rlog_transform_from_sample_effect_fit(
         ));
     }
     let n_samples = beta.n_cols();
-    let mut values = Vec::with_capacity(beta.n_rows() * n_samples);
+    let mut values = try_alloc_matrix(beta.n_rows(), n_samples, "rlog transformed values")?;
     for (gene, intercept) in frozen_intercept.iter().enumerate() {
         if !intercept.is_finite() {
             return Err(DeseqError::NonFiniteValue {

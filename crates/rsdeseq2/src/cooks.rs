@@ -225,7 +225,8 @@ pub fn calculate_cooks_distance(
     // Genes are independent: fill each gene's row in parallel and report the
     // lowest failing gene's error, as the sequential loop did.
     let n_samples = counts.n_samples();
-    let mut values = vec![f64::NAN; counts.n_genes() * n_samples];
+    let mut values = try_alloc_matrix(counts.n_genes(), n_samples, "Cook's distances")?;
+    values.resize(counts.n_genes() * n_samples, f64::NAN);
     let rows = values
         .par_chunks_mut(n_samples.max(1))
         .zip(robust_dispersion.par_iter().copied())

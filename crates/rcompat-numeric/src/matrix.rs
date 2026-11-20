@@ -188,7 +188,10 @@ pub fn try_alloc_matrix<T>(rows: usize, columns: usize, context: &str) -> Result
     values
         .try_reserve_exact(len)
         .map_err(|_| Error::InvalidDimensions {
-            context: format!("{context} allocation failed"),
+            context: format!(
+                "{context} allocation failed ({} bytes requested)",
+                len * std::mem::size_of::<T>()
+            ),
             expected: len,
             actual: 0,
         })?;
