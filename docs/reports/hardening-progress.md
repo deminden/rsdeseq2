@@ -1574,6 +1574,30 @@ outliers preserve the counts and a separate count buffer when an
 eligible replacement changes a value. Integration Clippy, formatting,
 the module dependency check and documentation checks passed.
 
+### Reused normalized counts in Cook's refit plans
+
+The builder and expanded beta-prior workflows pass their owned
+normalized counts into refit planning. The planner renormalizes only
+cells whose raw counts changed. The public planner continues to
+compute replacement normalization from the counts and offsets, so
+caller-supplied normalized counts still act only as the seed for
+replacement predictions.
+
+A paired 20,000-gene, 100-sample fixed-dispersion Wald run used four
+workers and the portable profile. Across nine pairs against
+`f34d0ab`, median peak RSS fell from 111.69 to 96.36 MiB. Median
+runtime was 180.0 versus 177.8 ms. Normalized counts, weighted
+metadata in the targeted regression, and final probabilities
+matched their reference. The nine timed pairs matched on all
+normalized-count, base-metadata and result checksums.
+
+Each profile passed 211 focused checks and matched all 8,032 golden
+fields. The regression exercises both offset layouts with weighted
+base metadata and checks that the owned matrix retains its buffer.
+It also verifies that the public planner accepts a seed matrix
+whose values differ from the normalized counts it returns.
+All-targets Clippy, formatting and the module dependency check passed.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |

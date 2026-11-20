@@ -5,8 +5,7 @@ use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::matrix::{try_alloc_matrix, try_filled_vec};
 use crate::normalization::{
-    base_mean, base_variance, normalized_counts_with_factors, validate_normalization_factors,
-    validate_size_factors,
+    base_mean, base_variance, validate_normalization_factors, validate_size_factors,
 };
 use crate::numeric::checked::{self, CheckedExt};
 use rayon::prelude::*;
@@ -297,6 +296,7 @@ pub fn calculate_cooks_distance(
 
 // Replacement and refit-plan construction.
 mod replacement;
+pub(crate) use replacement::prepare_cooks_replacement_refit_from_normalized;
 pub use replacement::{
     prepare_cooks_replacement_refit, prepare_cooks_replacement_refit_with_weights,
     replace_outlier_counts,

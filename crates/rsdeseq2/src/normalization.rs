@@ -197,12 +197,54 @@ pub(crate) fn normalized_counts_for_rows(
         let source = selected.map_or(gene, |selected| selected[gene]);
         let factors = offsets.row(source)?;
         for (sample, (&count, &factor)) in counts.row(source)?.iter().zip(factors).enumerate() {
-            values.push(checked::try_div(f64::from(count), factor).map_err(|error| {
-                normalized_count_error(context, gene * samples + sample, error.value)
-            })?);
+            values.push(normalized_count_value(
+                count,
+                factor,
+                context,
+                gene * samples + sample,
+            )?);
         }
     }
     RowMajorMatrix::from_row_major(genes, samples, values)
+}
+
+// The starting matrix already contains counts normalized by these offsets.
+pub(crate) fn renormalize_changed_rows(
+    normalized: &mut RowMajorMatrix<f64>,
+    original: &CountMatrix,
+    replaced: &CountMatrix,
+    offsets: Offsets<'_>,
+    rows: impl Iterator<Item = usize>,
+) -> Result<(), DeseqError> {
+    let samples = original.n_samples();
+    let context = match offsets {
+        Offsets::PerSample(_) => "normalized count",
+        Offsets::PerCell(_) => "normalization-factor normalized count",
+    };
+    for gene in rows {
+        let previous = original.row(gene)?;
+        let current = replaced.row(gene)?;
+        let factors = offsets.row(gene)?;
+        let start = gene * samples;
+        let normalized_row = &mut normalized.as_mut_slice()[start..start + samples];
+        for (sample, (&before, &after)) in previous.iter().zip(current).enumerate() {
+            if before != after {
+                normalized_row[sample] =
+                    normalized_count_value(after, factors[sample], context, start + sample)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn normalized_count_value(
+    count: u32,
+    factor: f64,
+    context: &str,
+    index: usize,
+) -> Result<f64, DeseqError> {
+    checked::try_div(f64::from(count), factor)
+        .map_err(|error| normalized_count_error(context, index, error.value))
 }
 
 /// Visit normalized counts in column-major order for foreign output buffers.

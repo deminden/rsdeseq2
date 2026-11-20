@@ -249,17 +249,12 @@ pub(super) fn replacement_refit_plan_from_original(
     let original_cooks = original_fit.cooks.as_ref().ok_or_else(|| {
         missing_prerequisite(ErrorKind::Options, "replacement refit", "Cook's distances")
     })?;
-    let normalized = match original_fit.normalization_factors.as_ref() {
-        Some(normalization_factors) => {
-            normalized_counts_with_factors(counts, normalization_factors)?
-        }
-        None => normalized_counts(counts, &original_fit.size_factors)?,
-    };
-    prepare_cooks_replacement_refit_with_weights(
+    let offsets = original_fit.offsets();
+    let normalized = crate::normalization::normalized_counts_for_rows(counts, offsets, None)?;
+    prepare_cooks_replacement_refit_from_normalized(
         counts,
-        &normalized,
-        &original_fit.size_factors,
-        original_fit.normalization_factors.as_ref(),
+        std::borrow::Cow::Owned(normalized),
+        offsets,
         original_cooks,
         design,
         replacement_options,

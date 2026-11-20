@@ -241,6 +241,10 @@ impl CountMatrix {
         })
     }
 
+    pub(crate) fn shares_count_storage(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.counts, &other.counts)
+    }
+
     /// Replace the count buffer while sharing the original axis labels.
     pub(crate) fn with_counts(&self, counts: Vec<u32>) -> Result<Self, DeseqError> {
         if counts.len() != self.counts.len() {

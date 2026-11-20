@@ -9,7 +9,7 @@ pub(super) use crate::contrasts::{
 };
 pub(super) use crate::cooks::{
     CooksOutput, CooksRefitPlan, CooksReplacementOptions, calculate_cooks_distance,
-    prepare_cooks_replacement_refit_with_weights,
+    prepare_cooks_replacement_refit_from_normalized,
 };
 pub(super) use crate::design::{
     DesignMatrix, FormulaModelFrame, r_like_name_candidates as design_name_candidates,

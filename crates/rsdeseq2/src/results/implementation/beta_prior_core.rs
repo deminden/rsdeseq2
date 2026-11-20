@@ -279,15 +279,8 @@ impl ExpandedBetaPriorInput<'_> {
     ) -> Result<ExpandedBetaPriorWaldReplacementResults, DeseqError> {
         let mut original = self.clone().fit(target)?;
         let counts = self.glm.counts;
-        let (normalized, size_factors, normalization_factors) = match self.glm.offsets {
-            Offsets::PerSample(factors) => (normalized_counts(counts, factors)?, factors, None),
-            // The replacement API reads sample factors only without cell factors.
-            Offsets::PerCell(factors) => (
-                normalized_counts_with_factors(counts, factors)?,
-                &[][..],
-                Some(factors),
-            ),
-        };
+        let normalized =
+            crate::normalization::normalized_counts_for_rows(counts, self.glm.offsets, None)?;
         let prior = &original.fit.prior_fit;
         let cooks = calculate_cooks_distance(
             counts,
@@ -296,17 +289,15 @@ impl ExpandedBetaPriorInput<'_> {
             &prior.hat_diagonal,
             &prior.model_matrix,
         )?;
-        let refit_plan = prepare_cooks_replacement_refit_with_weights(
+        let refit_plan = prepare_cooks_replacement_refit_from_normalized(
             counts,
-            &normalized,
-            size_factors,
-            normalization_factors,
+            std::borrow::Cow::Owned(normalized),
+            self.glm.offsets,
             &cooks.cooks,
             self.design.standard_design,
             replacement_options,
             self.glm.weights,
         )?;
-        drop(normalized);
 
         let refit = if refit_plan.requires_refit() {
             Some(

@@ -1,6 +1,8 @@
 use super::*;
 use crate::matrix::try_alloc_matrix;
+use crate::normalization::{Offsets, normalized_counts_for_rows, renormalize_changed_rows};
 use crate::numeric::checked::{self, CheckedExt};
+use std::borrow::Cow;
 
 /// Replace Cook's outlier counts with trimmed-mean predictions.
 ///
@@ -176,22 +178,61 @@ pub fn prepare_cooks_replacement_refit_with_weights(
     options: &CooksReplacementOptions,
     observation_weights: Option<&RowMajorMatrix<f64>>,
 ) -> Result<CooksRefitPlan, DeseqError> {
+    let offsets = normalization_factors.map_or(Offsets::PerSample(size_factors), Offsets::PerCell);
+    prepare_cooks_replacement_refit_from_normalized(
+        counts,
+        Cow::Borrowed(normalized_counts),
+        offsets,
+        cooks,
+        model_matrix,
+        options,
+        observation_weights,
+    )
+}
+
+/// Owned input was normalized from these counts with the same offsets.
+pub(crate) fn prepare_cooks_replacement_refit_from_normalized(
+    counts: &CountMatrix,
+    normalized: Cow<'_, RowMajorMatrix<f64>>,
+    offsets: Offsets<'_>,
+    cooks: &RowMajorMatrix<f64>,
+    model_matrix: &DesignMatrix,
+    options: &CooksReplacementOptions,
+    observation_weights: Option<&RowMajorMatrix<f64>>,
+) -> Result<CooksRefitPlan, DeseqError> {
+    let (size_factors, normalization_factors) = match offsets {
+        Offsets::PerSample(factors) => (factors, None),
+        Offsets::PerCell(factors) => (&[][..], Some(factors)),
+    };
     let replacement = replace_outlier_counts(
         counts,
-        normalized_counts,
+        &normalized,
         size_factors,
         normalization_factors,
         cooks,
         model_matrix,
         options,
     )?;
-    let replaced_normalized_counts = match normalization_factors {
-        Some(factors) => {
-            validate_normalization_factors(counts, factors)?;
-            normalized_counts_with_factors(&replacement.replaced_counts, factors)?
+    let replaced_normalized_counts = match normalized {
+        Cow::Owned(mut values) => {
+            if !counts.shares_count_storage(&replacement.replaced_counts) {
+                let marked_rows = replacement
+                    .replace
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(gene, &flag)| (flag == Some(true)).then_some(gene));
+                renormalize_changed_rows(
+                    &mut values,
+                    counts,
+                    &replacement.replaced_counts,
+                    offsets,
+                    marked_rows,
+                )?;
+            }
+            values
         }
-        None => {
-            crate::normalization::normalized_counts(&replacement.replaced_counts, size_factors)?
+        Cow::Borrowed(_) => {
+            normalized_counts_for_rows(&replacement.replaced_counts, offsets, None)?
         }
     };
     let (replaced_base_mean, replaced_base_var) = match observation_weights {
@@ -235,4 +276,84 @@ pub fn prepare_cooks_replacement_refit_with_weights(
         new_all_zero_rows,
         post_refit_max_cooks,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn owned_normalization_reuses_storage_for_weighted_replacement_metadata() {
+        let counts =
+            CountMatrix::from_row_major_u32(2, 4, vec![10, 200, 10, 10, 5, 5, 5, 5]).unwrap();
+        let weights =
+            RowMajorMatrix::from_row_major(2, 4, vec![1.0, 0.5, 0.8, 1.0, 1.0, 1.0, 0.5, 0.3])
+                .unwrap();
+        let size_factors = [1.5, 1.0, 1.25, 0.8];
+        let cell_factors =
+            RowMajorMatrix::from_row_major(2, 4, vec![0.8, 1.3, 1.2, 1.1, 1.4, 1.0, 0.9, 1.1])
+                .unwrap();
+        let cooks =
+            RowMajorMatrix::from_row_major(2, 4, vec![0., 2., 0., 0., 0., 0., 0., 0.]).unwrap();
+        let design = DesignMatrix::from_row_major(4, 1, vec![1.; 4], None).unwrap();
+        let mut options = CooksReplacementOptions::new(1.0);
+        options.which_samples = Some(vec![false, true, false, false]);
+
+        for factors in [None, Some(&cell_factors)] {
+            let offsets = factors.map_or(Offsets::PerSample(&size_factors), Offsets::PerCell);
+            let normalized = normalized_counts_for_rows(&counts, offsets, None).unwrap();
+            let reference = prepare_cooks_replacement_refit_with_weights(
+                &counts,
+                &normalized,
+                &size_factors,
+                factors,
+                &cooks,
+                &design,
+                &options,
+                Some(&weights),
+            )
+            .unwrap();
+            let original_buffer = normalized.as_slice().as_ptr();
+            let reused = prepare_cooks_replacement_refit_from_normalized(
+                &counts,
+                Cow::Owned(normalized),
+                offsets,
+                &cooks,
+                &design,
+                &options,
+                Some(&weights),
+            )
+            .unwrap();
+            assert_eq!(reused, reference);
+            assert_ne!(reused.replacement.replaced_counts.row(0).unwrap()[1], 200);
+            assert_eq!(
+                reused.replaced_normalized_counts.as_slice().as_ptr(),
+                original_buffer,
+            );
+        }
+    }
+
+    #[test]
+    fn public_planner_recomputes_normalization_when_seed_counts_are_caller_supplied() {
+        let counts = CountMatrix::from_row_major_u32(1, 4, vec![10, 20, 30, 40]).unwrap();
+        let seed = RowMajorMatrix::from_elem(1, 4, 3.0).unwrap();
+        let size_factors = [1.0, 2.0, 3.0, 4.0];
+        let cooks = RowMajorMatrix::from_elem(1, 4, 0.0).unwrap();
+        let design = DesignMatrix::from_row_major(4, 1, vec![1.; 4], None).unwrap();
+        let plan = prepare_cooks_replacement_refit(
+            &counts,
+            &seed,
+            &size_factors,
+            None,
+            &cooks,
+            &design,
+            &CooksReplacementOptions::new(1.0),
+        )
+        .unwrap();
+        assert_eq!(plan.replaced_normalized_counts.as_slice(), &[10.0; 4]);
+        assert_eq!(
+            plan.replacement.candidate_replacement_counts.as_slice(),
+            &[3, 6, 9, 12]
+        );
+    }
 }

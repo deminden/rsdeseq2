@@ -1,7 +1,7 @@
 use super::*;
 pub(super) use crate::cooks::{
     CooksOutput, CooksRefitPlan, CooksReplacementOptions, calculate_cooks_distance,
-    prepare_cooks_replacement_refit_with_weights,
+    prepare_cooks_replacement_refit_from_normalized,
 };
 pub(super) use crate::design::{
     DesignMatrix, ExpandedAdditiveFactorDesign, ExpandedFactorDesign,
@@ -22,7 +22,7 @@ pub(super) use crate::glm::{
 pub(super) use crate::matrix::CountMatrix;
 pub(super) use crate::matrix::RowMajorMatrix;
 pub(super) use crate::multiple_testing::bh_adjust;
-pub(super) use crate::normalization::{Offsets, normalized_counts, normalized_counts_with_factors};
+pub(super) use crate::normalization::Offsets;
 pub(super) use crate::options::{CooksCutoff, TestType};
 
 /// Core DESeq2 `results()` column names emitted by the current Rust result rows.
