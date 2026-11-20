@@ -19,6 +19,7 @@ pub(super) fn refit_optim_fallback_rows<const SELECTED: bool>(
 ) -> Result<(), DeseqError> {
     let p = input.x.ncols();
     let n = input.x.nrows();
+    let mut covariance_scratch = CovarianceScratch::default();
     for gene in rows.iter().copied() {
         let source_gene = input.rows.source(gene);
         let counts_row = input.rows.input.counts.row(source_gene)?;
@@ -63,7 +64,15 @@ pub(super) fn refit_optim_fallback_rows<const SELECTED: bool>(
             .map(|value| value.max(input.options.min_mu))
             .collect::<Vec<_>>();
         let w = working_weights(&mu_for_inference, dispersion, weight_row)?;
-        let Some(beta_covariance) = fallback_covariance(input.x, &w, input.ridge_lambda) else {
+        // Fallback preserves the IRLS leverage for Cook's distance.
+        let Some(beta_covariance) = covariance_and_hat_diagonal(
+            &mut covariance_scratch,
+            input.x,
+            &w,
+            input.ridge_lambda,
+            None,
+            input.max_design,
+        ) else {
             return Err(DeseqError::UnsupportedFeature {
                 feature: "optim fallback covariance is singular".to_string(),
             });
@@ -72,23 +81,25 @@ pub(super) fn refit_optim_fallback_rows<const SELECTED: bool>(
         for (col, value) in output.parameters.iter().copied().enumerate() {
             beta_optim_start_values[gene * p + col] = beta_start[col];
             beta_values[gene * p + col] = value;
-            let covariance_value = beta_covariance[col * p + col];
+            let covariance_value = beta_covariance[(col, col)];
             beta_var_values[gene * p + col] = checked_log2_standard_error(
                 covariance_value,
                 gene * p + col,
                 "optim fallback beta standard error",
             )?;
         }
-        for (idx, value) in beta_covariance.into_iter().enumerate() {
-            let scaled = checked_log2_covariance(
-                value,
-                gene * p * p + idx,
-                "optim fallback beta covariance log2 scale",
-            )?;
-            if !beta_covariance_values.is_empty() {
-                beta_covariance_values[gene * p * p + idx] = scaled;
-            }
-        }
+        let start_index = gene * p * p;
+        let destination = if beta_covariance_values.is_empty() {
+            None
+        } else {
+            Some(&mut beta_covariance_values[start_index..start_index + p * p])
+        };
+        retain_covariance_on_log2_scale(
+            beta_covariance,
+            destination,
+            start_index,
+            "optim fallback beta covariance log2 scale",
+        )?;
         for (sample, value) in mu_unfloored.iter().copied().enumerate() {
             mu_values[gene * n + sample] = value;
         }

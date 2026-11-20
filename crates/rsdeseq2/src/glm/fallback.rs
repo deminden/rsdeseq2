@@ -74,14 +74,14 @@ fn record_optim_fallback_row(
 pub(super) fn requires_optim_fallback(
     converged: bool,
     beta: &[f64],
-    covariance: &[f64],
+    variance_positive: bool,
     use_optim: bool,
     force_optim: bool,
 ) -> bool {
     should_refit(
         converged,
         row_values_finite(beta),
-        covariance_diagonal_positive(covariance, beta.len()),
+        variance_positive,
         use_optim,
         force_optim,
     )

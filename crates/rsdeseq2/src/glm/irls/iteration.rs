@@ -9,17 +9,16 @@ pub(super) struct IrlsScratch {
     fitted_means: Vec<f64>,
     weights: Vec<f64>,
     response: Vec<f64>,
-    covariance: Vec<f64>,
     least_squares: LeastSquaresScratch,
+    covariance: CovarianceScratch,
 }
 
 pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
     scratch: &mut IrlsScratch,
     input: IrlsRowInput<'_, SELECTED>,
-    output: IrlsRowOutput<'_>,
+    mut output: IrlsRowOutput<'_>,
 ) -> Result<IrlsRowStatus, DeseqError> {
     let gene = input.gene;
-    let p = input.x.ncols();
     let source_gene = input.rows.source(gene);
     let count_row = input.rows.input.counts.row(source_gene)?;
     if count_row.iter().all(|&count| count == 0) {
@@ -33,8 +32,8 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
         fitted_means: mu,
         weights: w,
         response: z,
-        covariance: transient_covariance,
         least_squares,
+        covariance: covariance_scratch,
     } = scratch;
     y.clear();
     y.extend(count_row.iter().copied().map(f64::from));
@@ -110,28 +109,40 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
     }
 
     working_weights_into(mu, dispersion, weight_row, w)?;
-    let covariance = covariance_and_hat_diagonal(input.x, w, input.ridge_lambda, output.hat);
+    let covariance = covariance_and_hat_diagonal(
+        covariance_scratch,
+        input.x,
+        w,
+        input.ridge_lambda,
+        output.hat.as_deref_mut(),
+        input.max_design,
+    );
 
     for (col, (out, value)) in output.beta.iter_mut().zip(beta.iter().copied()).enumerate() {
         *out = checked_log2_scale(value, col, "IRLS beta log2 scale")?;
     }
-    let scaled_covariance = output.covariance.unwrap_or_else(|| {
-        transient_covariance.resize(p * p, f64::NAN);
-        transient_covariance
-    });
+    let variance_positive;
     if let Some(covariance) = covariance {
         for (diagonal, out) in output.beta_se.iter_mut().enumerate() {
-            let value = covariance[diagonal * p + diagonal];
+            let value = covariance[(diagonal, diagonal)];
             *out = checked_log2_standard_error(value, diagonal, "IRLS beta standard error")?;
         }
-        for (idx, (out, value)) in scaled_covariance.iter_mut().zip(covariance).enumerate() {
-            *out = checked_log2_covariance(value, idx, "IRLS beta covariance log2 scale")?;
-        }
+        variance_positive = retain_covariance_on_log2_scale(
+            covariance,
+            output.covariance.as_deref_mut(),
+            0,
+            "IRLS beta covariance log2 scale",
+        )?;
     } else {
+        variance_positive = false;
         iter = input.options.maxit;
-        scaled_covariance.fill(f64::NAN);
+        if let Some(covariance) = output.covariance {
+            covariance.fill(f64::NAN);
+        }
         // Computing the hat diagonal can fail partway through a row.
-        output.hat.fill(f64::NAN);
+        if let Some(hat) = output.hat {
+            hat.fill(f64::NAN);
+        }
     }
     fitted_mu_into(input.x, &beta, nf, None, Some(log_nf), mu)?;
     output.mu.copy_from_slice(mu);
@@ -142,7 +153,7 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
         refit: requires_optim_fallback(
             converged,
             output.beta,
-            scaled_covariance,
+            variance_positive,
             input.options.use_optim,
             input.options.force_optim,
         ),

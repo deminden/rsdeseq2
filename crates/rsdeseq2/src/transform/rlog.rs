@@ -2,7 +2,7 @@ use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::glm::beta::{fit_prior_nf_for_output, fit_prior_sf_for_output};
-use crate::glm::irls::OutputRequirements;
+use crate::glm::irls::{IrlsOutput, OutputRequirements};
 use crate::glm::{IrlsOptions, NbinomGlmFit, match_weighted_upper_quantile_for_variance};
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
@@ -112,15 +112,16 @@ fn rlog_with_size_factors_impl(
     sample_prior_variance: f64,
     options: IrlsOptions,
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    rlog_fit_with_size_factors_for_output(
+    let fit = rlog_fit_with_size_factors_for_output(
         counts,
         size_factors,
         dispersions,
         sample_prior_variance,
         options,
         OutputRequirements::Transform,
-    )
-    .map(|output| output.transformed)
+    )?
+    .into_matrix()?;
+    rlog_transform_from_fit(&fit, counts.n_samples())
 }
 
 /// Fit the low-level rlog sample-effect model with size factors and retain the GLM fit.
@@ -131,14 +132,16 @@ fn rlog_fit_with_size_factors_impl(
     sample_prior_variance: f64,
     options: IrlsOptions,
 ) -> Result<RlogFitOutput, DeseqError> {
-    rlog_fit_with_size_factors_for_output(
+    let fit = rlog_fit_with_size_factors_for_output(
         counts,
         size_factors,
         dispersions,
         sample_prior_variance,
         options,
         OutputRequirements::Inference,
-    )
+    )?
+    .into_inference()?;
+    rlog_output_from_fit(fit, counts.n_samples())
 }
 
 fn rlog_fit_with_size_factors_for_output(
@@ -148,10 +151,10 @@ fn rlog_fit_with_size_factors_for_output(
     sample_prior_variance: f64,
     options: IrlsOptions,
     requirements: OutputRequirements,
-) -> Result<RlogFitOutput, DeseqError> {
+) -> Result<IrlsOutput, DeseqError> {
     let design = rlog_sample_design(counts.n_samples())?;
     let beta_prior_variance = rlog_beta_prior_variance(counts.n_samples(), sample_prior_variance)?;
-    let fit = fit_prior_sf_for_output(
+    fit_prior_sf_for_output(
         counts,
         &design,
         size_factors,
@@ -159,8 +162,7 @@ fn rlog_fit_with_size_factors_for_output(
         &beta_prior_variance,
         options,
         requirements,
-    )?;
-    rlog_output_from_fit(fit, counts.n_samples())
+    )
 }
 
 /// Fit an rlog transform using caller-supplied frozen intercepts and size factors.
@@ -214,17 +216,18 @@ fn rlog_with_estimated_prior_and_size_factors_impl(
     let normalized = normalized_counts(counts, size_factors)?;
     let sample_prior_variance =
         estimate_rlog_sample_prior_variance(&normalized, base_mean, disp_fit)?;
-    let fit_output = rlog_fit_with_size_factors_for_output(
+    let beta = rlog_fit_with_size_factors_for_output(
         counts,
         size_factors,
         dispersions,
         sample_prior_variance,
         options,
         OutputRequirements::Transform,
-    )?;
+    )?
+    .into_matrix()?;
     Ok(RlogOutput {
-        transformed: fit_output.transformed,
-        intercept: fit_output.intercept,
+        transformed: rlog_transform_from_fit(&beta, counts.n_samples())?,
+        intercept: rlog_intercept_from_beta(&beta, counts.n_samples())?,
         sample_prior_variance,
         offset_mode: RlogOffsetMode::SizeFactors,
     })
@@ -346,15 +349,16 @@ fn rlog_with_normalization_factors_impl(
     sample_prior_variance: f64,
     options: IrlsOptions,
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    rlog_fit_with_normalization_factors_for_output(
+    let fit = rlog_fit_with_normalization_factors_for_output(
         counts,
         normalization_factors,
         dispersions,
         sample_prior_variance,
         options,
         OutputRequirements::Transform,
-    )
-    .map(|output| output.transformed)
+    )?
+    .into_matrix()?;
+    rlog_transform_from_fit(&fit, counts.n_samples())
 }
 
 /// Fit the low-level rlog sample-effect model with normalization factors and retain the GLM fit.
@@ -365,14 +369,16 @@ fn rlog_fit_with_normalization_factors_impl(
     sample_prior_variance: f64,
     options: IrlsOptions,
 ) -> Result<RlogFitOutput, DeseqError> {
-    rlog_fit_with_normalization_factors_for_output(
+    let fit = rlog_fit_with_normalization_factors_for_output(
         counts,
         normalization_factors,
         dispersions,
         sample_prior_variance,
         options,
         OutputRequirements::Inference,
-    )
+    )?
+    .into_inference()?;
+    rlog_output_from_fit(fit, counts.n_samples())
 }
 
 fn rlog_fit_with_normalization_factors_for_output(
@@ -382,10 +388,10 @@ fn rlog_fit_with_normalization_factors_for_output(
     sample_prior_variance: f64,
     options: IrlsOptions,
     requirements: OutputRequirements,
-) -> Result<RlogFitOutput, DeseqError> {
+) -> Result<IrlsOutput, DeseqError> {
     let design = rlog_sample_design(counts.n_samples())?;
     let beta_prior_variance = rlog_beta_prior_variance(counts.n_samples(), sample_prior_variance)?;
-    let fit = fit_prior_nf_for_output(
+    fit_prior_nf_for_output(
         counts,
         &design,
         normalization_factors,
@@ -393,8 +399,7 @@ fn rlog_fit_with_normalization_factors_for_output(
         &beta_prior_variance,
         options,
         requirements,
-    )?;
-    rlog_output_from_fit(fit, counts.n_samples())
+    )
 }
 
 /// Fit an rlog transform using caller-supplied frozen intercepts and normalization factors.
@@ -427,7 +432,7 @@ fn rlog_frozen_with_normalization_factors_impl(
         options,
         OutputRequirements::Transform,
     )?;
-    let transformed = rlog_transform_from_sample_effect_fit(&fit.beta, frozen_intercept)?;
+    let transformed = rlog_transform_from_sample_effect_fit(&fit.into_matrix()?, frozen_intercept)?;
     Ok(RlogOutput {
         transformed,
         intercept: frozen_intercept.to_vec(),
@@ -448,17 +453,18 @@ fn rlog_with_estimated_prior_and_normalization_factors_impl(
     let normalized = normalized_counts_with_factors(counts, normalization_factors)?;
     let sample_prior_variance =
         estimate_rlog_sample_prior_variance(&normalized, base_mean, disp_fit)?;
-    let fit_output = rlog_fit_with_normalization_factors_for_output(
+    let beta = rlog_fit_with_normalization_factors_for_output(
         counts,
         normalization_factors,
         dispersions,
         sample_prior_variance,
         options,
         OutputRequirements::Transform,
-    )?;
+    )?
+    .into_matrix()?;
     Ok(RlogOutput {
-        transformed: fit_output.transformed,
-        intercept: fit_output.intercept,
+        transformed: rlog_transform_from_fit(&beta, counts.n_samples())?,
+        intercept: rlog_intercept_from_beta(&beta, counts.n_samples())?,
         sample_prior_variance,
         offset_mode: RlogOffsetMode::NormalizationFactors,
     })

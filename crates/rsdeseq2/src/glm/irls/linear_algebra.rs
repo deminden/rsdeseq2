@@ -170,30 +170,105 @@ pub(super) fn solve_qr_triangle(
     }
 }
 
-pub(super) fn covariance_and_hat_diagonal(
+#[derive(Default)]
+pub(super) struct CovarianceScratch {
+    crossproduct: DMatrix<f64>,
+    inverse: DMatrix<f64>,
+    product: DMatrix<f64>,
+    covariance: DMatrix<f64>,
+    active: Vec<(usize, f64)>,
+}
+
+pub(super) fn covariance_and_hat_diagonal<'a>(
+    scratch: &'a mut CovarianceScratch,
     x: &DMatrix<f64>,
     w: &[f64],
     ridge_lambda: &[f64],
-    hat: &mut [f64],
-) -> Option<Vec<f64>> {
-    let (inverse, beta_covariance) = covariance_with_inverse(x, w, ridge_lambda)?;
-    visit_hat_diagonal(x, w, &inverse, |sample, value| hat[sample] = value)?;
-    Some(beta_covariance)
+    hat: Option<&mut [f64]>,
+    max_design: Option<f64>,
+) -> Option<&'a DMatrix<f64>> {
+    let p = x.ncols();
+    if scratch.crossproduct.shape() != (p, p) {
+        scratch.crossproduct = DMatrix::zeros(p, p);
+        scratch.inverse = DMatrix::zeros(p, p);
+        scratch.product = DMatrix::zeros(p, p);
+        scratch.covariance = DMatrix::zeros(p, p);
+        scratch.active = Vec::with_capacity(p);
+    } else {
+        scratch.crossproduct.fill(0.0);
+    }
+    let CovarianceScratch {
+        crossproduct,
+        inverse,
+        product,
+        covariance,
+        active,
+    } = scratch;
+    fill_xtwx(x, w, crossproduct, active)?;
+    inverse.copy_from(crossproduct);
+    for diagonal in 0..p {
+        inverse[(diagonal, diagonal)] =
+            checked::add(inverse[(diagonal, diagonal)], ridge_lambda[diagonal])?;
+    }
+    if !inverse.try_inverse_mut() {
+        return None;
+    }
+    product.gemm(1.0, inverse, crossproduct, 0.0);
+    covariance.gemm(1.0, product, inverse, 0.0);
+    if !covariance.iter().all(|value| value.is_finite()) {
+        return None;
+    }
+    if let Some(hat) = hat {
+        visit_hat_diagonal(x, w, inverse, active, |sample, value| hat[sample] = value)?;
+    } else {
+        validate_unretained_hat(x, w, inverse, max_design, active)?;
+    }
+    Some(covariance)
+}
+
+pub(super) fn finite_abs_max(values: &[f64]) -> Option<f64> {
+    values.iter().try_fold(0.0_f64, |max, value| {
+        value.is_finite().then_some(max.max(value.abs()))
+    })
+}
+
+pub(super) fn validate_unretained_hat(
+    x: &DMatrix<f64>,
+    w: &[f64],
+    inverse: &DMatrix<f64>,
+    max_design: Option<f64>,
+    active: &mut Vec<(usize, f64)>,
+) -> Option<()> {
+    let bounds = || {
+        let max_design = max_design?;
+        let left = checked::mul(max_design, finite_abs_max(w)?)?;
+        let right = checked::mul(max_design, finite_abs_max(inverse.as_slice())?)?;
+        let term = checked::mul(left, right)?;
+        checked::mul(term, (x.ncols() as f64).powi(2))
+    };
+    // Each rounded addition can increase the magnitude by at most twice
+    // the term's magnitude. Leave ample room for rounding and fall back
+    // to the element-wise checks for extreme inputs.
+    if bounds().is_some_and(|bound| bound <= f64::MAX / 4.0) {
+        Some(())
+    } else {
+        visit_hat_diagonal(x, w, inverse, active, |_, _| {})
+    }
 }
 
 fn visit_hat_diagonal(
     x: &DMatrix<f64>,
     w: &[f64],
     inverse: &DMatrix<f64>,
+    active: &mut Vec<(usize, f64)>,
     mut use_value: impl FnMut(usize, f64),
 ) -> Option<()> {
-    let mut active = Vec::with_capacity(x.ncols());
     for (sample, &weight) in w.iter().enumerate().take(x.nrows()) {
         let mut value = 0.0;
         if !weight.is_finite() {
             return None;
         }
-        fill_active_design_columns(x, sample, &mut active);
+        fill_active_design_columns(x, sample, active);
         for (left, left_value) in active.iter().copied() {
             for (right, right_value) in active.iter().copied() {
                 value = checked::add(
@@ -205,43 +280,6 @@ fn visit_hat_diagonal(
         use_value(sample, value);
     }
     Some(())
-}
-
-// Optim fallback preserves the original IRLS hat diagonal.
-pub(super) fn fallback_covariance(
-    x: &DMatrix<f64>,
-    w: &[f64],
-    ridge_lambda: &[f64],
-) -> Option<Vec<f64>> {
-    let (inverse, covariance) = covariance_with_inverse(x, w, ridge_lambda)?;
-    visit_hat_diagonal(x, w, &inverse, |_, _| {})?;
-    Some(covariance)
-}
-
-fn covariance_with_inverse(
-    x: &DMatrix<f64>,
-    w: &[f64],
-    ridge_lambda: &[f64],
-) -> Option<(DMatrix<f64>, Vec<f64>)> {
-    let xtwx = xtwx_without_ridge(x, w)?;
-    let mut xtwx_ridge = xtwx.clone();
-    for diagonal in 0..x.ncols() {
-        xtwx_ridge[(diagonal, diagonal)] =
-            checked::add(xtwx_ridge[(diagonal, diagonal)], ridge_lambda[diagonal])?;
-    }
-    let inverse = xtwx_ridge.try_inverse()?;
-    let sigma = &inverse * xtwx * &inverse;
-    let mut beta_covariance = Vec::with_capacity(x.ncols() * x.ncols());
-    for row in 0..x.ncols() {
-        for col in 0..x.ncols() {
-            let value = sigma[(row, col)];
-            if !value.is_finite() {
-                return None;
-            }
-            beta_covariance.push(value);
-        }
-    }
-    Some((inverse, beta_covariance))
 }
 
 #[derive(Default)]
@@ -338,11 +376,22 @@ fn solve_lu_in_place(matrix: &mut DMatrix<f64>, response: &mut DVector<f64>) -> 
             && matrix.solve_upper_triangular_mut(response))
 }
 
+#[cfg(test)]
 pub(super) fn xtwx_without_ridge(x: &DMatrix<f64>, w: &[f64]) -> Option<DMatrix<f64>> {
     let mut xtwx = DMatrix::zeros(x.ncols(), x.ncols());
     let mut active = Vec::with_capacity(x.ncols());
+    fill_xtwx(x, w, &mut xtwx, &mut active)?;
+    Some(xtwx)
+}
+
+fn fill_xtwx(
+    x: &DMatrix<f64>,
+    w: &[f64],
+    xtwx: &mut DMatrix<f64>,
+    active: &mut Vec<(usize, f64)>,
+) -> Option<()> {
     for (sample, &weight) in w.iter().enumerate().take(x.nrows()) {
-        fill_active_design_columns(x, sample, &mut active);
+        fill_active_design_columns(x, sample, active);
         for (left_pos, (row, row_value)) in active.iter().copied().enumerate() {
             for (col, col_value) in active.iter().copied().skip(left_pos) {
                 xtwx[(row, col)] = checked::add(
@@ -355,7 +404,7 @@ pub(super) fn xtwx_without_ridge(x: &DMatrix<f64>, w: &[f64]) -> Option<DMatrix<
             }
         }
     }
-    Some(xtwx)
+    Some(())
 }
 
 pub(super) fn fill_active_design_columns(

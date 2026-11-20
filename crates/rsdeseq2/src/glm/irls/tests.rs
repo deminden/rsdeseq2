@@ -49,7 +49,7 @@ fn qr_triangle_keeps_lu_signed_zeros_and_subnormal_pivots() {
 }
 
 #[test]
-fn transient_covariance_preserves_all_retained_fields_and_fallbacks() {
+fn reduced_outputs_match_inference_including_fallbacks() {
     let counts = CountMatrix::from_row_major_u32(
         3,
         6,
@@ -79,7 +79,7 @@ fn transient_covariance_preserves_all_retained_fields_and_fallbacks() {
                 force_optim,
                 ..IrlsOptions::default()
             };
-            let mut full = fit_sf_irls_for_output(
+            let full = fit_sf_irls_for_output(
                 &counts,
                 &design,
                 &[0.8, 1., 1.2, 0.9, 1.1, 1.],
@@ -88,8 +88,10 @@ fn transient_covariance_preserves_all_retained_fields_and_fallbacks() {
                 options.clone(),
                 OutputRequirements::Inference,
             )
+            .unwrap()
+            .into_inference()
             .unwrap();
-            assert!(full.beta_covariance.take().is_some());
+            assert!(full.beta_covariance.is_some());
             for requirements in [OutputRequirements::Means, OutputRequirements::Transform] {
                 let transient = fit_sf_irls_for_output(
                     &counts,
@@ -100,13 +102,43 @@ fn transient_covariance_preserves_all_retained_fields_and_fallbacks() {
                     options.clone(),
                     requirements,
                 )
+                .unwrap()
+                .into_matrix()
                 .unwrap();
+                let expected = if requirements == OutputRequirements::Means {
+                    &full.mu
+                } else {
+                    &full.beta
+                };
                 assert_eq!(
-                    transient, full,
+                    &transient, expected,
                     "{requirements:?}, force_optim={force_optim}"
                 );
             }
         }
+    }
+}
+
+#[test]
+fn unretained_hat_keeps_the_overflow_check() {
+    let design = DMatrix::from_row_slice(1, 1, &[1e155]);
+    let inverse = DMatrix::from_row_slice(1, 1, &[1e-160]);
+    let mut active = Vec::new();
+    assert!(
+        validate_unretained_hat(&design, &[1e160], &inverse, Some(1e155), &mut active).is_none()
+    );
+    assert!(validate_unretained_hat(&design, &[1.0], &inverse, Some(1e155), &mut active).is_some());
+}
+
+#[test]
+fn unretained_covariance_keeps_off_diagonal_overflow_check() {
+    let covariance = DMatrix::from_row_slice(2, 2, &[1.0, f64::MAX, 0.0, 2.0]);
+    let mut stored = [0.0; 4];
+    for destination in [Some(stored.as_mut_slice()), None] {
+        assert!(matches!(
+            retain_covariance_on_log2_scale(&covariance, destination, 10, "covariance test"),
+            Err(DeseqError::NonFiniteValue {index:Some(11), context, ..}) if context == "covariance test"
+        ));
     }
 }
 

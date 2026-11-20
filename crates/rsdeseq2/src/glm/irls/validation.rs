@@ -211,3 +211,49 @@ pub(super) fn checked_log2_covariance(
         })
     }
 }
+
+pub(super) fn retain_covariance_on_log2_scale(
+    covariance: &DMatrix<f64>,
+    destination: Option<&mut [f64]>,
+    start_index: usize,
+    context: &str,
+) -> Result<bool, DeseqError> {
+    let p = covariance.ncols();
+    let mut positive = true;
+    if let Some(destination) = destination {
+        for (row, values) in destination.chunks_exact_mut(p).enumerate() {
+            for (col, value) in values.iter_mut().enumerate() {
+                *value = checked_log2_covariance(
+                    covariance[(row, col)],
+                    start_index + row * p + col,
+                    context,
+                )?;
+            }
+            positive &= values[row] > 0.0;
+        }
+        return Ok(positive);
+    }
+
+    // The caller checks that the matrix is finite. LOG2_E squared is less
+    // than four, so only the diagonal needs scaling in the regular range.
+    if covariance.iter().any(|value| value.abs() > f64::MAX / 4.0) {
+        for row in 0..p {
+            for col in 0..p {
+                checked_log2_covariance(
+                    covariance[(row, col)],
+                    start_index + row * p + col,
+                    context,
+                )?;
+            }
+        }
+    }
+    for index in 0..p {
+        let diagonal = checked_log2_covariance(
+            covariance[(index, index)],
+            start_index + index * (p + 1),
+            context,
+        )?;
+        positive &= diagonal > 0.0;
+    }
+    Ok(positive)
+}

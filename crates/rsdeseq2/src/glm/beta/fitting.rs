@@ -496,7 +496,7 @@ pub(crate) fn fit_prior_sf_for_output(
     beta_prior_variance: &[f64],
     options: IrlsOptions,
     requirements: crate::glm::irls::OutputRequirements,
-) -> Result<NbinomGlmFit, DeseqError> {
+) -> Result<crate::glm::irls::IrlsOutput, DeseqError> {
     let options = options_with_beta_prior_variance(design, beta_prior_variance, options)?;
     crate::glm::irls::fit_sf_irls_for_output(
         counts,
@@ -517,7 +517,7 @@ pub(crate) fn fit_prior_nf_for_output(
     beta_prior_variance: &[f64],
     options: IrlsOptions,
     requirements: crate::glm::irls::OutputRequirements,
-) -> Result<NbinomGlmFit, DeseqError> {
+) -> Result<crate::glm::irls::IrlsOutput, DeseqError> {
     let options = options_with_beta_prior_variance(design, beta_prior_variance, options)?;
     crate::glm::irls::fit_nf_irls_for_output(
         counts,

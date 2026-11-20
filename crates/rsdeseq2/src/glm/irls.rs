@@ -36,6 +36,29 @@ impl OutputRequirements {
     }
 }
 
+// Return the inference value inline so full fits need no additional heap allocation.
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum IrlsOutput {
+    Inference(NbinomGlmFit),
+    Matrix(RowMajorMatrix<f64>),
+}
+
+impl IrlsOutput {
+    pub(crate) fn into_inference(self) -> Result<NbinomGlmFit, DeseqError> {
+        match self {
+            Self::Inference(fit) => Ok(fit),
+            Self::Matrix(_) => Err(crate::errors::invariant("IRLS inference output requested")),
+        }
+    }
+
+    pub(crate) fn into_matrix(self) -> Result<RowMajorMatrix<f64>, DeseqError> {
+        match self {
+            Self::Matrix(matrix) => Ok(matrix),
+            Self::Inference(_) => Err(crate::errors::invariant("IRLS matrix output requested")),
+        }
+    }
+}
+
 /// Fit a fixed-dispersion negative-binomial GLM with DESeq2-style dispatch.
 ///
 /// Intercept-only designs with the default tiny ridge use DESeq2's closed-form
@@ -318,6 +341,7 @@ pub fn fit_fixed_dispersion_glm(
             OutputRequirements::Inference,
         ),
     }
+    .and_then(IrlsOutput::into_inference)
 }
 
 pub(crate) fn fit_sf_irls_for_output(
@@ -328,7 +352,7 @@ pub(crate) fn fit_sf_irls_for_output(
     weights: Option<&RowMajorMatrix<f64>>,
     options: IrlsOptions,
     requirements: OutputRequirements,
-) -> Result<NbinomGlmFit, DeseqError> {
+) -> Result<IrlsOutput, DeseqError> {
     validate_size_factor_offsets(counts, size_factors)?;
     fit_offsets_irls_for_output(
         counts,
@@ -349,7 +373,7 @@ pub(crate) fn fit_nf_irls_for_output(
     weights: Option<&RowMajorMatrix<f64>>,
     options: IrlsOptions,
     requirements: OutputRequirements,
-) -> Result<NbinomGlmFit, DeseqError> {
+) -> Result<IrlsOutput, DeseqError> {
     fit_offsets_irls_for_output(
         counts,
         design,
@@ -369,7 +393,7 @@ pub(crate) fn fit_offsets_irls_for_output(
     weights: Option<&RowMajorMatrix<f64>>,
     options: IrlsOptions,
     requirements: OutputRequirements,
-) -> Result<NbinomGlmFit, DeseqError> {
+) -> Result<IrlsOutput, DeseqError> {
     let input = GlmInput {
         counts,
         offsets: normalization_factors,
@@ -405,7 +429,7 @@ pub(crate) fn fit_selected_irls_means(
         options,
         OutputRequirements::Means,
     )
-    .map(|fit| fit.mu)
+    .and_then(IrlsOutput::into_matrix)
 }
 
 #[derive(Clone, Copy)]
@@ -441,7 +465,7 @@ fn fit_irls_rows<const SELECTED: bool>(
     design: &DesignMatrix,
     options: IrlsOptions,
     requirements: OutputRequirements,
-) -> Result<NbinomGlmFit, DeseqError> {
+) -> Result<IrlsOutput, DeseqError> {
     validate_nf_irls_inputs(rows, design, &options)?;
     let samples = rows.input.counts.n_samples();
     let genes = rows.len();
@@ -451,6 +475,7 @@ fn fit_irls_rows<const SELECTED: bool>(
         design.n_coefficients(),
         design.matrix().as_slice(),
     );
+    let max_design = finite_abs_max(x.as_slice());
     let initial_lu = (x.transpose() * &x).lu();
     let initial_beta = InitialBeta::for_design(design)?;
     let shared_log_offsets = match rows.input.offsets {
@@ -481,8 +506,13 @@ fn fit_irls_rows<const SELECTED: bool>(
     beta_covariance_values.resize(n_covariance, f64::NAN);
     let mut mu_values = try_alloc_matrix(n_means, 1, "IRLS output")?;
     mu_values.resize(n_means, 0.0);
-    let mut hat_values = try_alloc_matrix(n_means, 1, "IRLS output")?;
-    hat_values.resize(n_means, f64::NAN);
+    let mut hat_values = if requirements == OutputRequirements::Inference {
+        let mut values = try_alloc_matrix(n_means, 1, "IRLS hat diagonal")?;
+        values.resize(n_means, f64::NAN);
+        values
+    } else {
+        Vec::new()
+    };
     let mut beta_iter = Vec::with_capacity(genes);
     let mut beta_converged = Vec::with_capacity(genes);
     let mut beta_optim_iter = vec![f64::NAN; genes];
@@ -499,12 +529,17 @@ fn fit_irls_rows<const SELECTED: bool>(
     } else {
         rayon::iter::Either::Right((0..genes).into_par_iter().map(|_| None))
     };
+    let hat_rows = if requirements == OutputRequirements::Inference {
+        rayon::iter::Either::Left(hat_values.par_chunks_mut(samples).map(Some))
+    } else {
+        rayon::iter::Either::Right((0..genes).into_par_iter().map(|_| None))
+    };
     let row_statuses = (
         beta_values.par_chunks_mut(p),
         beta_var_values.par_chunks_mut(p),
         covariance_rows,
         mu_values.par_chunks_mut(samples),
-        hat_values.par_chunks_mut(samples),
+        hat_rows,
     )
         .into_par_iter()
         .enumerate()
@@ -518,6 +553,7 @@ fn fit_irls_rows<const SELECTED: bool>(
                         shared_log_offsets: shared_log_offsets.as_deref(),
                         rows,
                         x: &x,
+                        max_design,
                         initial_lu: &initial_lu,
                         initial_beta,
                         ridge_lambda: &ridge_lambda,
@@ -563,6 +599,7 @@ fn fit_irls_rows<const SELECTED: bool>(
             OptimFallbackInput {
                 rows,
                 x: &x,
+                max_design,
                 ridge_lambda: &ridge_lambda,
                 options: &options,
             },
@@ -581,7 +618,6 @@ fn fit_irls_rows<const SELECTED: bool>(
         None
     };
     let mu = RowMajorMatrix::from_row_major(genes, samples, mu_values)?;
-    let hat_diagonal = RowMajorMatrix::from_row_major(genes, samples, hat_values)?;
     let mut log_like = if SELECTED {
         let mut result = Vec::with_capacity(genes);
         for (gene, &source_gene) in rows.selection.iter().enumerate() {
@@ -607,7 +643,13 @@ fn fit_irls_rows<const SELECTED: bool>(
         }
     }
 
-    Ok(NbinomGlmFit {
+    match requirements {
+        OutputRequirements::Means => return Ok(IrlsOutput::Matrix(mu)),
+        OutputRequirements::Transform => return Ok(IrlsOutput::Matrix(beta)),
+        OutputRequirements::Inference => {}
+    }
+    let hat_diagonal = RowMajorMatrix::from_row_major(genes, samples, hat_values)?;
+    Ok(IrlsOutput::Inference(NbinomGlmFit {
         log_like,
         beta_converged,
         beta,
@@ -623,7 +665,7 @@ fn fit_irls_rows<const SELECTED: bool>(
         model_matrix: design.clone(),
         n_terms: p,
         hat_diagonal,
-    })
+    }))
 }
 
 fn checked_output_elements(rows: usize, columns: usize) -> Result<usize, DeseqError> {
@@ -639,6 +681,7 @@ fn checked_output_elements(rows: usize, columns: usize) -> Result<usize, DeseqEr
 struct OptimFallbackInput<'a, const SELECTED: bool> {
     rows: IrlsRows<'a, SELECTED>,
     x: &'a DMatrix<f64>,
+    max_design: Option<f64>,
     ridge_lambda: &'a [f64],
     options: &'a IrlsOptions,
 }
@@ -649,6 +692,7 @@ struct IrlsRowInput<'a, const SELECTED: bool> {
     shared_log_offsets: Option<&'a [f64]>,
     rows: IrlsRows<'a, SELECTED>,
     x: &'a DMatrix<f64>,
+    max_design: Option<f64>,
     initial_lu: &'a LU<f64, Dyn, Dyn>,
     initial_beta: InitialBeta,
     ridge_lambda: &'a [f64],
@@ -660,7 +704,7 @@ struct IrlsRowOutput<'a> {
     beta_se: &'a mut [f64],
     covariance: Option<&'a mut [f64]>,
     mu: &'a mut [f64],
-    hat: &'a mut [f64],
+    hat: Option<&'a mut [f64]>,
 }
 
 struct IrlsRowStatus {
