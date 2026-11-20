@@ -343,6 +343,14 @@ blocked-condition p-value error. Cutoffs at 1,024 and 65,536 left the
 three gaps in the two blocked contrasts. The dispersion trials were
 kept in local experiment worktrees.
 
+An 80-digit replay of the three gene-wise fits with the largest
+influence on the remaining trend differences found positive gains at
+iteration 12 in both Rust profiles. They ranged from `1.50e-10` to
+`5.75e-10`. The host profile rounded the two blocked split 01 gains
+negative. The portable profile rounded the blocked condition gain
+negative. In each case the rejected step changed the final gene-wise
+estimate supplied to the trend fit.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
