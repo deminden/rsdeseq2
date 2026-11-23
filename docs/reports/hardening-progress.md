@@ -1928,6 +1928,9 @@ open.
 
 ## Review plan verification for 0.6.0
 
+The maintainer scoped the 23 November development closeout to macOS arm64
+and Linux arm64. The release workflow defines the broader platform matrix.
+
 | Priority | Implementation and evidence |
 | --- | --- |
 | 1. Golden harness | The [golden harness](../development.md) covers 8,032 fields. Portable hashes have replayed on macOS arm64, Linux arm64 and emulated Linux x86_64. |
