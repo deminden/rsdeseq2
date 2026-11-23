@@ -2,6 +2,10 @@
 RUST_TARGET = @RUST_TARGET@
 RUST_BACKEND = rust/target/$(RUST_TARGET)/release/librsdeseq2_r.a
 override CC = x86_64-w64-mingw32-clang
+# Makeconf adds the Rtools sysroot through these two variables.
+# The LLVM-MinGW driver must use its own UCRT headers and libraries.
+override LOCAL_CPPFLAGS =
+override LOCAL_LIBS =
 
 all: $(SHLIB)
 
