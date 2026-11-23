@@ -27,8 +27,8 @@ def source_identity():
     return subprocess.check_output(['git','rev-parse','HEAD'], cwd=ROOT, text=True).strip()
 
 
-# Workspace crates published to crates.io (sorted; cargo publishes them in dependency order).
-PUBLISHED_CRATES = ['rcompat-formula', 'rcompat-numeric', 'rcompat-shrinkage', 'rsdeseq2']
+# rcompat archives are published by the independent rcompat release workflow.
+PUBLISHED_CRATES = ['rsdeseq2']
 
 
 def check_files(root, files):

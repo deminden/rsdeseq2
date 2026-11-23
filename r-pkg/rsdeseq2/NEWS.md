@@ -1,3 +1,7 @@
+# rsdeseq2 0.6.1
+
+* Update the bundled Rust numerical, formula, and shrinkage crates to 0.1.1.
+
 # rsdeseq2 0.6.0
 
 * With `fitType = "parametric"`, a failed parametric dispersion trend is now

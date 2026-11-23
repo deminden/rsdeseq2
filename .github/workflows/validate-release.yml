@@ -38,9 +38,13 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           python3 scripts/release/stage_release_crate.py
-          cargo package --workspace --locked --allow-dirty --no-verify
-          python3 scripts/release/verify_release_crates.py
-          cp target/package/{rcompat-numeric,rcompat-formula,rcompat-shrinkage,rsdeseq2}-*.crate validated/
+          cargo package --locked --allow-dirty --all-features -p rsdeseq2
+          archive="target/package/rsdeseq2-${RELEASE_TAG#v}.crate"
+          directory=$(mktemp -d "$RUNNER_TEMP/rsdeseq2-crate.XXXXXX")
+          tar -xzf "$archive" -C "$directory"
+          RSDESEQ2_NUMERIC_PROFILE=r-host cargo test --locked --all-features --lib \
+            --manifest-path "$directory/rsdeseq2-${RELEASE_TAG#v}/Cargo.toml"
+          cp "$archive" validated/
           python3 scripts/release/release_artifact_manifest.py write validated
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

@@ -1,6 +1,6 @@
 # Standalone Rust and R wrapper contract
 
-This inventory maps supported 0.6.0 entry points and options to their Rust
+This inventory maps supported 0.6.1 entry points and options to their Rust
 implementations and independent tests. See [compatibility](compatibility.md)
 for limits and [testing](testing-parity.md) for validation.
 

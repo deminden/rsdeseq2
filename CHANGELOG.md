@@ -2,6 +2,13 @@
 
 Public API and user-visible behaviour changes. Version notes live in [docs/releases](docs/releases/).
 
+## 0.6.1
+
+- Use version 0.1.1 of `rcompat-numeric`, `rcompat-formula`, and
+  `rcompat-shrinkage`. Each crate ships a README with a Rust example.
+- Validate the packaged Rust crate against the published dependencies in its
+  lockfile.
+
 ## 0.6.0
 
 ### Added

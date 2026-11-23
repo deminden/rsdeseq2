@@ -6,14 +6,14 @@
 Rust. Use it from the command line, as a Rust library, or as an R package.
 The CLI and Rust library run without R or DESeq2.
 
-In a single-worker benchmark on an Apple M5, the rsdeseq2 CLI ran **4× as
+In a single-worker benchmark on an Apple M5, the rsdeseq2 0.6.0 CLI ran **4× as
 fast as DESeq2** and used **86% less peak RAM** for an end-to-end
 differential expression analysis of 56,200 genes across 61 GTEx samples.
 [Benchmark details](#single-worker-benchmark)
 
 ## Installation
 
-The steps below build **0.6.0** from this repository. You’ll need
+The steps below build **0.6.1** from this repository. You’ll need
 **Rust 1.96.0 or newer** with Cargo. For published versions, see
 [crates.io](https://crates.io/crates/rsdeseq2) and
 [GitHub Releases](https://github.com/deminden/rsdeseq2/releases).
@@ -188,7 +188,7 @@ disabled. They agreed on significant genes at adjusted p-value cutoffs of
 
 ## Documentation
 
-- [0.6.0 release notes](docs/releases/0.6.0.md)
+- [0.6.1 release notes](docs/releases/0.6.1.md)
 - [Algorithms](docs/algorithms.md)
 - [Benchmarks](docs/benchmarks.md) and [reproducibility](docs/reproducibility.md)
 - [Development guide](docs/development.md) and [release checklist](docs/release.md)

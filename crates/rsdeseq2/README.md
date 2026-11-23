@@ -10,14 +10,14 @@ genes across 61 GTEx samples. [Benchmark details][benchmark]
 
 ## Install
 
-The 0.6.0 release requires **Rust 1.96.0 or newer**.
+The 0.6.1 release requires **Rust 1.96.0 or newer**.
 
 ```sh
 # Add the library to your Rust project.
-cargo add rsdeseq2@0.6.0
+cargo add rsdeseq2@0.6.1
 
 # Install the standalone command.
-cargo install rsdeseq2 --version 0.6.0 --locked
+cargo install rsdeseq2 --version 0.6.1 --locked
 ```
 
 Building from a checkout? Follow the [source installation instructions][source-install].

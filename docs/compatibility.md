@@ -1,6 +1,6 @@
 # Compatibility
 
-This guide describes version 0.6.0. The Rust library, CLI and R package share
+This guide describes version 0.6.1. The Rust library, CLI and R package share
 one numerical engine. R translates inputs and constructs objects; it does not
 calculate statistics or provide a fallback numerical implementation.
 

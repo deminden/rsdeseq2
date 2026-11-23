@@ -49,7 +49,7 @@ jobs:
         run: python3 scripts/release/stage_release_crate.py
 
       - name: Package
-        run: cargo package --workspace --locked --allow-dirty --no-verify
+        run: cargo package --locked --allow-dirty --all-features --no-verify -p rsdeseq2
 
       - name: Verify regenerated crate matches checked archive
         run: |
@@ -67,13 +67,4 @@ jobs:
         if: ${{ github.ref != 'refs/tags/v0.2.6' }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        # The rcompat crates have their own versions; a version that is
-        # already on crates.io (unchanged since the last release) is skipped.
-        run: |
-          for crate in rcompat-numeric rcompat-formula rcompat-shrinkage; do
-            if ! output=$(cargo publish -p "$crate" --locked --allow-dirty 2>&1); then
-              echo "$output"
-              echo "$output" | grep -q "already exists" || exit 1
-            fi
-          done
-          cargo publish -p rsdeseq2 --locked --allow-dirty
+        run: cargo publish -p rsdeseq2 --locked --allow-dirty --all-features

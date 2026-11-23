@@ -1,6 +1,6 @@
 # Documentation
 
-These guides describe the 0.6.0 source and its supported behavior.
+These guides describe the 0.6.1 source and its supported behavior.
 
 | Task | Guide |
 | --- | --- |
@@ -12,7 +12,7 @@ These guides describe the 0.6.0 source and its supported behavior.
 | Reproduce data and independent references | [Reproducibility](reproducibility.md) |
 | Run tests or review validation | [Testing and parity](testing-parity.md) |
 | Read development history | [Hardening progress](reports/hardening-progress.md), [0.5.0 baseline](reports/baseline-0.5.0.md), [GTEx comparison](reports/gtex-native-wald-benchmark.md) |
-| Change or package the code | [Development](development.md), [release procedure](release.md), [0.6.0 notes](releases/0.6.0.md) |
+| Change or package the code | [Development](development.md), [release procedure](release.md), [0.6.1 notes](releases/0.6.1.md) |
 
 `data/` contains the raw evidence used by these guides and active validation
 tools. Operational R environment locks live in [`config/r-reference/`](../config/r-reference/).
