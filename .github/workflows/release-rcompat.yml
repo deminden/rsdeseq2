@@ -1,0 +1,60 @@
+name: Release rcompat crates
+
+on:
+  push:
+    tags:
+      - 'rcompat-v*'
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: release-rcompat-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-26.04
+    environment:
+      name: crates.io
+      url: https://crates.io/crates/rcompat-numeric
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - name: Check tag and verify crate archives
+        run: |
+          cargo metadata --locked --no-deps --format-version 1 | python3 -c '
+          import json, os, sys
+          target = os.environ["GITHUB_REF_NAME"].removeprefix("rcompat-v")
+          names = {"rcompat-numeric", "rcompat-formula", "rcompat-shrinkage"}
+          versions = {p["name"]: p["version"] for p in json.load(sys.stdin)["packages"] if p["name"] in names}
+          if versions != dict.fromkeys(names, target):
+              sys.exit(f"Tag version {target} does not match rcompat packages: {versions}")
+          '
+          cargo package --locked --no-verify -p rcompat-numeric -p rcompat-formula -p rcompat-shrinkage
+          python3 scripts/release/verify_release_crates.py
+
+      - name: Publish in dependency order
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          for crate in rcompat-numeric rcompat-formula rcompat-shrinkage; do
+            if cargo publish --locked -p "$crate"; then
+              continue
+            fi
+            # A retry can reuse a package published in an earlier attempt only
+            # if the registry has the same archive from this tag.
+            python3 - "$crate" "${GITHUB_REF_NAME#rcompat-v}" <<'PY'
+          import hashlib, json, pathlib, sys, urllib.request
+          crate, version = sys.argv[1:]
+          archive = pathlib.Path("target/package") / f"{crate}-{version}.crate"
+          url = f"https://crates.io/api/v1/crates/{crate}/{version}"
+          request = urllib.request.Request(url, headers={"User-Agent": "rsdeseq2 rcompat release verification"})
+          with urllib.request.urlopen(request, timeout=20) as response:
+              registered = json.load(response)["version"]
+          if registered["yanked"] or hashlib.sha256(archive.read_bytes()).hexdigest() != registered["checksum"]:
+              sys.exit(f"Registry archive for {crate} {version} differs from the verified archive")
+          print(f"Verified that {crate} {version} is already published")
+          PY
+          done

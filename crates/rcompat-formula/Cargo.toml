@@ -1,11 +1,12 @@
 [package]
 name = "rcompat-formula"
-version = "0.1.0"
+version = "0.1.1"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "R formula evaluation and model.matrix construction in Rust: terms, factor codings, transforms and expanded designs, reproducing R"
+description = "Build R-style model matrices in Rust from formulas, factor contrasts, interactions, numeric transforms, and offsets"
+readme = "README.md"
 documentation = "https://docs.rs/rcompat-formula"
 keywords = ["r", "formula", "model-matrix", "statistics", "design-matrix"]
 categories = ["science", "mathematics"]

@@ -37,9 +37,9 @@ lto = false
 missing_docs = "deny"
 
 [workspace.dependencies]
-rcompat-formula = { path = "crates/rcompat-formula", version = "0.1.0" }
-rcompat-numeric = { path = "crates/rcompat-numeric", version = "0.1.0" }
-rcompat-shrinkage = { path = "crates/rcompat-shrinkage", version = "0.1.0" }
+rcompat-formula = { path = "crates/rcompat-formula", version = "0.1.1" }
+rcompat-numeric = { path = "crates/rcompat-numeric", version = "0.1.1" }
+rcompat-shrinkage = { path = "crates/rcompat-shrinkage", version = "0.1.1" }
 approx = "0.5.1"
 clap = { version = "4.6.7", features = ["derive"] }
 criterion = { version = "0.8.2", features = ["html_reports"] }

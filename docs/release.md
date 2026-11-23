@@ -115,3 +115,11 @@ publication must already have succeeded. Windows and Intel macOS regenerate
 the same independent R 4.6.2 CDF references used by normal platform CI, at the
 existing bounds. Only the asset workflow is repaired; tagged numerical source
 and registry packages remain immutable.
+
+## Publish the rcompat crates
+
+The `rcompat-vX.Y.Z` tag runs the [rcompat release workflow](../.github/workflows/release-rcompat.yml).
+It checks the three package versions, tests their packaged archives, and
+publishes `rcompat-numeric`, `rcompat-formula`, then `rcompat-shrinkage` to
+crates.io. Give each package the tag's version and update the workspace,
+fuzz and R backend lockfiles before pushing the tag.

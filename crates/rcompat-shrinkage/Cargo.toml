@@ -1,11 +1,12 @@
 [package]
 name = "rcompat-shrinkage"
-version = "0.1.0"
+version = "0.1.1"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "R-compatible empirical-Bayes shrinkage in Rust: ashr-style mixture posteriors and apeglm-style heavy-tailed posteriors, reproducing R"
+description = "Empirical Bayes shrinkage in Rust with ashr-style adaptive mixtures and apeglm-style heavy-tailed regression posteriors"
+readme = "README.md"
 documentation = "https://docs.rs/rcompat-shrinkage"
 keywords = ["r", "ashr", "apeglm", "shrinkage", "statistics"]
 categories = ["science", "mathematics"]
