@@ -18,14 +18,6 @@ The steps below build **0.6.0** from this repository. You’ll need
 [crates.io](https://crates.io/crates/rsdeseq2) and
 [GitHub Releases](https://github.com/deminden/rsdeseq2/releases).
 
-### Command line
-
-From the repository root, install the `rsdeseq2` command.
-
-```sh
-cargo install --path crates/rsdeseq2 --locked
-```
-
 ### Rust library
 
 From your application, add the library using the path to your local copy.
@@ -49,12 +41,72 @@ R CMD INSTALL r-pkg/rsdeseq2
 The R package accepts matrices, lists, formulas, and supported `DESeqDataSet`
 inputs. [R usage guide](docs/r-wrapper.md)
 
+### Command line
+
+From the repository root, install the `rsdeseq2` command.
+
+```sh
+cargo install --path crates/rsdeseq2 --locked
+```
+
 ## Compare treated and control samples
 
-Use `counts.tsv` with one row per gene and one raw-count column per sample.
-Put gene IDs in the first column. In `samples.tsv`, put matching sample IDs
-in the first column and label each sample `control` or `treated` in a
-`condition` column.
+In `counts.tsv`, put gene IDs in the first column (`gene`) and raw counts
+in one column per sample. In `samples.tsv`, use two columns, `sample` and
+`condition`. Give each sample a matching ID and label it `control` or
+`treated`.
+
+Both examples write `differential_expression.tsv` with per-gene log2 fold
+changes and adjusted p-values. Positive log2 fold changes mean higher
+expression in the treated group.
+
+### Rust
+
+Save this as `src/main.rs` in your Rust project. Run `cargo run` from the
+project directory with both TSV files there.
+
+```rust
+use rsdeseq2::io::{
+    align_sample_levels_to_samples, read_count_matrix_tsv, read_sample_levels_tsv,
+    write_deseq_results_tsv,
+};
+use rsdeseq2::prelude::{Analysis, DeseqBuilder, DesignMatrix, ResultColumn};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let counts = read_count_matrix_tsv("counts.tsv")?;
+    let samples = read_sample_levels_tsv("samples.tsv")?;
+    let sample_names = counts.sample_names().ok_or("missing sample names")?;
+    let conditions = align_sample_levels_to_samples(&samples, sample_names)?;
+
+    // Each row is an intercept followed by the treated-group indicator.
+    let mut values = Vec::with_capacity(2 * conditions.len());
+    for condition in conditions {
+        let treated = match condition.as_str() {
+            "control" => 0.0,
+            "treated" => 1.0,
+            _ => return Err(format!("unknown condition: {condition}").into()),
+        };
+        values.extend([1.0, treated]);
+    }
+    let design = DesignMatrix::from_row_major(
+        counts.n_samples(),
+        2,
+        values,
+        Some(vec!["Intercept".into(), "treated_vs_control".into()]),
+    )?;
+
+    let analysis = Analysis::new(&counts, &design)
+        .result(ResultColumn::Name("treated_vs_control"));
+    let output = DeseqBuilder::new().run(&analysis)?;
+    let results = output.results().ok_or("analysis returned no results")?;
+    write_deseq_results_tsv("differential_expression.tsv", results)?;
+    Ok(())
+}
+```
+
+### R
+
+The R package runs the same comparison.
 
 ```r
 counts <- as.matrix(read.delim("counts.tsv", row.names = 1, check.names = FALSE))
@@ -74,8 +126,6 @@ write.table(
 )
 ```
 
-The results include log2 fold changes and adjusted p-values for each gene.
-A positive log2 fold change means higher expression in the treated group.
 For the same workflow from the command line, see the [CLI guide](docs/cli.md).
 
 ## Supported Workflows
