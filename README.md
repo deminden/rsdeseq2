@@ -2,48 +2,56 @@
 
 [![License: MIT + BSD notices](https://img.shields.io/badge/license-MIT%20%2B%20BSD-blue.svg)](THIRD_PARTY_NOTICES.md)
 
-`rsdeseq2` independently implements DESeq2-compatible count-data
-workflows in Rust: normalization, dispersion estimation, negative-binomial
-Wald and likelihood-ratio tests, transformations, and result assembly. The
-Rust crate and CLI require neither R nor DESeq2 at runtime.
-
-## Choose an Interface
-
-| interface | intended use | scope |
-| --- | --- | --- |
-| [CLI](docs/cli.md) | File-based normalization, Wald/LRT, VST, and rlog workflows | Explicit numeric TSV inputs; no R formula parser |
-| [Rust crate](crates/rsdeseq2/README.md) | Embedding analysis stages in Rust applications | Broadest implemented API |
-| [R package](r-pkg/rsdeseq2/README.md) | Run analyses in R with matrices, lists, formulas, or `DESeqDataSet` inputs | Wald/LRT, VST, rlog, and selected shrinkage |
-
-The shared Rust core runs supported formula, transform and shrinkage
-calculations. The [supported contract](docs/native-supported-contract.md)
-records methods and limits. The [0.6.0 release notes](docs/releases/0.6.0.md)
-describe the changes and current validation status.
-
-In 0.6.0, Rust callers use `DeseqBuilder::run(&Analysis)` for full fits and
-individual stages. See the [Analysis API guide](docs/design/run-entry-point.md).
+`rsdeseq2` runs DESeq2-compatible RNA-seq differential expression analyses in
+Rust. Use it from the command line, as a Rust library, or as an R package.
+The CLI and Rust library run without R or DESeq2.
 
 ## Installation
 
-This checkout contains the **0.6.0** source. The published version is **0.5.0**
-on [crates.io](https://crates.io/crates/rsdeseq2/0.5.0) and
-[GitHub Releases](https://github.com/deminden/rsdeseq2/releases/tag/v0.5.0).
-Use the checkout for the 0.6.0 interfaces described here.
+The steps below build **0.6.0** from this repository. You’ll need
+**Rust 1.96.0 or newer** with Cargo. For published versions, see
+[crates.io](https://crates.io/crates/rsdeseq2) and
+[GitHub Releases](https://github.com/deminden/rsdeseq2/releases).
 
-Source installation requires **Rust 1.96.0 or newer, with Cargo**. Installing
-the R package also compiles Rust and requires R and its native build tools.
-R 4.6.2 is the pinned comparison environment; see the
-[R guide](docs/r-wrapper.md) for supported interfaces and optional dependencies.
+### Command line
 
-| Interface | Install | Usage |
-| --- | --- | --- |
-| CLI | `cargo install --path crates/rsdeseq2 --locked` from the checkout root | [Commands and input schemas](docs/cli.md) |
-| Rust library | `cargo add rsdeseq2 --path /absolute/path/to/rsdeseq2/crates/rsdeseq2` from your application | [Library usage](crates/rsdeseq2/README.md#rust-usage) |
-| R package | `R CMD INSTALL r-pkg/rsdeseq2` from the checkout root | [Fitting and results](docs/r-wrapper.md) |
+From the repository root, install the `rsdeseq2` command.
 
-For a Wald analysis with your own count and numeric design tables:
+```sh
+cargo install --path crates/rsdeseq2 --locked
+```
 
-```bash
+### Rust library
+
+From your application, add the library using the path to your local copy.
+
+```sh
+cargo add rsdeseq2 --path /path/to/rsdeseq2/crates/rsdeseq2
+```
+
+Use `DeseqBuilder::run(&Analysis)` to run a full analysis or stop after a
+specific stage. [Rust example](crates/rsdeseq2/README.md#rust-usage) ·
+[Analysis API](docs/design/run-entry-point.md)
+
+### R package
+
+With R and its native build tools installed, run this from the repository root.
+
+```sh
+R CMD INSTALL r-pkg/rsdeseq2
+```
+
+The R package accepts matrices, lists, formulas, and supported `DESeqDataSet`
+inputs. [R usage guide](docs/r-wrapper.md)
+
+## Run a Wald test
+
+Use `counts.tsv` for raw, nonnegative integer counts. Put gene IDs in the
+first column (`gene`) and sample IDs in the remaining column headers. In
+`design.tsv`, put sample IDs in the first column (`sample`), followed by the
+numeric design columns.
+
+```sh
 rsdeseq2 wald \
   --counts counts.tsv \
   --design design.tsv \
@@ -52,87 +60,72 @@ rsdeseq2 wald \
   --output results.tsv
 ```
 
-Here `--fit-type mean` explicitly selects a constant mean dispersion trend;
-it is a modeling choice. Select the trend appropriate to your analysis.
-Counts must be unnormalized non-negative integers. The leading columns are
-`gene` in the count table and `sample` in the design table; sample labels align
-the two tables. Coefficient indices are zero-based. The [CLI guide](docs/cli.md)
-describes complete schemas, contrasts and outputs.
+This tests the second design coefficient and writes the results to
+`results.tsv`. The example uses a constant dispersion trend (`--fit-type mean`).
+[CLI commands, file formats, and contrasts](docs/cli.md)
 
 ## Supported Workflows
 
-| Area | Implemented scope |
-| --- | --- |
-| Normalization and fitting | Ratio/`poscounts`, normalization factors, dispersion estimation, Wald and LRT |
-| Results and diagnostics | Contrasts, Cook's replacement/refitting, independent filtering and adjusted p-values |
-| Transformations and shrinkage | VST, rlog and normal shrinkage; `ashr` and `apeglm` methods are **experimental** (see below) |
-| R integration | Matrix/list and `DESeqDataSet` workflows; formula evaluation is **experimental**; selected Bioconductor result objects |
+- Estimate size factors with the ratio or `poscounts` method, or supply
+  normalization factors.
+- Estimate dispersions and run negative-binomial Wald or likelihood-ratio
+  tests. Test coefficients or contrasts and compute adjusted p-values.
+- Apply Cook’s distance diagnostics, outlier replacement and refitting, and
+  independent filtering.
+- Run variance-stabilizing (VST) and regularized log (rlog) transformations,
+  or shrink log fold changes with the normal method.
 
-**Experimental:** `ashr`- and `apeglm`-style shrinkage and R-style formula
-evaluation have independent reference tests. The formula parser and its
-transport also have fuzz targets. Stability will require broader property
-testing and validation on independent datasets.
-
-Full Bioconductor object semantics, `glmGamPoi`, plotting and custom formula
-functions are outside scope. Method-specific restrictions are maintained in
-[compatibility and limits](docs/compatibility.md) and the
-[supported contract](docs/native-supported-contract.md).
-The public Rust API is pre-1.0 and can change between minor releases.
+R-style formula evaluation and `ashr`- and `apeglm`-style shrinkage are
+experimental. The R package supports selected Bioconductor result objects.
+`glmGamPoi`, plotting, and custom formula functions are outside the supported
+workflows.
+[Compatibility guide](docs/compatibility.md) ·
+[Supported methods by interface](docs/native-supported-contract.md)
 
 ## Validation and Performance
 
-The 0.6.0 acceptance run at `a0808b2` passed the release panels and golden
-comparisons on macOS arm64 and Linux arm64. Both numeric profiles passed the
-full 56,200-gene GTEx replay and all 130 precision gates across eleven
-full GTEx v8 Kidney Cortex Wald contrasts against R 4.6.2 / DESeq2 1.52.0.
-The contrast runs estimate normalization and dispersions with Cook's
-masking and independent filtering disabled. Both profiles had zero
-significance flips at adjusted p-value cutoffs of 0.05 and 0.1.
+The 0.6.0 acceptance checks at `a0808b2` passed on macOS arm64 and Linux
+arm64. Both numeric profiles passed the full 56,200-gene GTEx replay.
 
-| Numeric profile | Max absolute LFC error | Max absolute SE error | Max absolute p-value error | Max absolute adjusted p-value error |
+In a separate comparison against R 4.6.2 and DESeq2 1.52.0, both profiles
+passed all 130 precision checks across eleven GTEx v8 Kidney Cortex Wald
+contrasts and agreed with DESeq2 at adjusted p-value cutoffs of 0.05 and
+0.1. The runs estimated normalization and dispersions with Cook’s masking
+and independent filtering disabled. The table shows the largest absolute
+differences from DESeq2.
+
+| Numeric profile | Log fold change | Standard error | p-value | Adjusted p-value |
 | --- | ---: | ---: | ---: | ---: |
 | Portable | `3.65e-6` | `6.18e-5` | `7.25e-5` | `3.57e-5` |
 | Host R | `7.15e-6` | `2.75e-5` | `3.74e-5` | `2.87e-5` |
 
-A single four-worker macOS arm64 run of the portable CLI took 15.85 s
-across the eleven contrasts and peaked at 259.41 MiB RSS.
-[Validation and measurement details](docs/reports/hardening-progress.md#batched-acceptance-after-the-portable-arithmetic-changes)
-record the checked revision, comparison settings and output checks.
+With four workers on macOS arm64, the portable CLI ran all eleven contrasts
+in 15.85 seconds and used 259.41 MiB of peak resident memory in one run.
+[Benchmark setup and results](docs/reports/hardening-progress.md#batched-acceptance-after-the-portable-arithmetic-changes)
 
-After the builder API cleanup, both numeric profiles passed the macOS arm64
-integration and golden checks. See the
-[API cleanup validation](docs/reports/hardening-progress.md#analysis-api-cleanup).
+Both numeric profiles also passed the macOS arm64 integration tests and
+matched the reference outputs after the builder API cleanup.
+[API cleanup validation](docs/reports/hardening-progress.md#analysis-api-cleanup)
 
 ## Documentation
 
-- **Run analyses:** [CLI inputs and commands](docs/cli.md)
-- **Check feature support:** [compatibility and limits](docs/compatibility.md)
-- **Understand numerical behavior:** [algorithms](docs/algorithms.md)
-- **Inspect evidence:** [benchmarks](docs/benchmarks.md) and
-  [reproducibility](docs/reproducibility.md)
-- **Use the R layer:** [R wrapper status](docs/r-wrapper.md)
-- **Contribute or release:** [development](docs/development.md) and
-  [release checklist](docs/release.md)
+- [0.6.0 release notes](docs/releases/0.6.0.md)
+- [Algorithms](docs/algorithms.md)
+- [Benchmarks](docs/benchmarks.md) and [reproducibility](docs/reproducibility.md)
+- [Development guide](docs/development.md) and [release checklist](docs/release.md)
 
 ## Support and Citation
 
-Report bugs and parity differences through
-[GitHub Issues](https://github.com/deminden/rsdeseq2/issues). Include the
-rsdeseq2 version, command or API call, input dimensions, and the R/DESeq2
-versions used for comparison.
+When reporting a bug or a difference from DESeq2, include the rsdeseq2 version,
+the command or API call, the input dimensions, and the comparison versions of
+R and DESeq2. [GitHub Issues](https://github.com/deminden/rsdeseq2/issues)
 
-For the statistical method, cite Love, Huber, and Anders (2014),
-[“Moderated estimation of fold change and dispersion for RNA-seq data with
-DESeq2”](https://doi.org/10.1186/s13059-014-0550-8). Cite the exact rsdeseq2
-release used for software provenance.
+Cite the exact rsdeseq2 release you used. For the statistical method, cite
+Love, Huber, and Anders (2014).
+[Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2](https://doi.org/10.1186/s13059-014-0550-8)
 
 ## License
 
-Project code is MIT-licensed; adapted numerical components also carry
-BSD-3-Clause and BSD-2-Clause-Views terms. See [LICENSE](LICENSE) and
-[third-party notices](THIRD_PARTY_NOTICES.md), consistent with the Cargo
-license expression `MIT AND BSD-3-Clause AND BSD-2-Clause-Views`.
-
-The R-compatible arithmetic is independently implemented from published
-probability identities and validated against saved black-box R outputs. No R
-or DESeq2 implementation is copied, linked, or distributed.
+Project code is MIT-licensed. Adapted numerical components also carry
+BSD-3-Clause and BSD-2-Clause-Views terms.
+[License](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md)
