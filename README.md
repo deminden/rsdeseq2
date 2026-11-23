@@ -7,16 +7,13 @@ workflows in Rust: normalization, dispersion estimation, negative-binomial
 Wald and likelihood-ratio tests, transformations, and result assembly. The
 Rust crate and CLI require neither R nor DESeq2 at runtime.
 
-The Rust core uses DESeq2 only for validation references. `rsdeseq2` is not
-a drop-in replacement for `DESeqDataSet` or the complete Bioconductor API.
-
 ## Choose an Interface
 
 | interface | intended use | scope |
 | --- | --- | --- |
 | [CLI](docs/cli.md) | File-based normalization, Wald/LRT, VST, and rlog workflows | Explicit numeric TSV inputs; no R formula parser |
 | [Rust crate](crates/rsdeseq2/README.md) | Embedding analysis stages in Rust applications | Broadest implemented API |
-| [R package](r-pkg/rsdeseq2/README.md) | Rust-backed matrix, list, formula, and limited `DESeqDataSet` workflows; VST/rlog and selected shrinkage | Does not implement the complete Bioconductor object API |
+| [R package](r-pkg/rsdeseq2/README.md) | Run analyses in R with matrices, lists, formulas, or `DESeqDataSet` inputs | Wald/LRT, VST, rlog, and selected shrinkage |
 
 The shared Rust core runs supported formula, transform and shrinkage
 calculations. The [supported contract](docs/native-supported-contract.md)
