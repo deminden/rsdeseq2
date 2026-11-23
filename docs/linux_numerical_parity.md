@@ -10,6 +10,7 @@ See the [validation record](testing-parity.md#ci-status) for checked revisions.
 
 ## Linux formulas
 
+Linux CI and release builds that run exact numerical checks use Ubuntu 24.04.
 The Linux references use R 4.6.2 and one OpenBLAS 0.3.26 thread. Linux
 x86_64 pins `OPENBLAS_CORETYPE=Haswell` and uses 80-bit x87 scalar reductions.
 Linux arm64 pins `OPENBLAS_CORETYPE=ARMV8` and uses 128-bit scalar reductions

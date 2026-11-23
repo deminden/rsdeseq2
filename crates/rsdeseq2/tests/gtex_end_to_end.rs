@@ -16,8 +16,9 @@
 //! halves kappa 20 times and accepts at iteration 32). The two end points have
 //! the same log posterior to working precision; the log-dispersion gap is
 //! 2.6e-5 and moves lfcSE by 5.9e-6, stat by 5.0e-6 and the p-value by
-//! 3.7e-6, with no significance change. The gate below allows at most one such
-//! gene, bounds it, and holds every other gene to 1e-8.
+//! 3.7e-6, with no significance change. Intel macOS R-host also shows a
+//! 6.886e-8 log-dispersion gap for ENSG00000253476.1. The gate bounds each
+//! known exception individually and holds every other result to 1e-8.
 
 use std::path::PathBuf;
 
@@ -28,8 +29,6 @@ use crate::support as common;
 
 /// A gene's dispersion "matches" R when the log gap is at most this.
 const DISPERSION_MATCH_LOG_GAP: f64 = 1e-10;
-/// Largest allowed log-dispersion gap for a knife-edge gene.
-const KNIFE_EDGE_LOG_GAP: f64 = 1e-4;
 /// Bounds for genes whose dispersion matches R.
 const MATCHED_ABS: f64 = 1e-8;
 const MATCHED_LOG10: f64 = 1e-8;
@@ -233,20 +232,21 @@ fn default_pipeline_matches_deseq2_end_to_end() {
     let flips_10 = common::significance_flips(padj, &column("padj"), 0.1);
     eprintln!("significance flips: {flips_05} at 0.05, {flips_10} at 0.1");
 
-    // Gates. Matched genes: tight bounds. Knife-edge genes: at most one, with
-    // the dispersion within KNIFE_EDGE_LOG_GAP and outputs within 1e-5.
-    // Everywhere: no missingness differences and no significance flips.
-    assert!(
-        knife_edge.len() <= 1,
-        "{} genes left the dispersion match: {:?}",
-        knife_edge.len(),
-        knife_edge
-            .iter()
-            .map(|&i| &reference[i]["gene"])
-            .collect::<Vec<_>>()
-    );
+    // Only the measured exceptions may exceed the tight dispersion bound.
+    let intel_macos_r_host = cfg!(all(target_os = "macos", target_arch = "x86_64"))
+        && rsdeseq2::numeric_profile() == rsdeseq2::NumericProfile::RMacos;
     for &i in &knife_edge {
-        assert!(dispersion_log_gap(i) <= KNIFE_EDGE_LOG_GAP);
+        let gene = reference[i]["gene"].as_str();
+        let max_log_gap = match gene {
+            "ENSG00000211445.11" => 1e-4,
+            "ENSG00000253476.1" if intel_macos_r_host => 1e-7,
+            _ => DISPERSION_MATCH_LOG_GAP,
+        };
+        let actual = dispersion_log_gap(i);
+        assert!(
+            actual <= max_log_gap,
+            "{gene}: log-dispersion gap {actual:e} > {max_log_gap:e}"
+        );
     }
     for (name, tight, loose) in &report {
         assert_eq!(

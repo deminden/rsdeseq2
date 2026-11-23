@@ -9,7 +9,7 @@ on:
 
 jobs:
   r:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     continue-on-error: ${{ matrix.lane != 'reference' }}
     strategy:
       fail-fast: false
