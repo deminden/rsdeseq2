@@ -6,6 +6,10 @@
 Rust. Use it from the command line, as a Rust library, or as an R package.
 The CLI and Rust library run without R or DESeq2.
 
+In a single-worker benchmark on an Apple M5, the rsdeseq2 CLI ran **4× as
+fast as DESeq2** and used **86% less peak RAM** for a Wald analysis of
+56,200 genes across 61 GTEx samples. [Benchmark details](#single-worker-benchmark)
+
 ## Installation
 
 The steps below build **0.6.0** from this repository. You’ll need
@@ -106,6 +110,21 @@ in 15.85 seconds and used 259.41 MiB of peak resident memory in one run.
 Both numeric profiles also passed the macOS arm64 integration tests and
 matched the reference outputs after the builder API cleanup.
 [API cleanup validation](docs/reports/hardening-progress.md#analysis-api-cleanup)
+
+### Single-worker benchmark
+
+On Apple M5 with macOS 27.2, the portable 0.6.0 CLI (Cargo `local` profile)
+took 5.99 seconds and used 239 MiB of peak resident memory. DESeq2 1.52.0
+on R 4.6.2 took 23.86 seconds and used 1,709 MiB. Each tool ran once with
+one worker. The timings include startup, loading the inputs, fitting, and
+writing the results.
+
+Both tools fit the same blocked Wald contrast with parametric dispersions
+and with Cook’s masking, outlier replacement, and independent filtering
+disabled. They agreed on significant genes at adjusted p-value cutoffs of
+0.05 and 0.1.
+[GTEx fixture](crates/rsdeseq2/tests/data/gtex_v8_real_wald/README.md) ·
+[Benchmark procedure](docs/benchmarks.md#full-quantification)
 
 ## Documentation
 
