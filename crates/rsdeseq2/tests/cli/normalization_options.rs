@@ -1,5 +1,7 @@
 use super::numerical_assertions::*;
 use super::*;
+use crate::support::run::{run_fit, run_results};
+use rsdeseq2::prelude::Analysis;
 
 fn shuffled_assay(source: &Path, target: &Path) {
     let (headers, rows) = read_export(source);
@@ -183,7 +185,7 @@ fn expected_export(
     design: Option<&DesignMatrix>,
 ) -> ExpectedExport {
     let counts = common::reference_counts();
-    let fit = || builder.fit_size_factors_and_base_means(&counts).unwrap();
+    let fit = || run_fit(builder.run(&Analysis::without_design(&counts))).unwrap();
     let values = match command {
         "size-factors" => fit().size_factors,
         "base-mean" => fit().base_mean,
@@ -204,22 +206,21 @@ fn expected_export(
         .into_values(),
         "wald" => {
             return ExpectedExport::Results(Box::new(
-                builder
-                    .fit_with_results(&counts, &common::reference_full_design())
+                run_results(builder.run(&Analysis::new(&counts, &common::reference_full_design())))
                     .unwrap()
                     .1,
             ));
         }
         "lrt" => {
             return ExpectedExport::Results(Box::new(
-                builder
-                    .fit_lrt_with_results(
-                        &counts,
-                        &common::reference_full_design(),
-                        &common::reference_reduced_design(),
-                    )
-                    .unwrap()
-                    .1,
+                run_results(
+                    builder.run(
+                        &Analysis::new(&counts, &common::reference_full_design())
+                            .lrt(&common::reference_reduced_design()),
+                    ),
+                )
+                .unwrap()
+                .1,
             ));
         }
         _ => unreachable!(),

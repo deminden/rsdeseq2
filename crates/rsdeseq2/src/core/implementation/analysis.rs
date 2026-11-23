@@ -128,8 +128,8 @@ pub enum Stage {
 
 /// One analysis request for [`DeseqBuilder::run`](super::DeseqBuilder::run).
 ///
-/// [`Analysis::new`] matches `fit_with_results`: Wald test, estimated
-/// dispersions, automatic means, the last coefficient and no replacement.
+/// [`Analysis::new`] defaults to Wald with estimated dispersions, automatic
+/// means, the last coefficient and no replacement.
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
 pub struct Analysis<'a> {

@@ -3,7 +3,6 @@ use super::*;
 use crate::errors::{ErrorKind, missing_prerequisite};
 
 impl DeseqBuilder {
-    /// Leaf workflow behind [`DeseqBuilder::fit_parametric_dispersion_trend_linear_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_parametric_dispersion_trend_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -15,7 +14,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_mean_dispersion_trend_linear_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_mean_dispersion_trend_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -27,7 +25,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_parametric_dispersion_trend_glm_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_parametric_dispersion_trend_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -39,7 +36,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_mean_dispersion_trend_glm_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_mean_dispersion_trend_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -51,7 +47,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_local_dispersion_trend_linear_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_local_dispersion_trend_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -63,7 +58,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_local_dispersion_trend_glm_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_local_dispersion_trend_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -131,7 +125,6 @@ impl DeseqBuilder {
         Ok(fit)
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_dispersion_trend_linear_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_dispersion_trend_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -144,7 +137,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_dispersion_trend_glm_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_dispersion_trend_glm_mu(
         &self,
         counts: &CountMatrix,

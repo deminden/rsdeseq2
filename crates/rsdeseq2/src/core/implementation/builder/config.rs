@@ -13,7 +13,6 @@ impl DeseqBuilder {
     pub fn new() -> Self {
         Self {
             fit_type: FitType::default(),
-            test: TestType::default(),
             size_factor_options: SizeFactorOptions::default(),
             normalization_factors: None,
             formula_sample_factors: false,
@@ -23,7 +22,6 @@ impl DeseqBuilder {
             execution_context: ExecutionContext::default(),
             #[cfg(test)]
             execution_observer: None,
-            reduced_design: None,
             model_frame: None,
             irls_options: IrlsOptions::default(),
             gene_wise_dispersion_options: GeneWiseDispersionOptions::default(),
@@ -52,15 +50,9 @@ impl DeseqBuilder {
         }
     }
 
-    /// Set future dispersion fit type.
+    /// Set the default dispersion fit type.
     pub fn fit_type(mut self, fit_type: FitType) -> Self {
         self.fit_type = fit_type;
-        self
-    }
-
-    /// Set future test type.
-    pub fn test(mut self, test: TestType) -> Self {
-        self.test = test;
         self
     }
 
@@ -155,12 +147,6 @@ impl DeseqBuilder {
         workflow: impl FnOnce() -> Result<T, DeseqError> + Send,
     ) -> Result<T, DeseqError> {
         self.with_execution_context(workflow)?
-    }
-
-    /// Store a reduced design matrix for top-level LRT workflows.
-    pub fn reduced_design(mut self, reduced_design: DesignMatrix) -> Self {
-        self.reduced_design = Some(reduced_design);
-        self
     }
 
     /// Store owned formula/model-frame metadata for object-style result routing.
@@ -315,19 +301,9 @@ impl DeseqBuilder {
         self.fit_type
     }
 
-    /// Current test option.
-    pub fn current_test(&self) -> TestType {
-        self.test
-    }
-
     /// Requested thread count.
     pub fn requested_threads(&self) -> Option<usize> {
         self.threads
-    }
-
-    /// Current reduced design for top-level LRT workflows, if supplied.
-    pub fn current_reduced_design(&self) -> Option<&DesignMatrix> {
-        self.reduced_design.as_ref()
     }
 
     /// Current formula/model-frame metadata, if supplied.
@@ -531,16 +507,6 @@ pub(super) fn factor_level_contrast_from_sample_levels<'a>(
         denominator,
         reference,
         sample_levels,
-    })
-}
-
-/// Per-sample levels as owned strings for a `results()` contrast request.
-pub(super) fn owned_levels<S: AsRef<str>>(levels: Option<&[S]>) -> Option<Vec<String>> {
-    levels.map(|levels| {
-        levels
-            .iter()
-            .map(|level| level.as_ref().to_string())
-            .collect()
     })
 }
 

@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::run_results;
+use rsdeseq2::prelude::{Analysis, ResultColumn};
 
 #[test]
 fn fixed_dispersion_lrt_matches_deseq2_internal_reference() {
@@ -11,18 +13,19 @@ fn fixed_dispersion_lrt_matches_deseq2_internal_reference() {
         .iter()
         .map(|row| parse_required_f64(row, "dispersion"))
         .collect::<Vec<_>>();
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(size_factors)
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_lrt(
-            &reference_counts(),
-            &reference_full_design(),
-            &reference_reduced_design(),
-            &dispersions,
-            1,
-        )
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(size_factors)
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&reference_counts(), &reference_full_design())
+                    .lrt(&reference_reduced_design())
+                    .fixed_dispersion(&dispersions)
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     let beta = fit.beta.as_ref().unwrap();
     let beta_se = fit.beta_se.as_ref().unwrap();
@@ -158,19 +161,20 @@ fn fixed_dispersion_weighted_lrt_matches_deseq2_internal_reference() {
         .iter()
         .map(|row| parse_required_f64(row, "dispersion"))
         .collect::<Vec<_>>();
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(size_factors)
-        .observation_weights(observation_weights)
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_lrt(
-            &reference_counts(),
-            &reference_full_design(),
-            &reference_reduced_design(),
-            &dispersions,
-            1,
-        )
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(size_factors)
+            .observation_weights(observation_weights)
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&reference_counts(), &reference_full_design())
+                    .lrt(&reference_reduced_design())
+                    .fixed_dispersion(&dispersions)
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     let beta = fit.beta.as_ref().unwrap();
     let beta_se = fit.beta_se.as_ref().unwrap();

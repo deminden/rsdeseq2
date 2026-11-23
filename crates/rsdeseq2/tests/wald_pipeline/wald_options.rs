@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::run_results;
+use rsdeseq2::prelude::{Analysis, ResultColumn};
 
 #[test]
 fn fixed_dispersion_wald_pipeline_can_use_t_pvalues() {
@@ -18,17 +20,23 @@ fn fixed_dispersion_wald_pipeline_can_use_t_pvalues() {
     )
     .unwrap();
 
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0, 1.0])
-        .irls_options(IrlsOptions {
-            ridge_lambda: 0.0,
-            ..IrlsOptions::default()
-        })
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .wald_t_degrees_of_freedom(4.0)
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.05], 1)
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0, 1.0])
+            .irls_options(IrlsOptions {
+                ridge_lambda: 0.0,
+                ..IrlsOptions::default()
+            })
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .wald_t_degrees_of_freedom(4.0)
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.05])
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     let wald = fit.wald.as_ref().unwrap();
     assert_eq!(wald.degrees_of_freedom.as_ref().unwrap(), &vec![Some(4.0)]);
@@ -59,17 +67,23 @@ fn fixed_dispersion_wald_pipeline_can_use_lfc_threshold() {
     )
     .unwrap();
 
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0, 1.0])
-        .irls_options(IrlsOptions {
-            ridge_lambda: 0.0,
-            ..IrlsOptions::default()
-        })
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .wald_lfc_threshold(0.5, WaldAlternative::Greater)
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.05], 1)
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0, 1.0])
+            .irls_options(IrlsOptions {
+                ridge_lambda: 0.0,
+                ..IrlsOptions::default()
+            })
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .wald_lfc_threshold(0.5, WaldAlternative::Greater)
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.05])
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     let wald = fit.wald.as_ref().unwrap();
     assert!(wald.stat[0].unwrap() >= 0.0);
@@ -86,11 +100,17 @@ fn fixed_dispersion_wald_pipeline_validates_per_gene_t_df_length() {
     let counts = CountMatrix::from_row_major_u32(2, 3, vec![2, 4, 6, 10, 10, 10]).unwrap();
     let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
 
-    let err = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0])
-        .wald_t_per_gene_degrees_of_freedom(vec![4.0])
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.1, 0.2], 0)
-        .unwrap_err();
+    let err = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0])
+            .wald_t_per_gene_degrees_of_freedom(vec![4.0])
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1, 0.2])
+                    .result(ResultColumn::Coefficient(0)),
+            ),
+    )
+    .unwrap_err();
 
     std::assert_matches!(
         err,

@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::run_fit;
+use rsdeseq2::prelude::{Analysis, MeanModel, Stage};
 
 #[test]
 fn fitted_state_builds_fast_vst_subset_from_base_mean_and_aligned_inputs() {
@@ -12,10 +14,12 @@ fn fitted_state_builds_fast_vst_subset_from_base_mean_and_aligned_inputs() {
             .collect(),
     )
     .unwrap();
-    let fit = glm_mu_native_wald_builder()
-        .observation_weights(weights)
-        .fit_size_factors_and_base_means_with_design(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        glm_mu_native_wald_builder()
+            .observation_weights(weights)
+            .run(&Analysis::new(&counts, &design).stop_after(Stage::SizeFactors)),
+    )
+    .unwrap();
 
     let subset = fit.fast_vst_subset(&counts, 2).unwrap();
 
@@ -142,9 +146,14 @@ fn builder_auto_vst_uses_full_trend_when_default_fast_subset_is_too_large() {
     let builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
 
     let output = builder.default_vst_glm_mu_auto(&counts, &design).unwrap();
-    let full_fit = builder
-        .fit_dispersion_trend_glm_mu(&counts, &design)
-        .unwrap();
+    let full_fit = run_fit(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::Trend),
+        ),
+    )
+    .unwrap();
     let expected = full_fit.variance_stabilizing_transform(&counts).unwrap();
 
     assert!(output.fast_subset.is_none());
@@ -240,9 +249,9 @@ fn builder_auto_vst_uses_fast_subset_when_observation_weights_are_present() {
 
     let output = builder.vst_glm_mu_auto(&counts, &design, 4).unwrap();
     let fast = builder.fast_vst_glm_mu(&counts, &design, 4).unwrap();
-    let base_fit = builder
-        .fit_size_factors_and_base_means_with_design(&counts, &design)
-        .unwrap();
+    let base_fit =
+        run_fit(builder.run(&Analysis::new(&counts, &design).stop_after(Stage::SizeFactors)))
+            .unwrap();
 
     assert_eq!(
         output.fast_subset.as_ref().unwrap().row_indices,
@@ -345,9 +354,9 @@ fn fitted_state_can_apply_external_subset_trend_to_full_counts() {
     let counts = native_wald_counts_with_zero_row();
     let design = two_group_design();
     let builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
-    let full_fit = builder
-        .fit_size_factors_and_base_means_with_design(&counts, &design)
-        .unwrap();
+    let full_fit =
+        run_fit(builder.run(&Analysis::new(&counts, &design).stop_after(Stage::SizeFactors)))
+            .unwrap();
     let (subset_fit, _subset) = builder
         .fit_fast_vst_dispersion_trend_glm_mu(&counts, &design, 4)
         .unwrap();
@@ -435,9 +444,9 @@ fn builder_fast_vst_subset_trend_preserves_observation_weights() {
     )
     .unwrap();
     let builder = glm_mu_native_wald_builder().observation_weights(weights.clone());
-    let base_fit = builder
-        .fit_size_factors_and_base_means_with_design(&counts, &design)
-        .unwrap();
+    let base_fit =
+        run_fit(builder.run(&Analysis::new(&counts, &design).stop_after(Stage::SizeFactors)))
+            .unwrap();
 
     let invalid_nsub = builder
         .fit_fast_vst_dispersion_trend_glm_mu(&counts, &design, 0)
@@ -492,9 +501,11 @@ fn builder_fast_vst_subset_trend_preserves_observation_weights() {
 fn fitted_vst_requires_stored_dispersion_trend_and_matching_counts() {
     let counts = native_wald_counts_with_zero_row();
     let design = two_group_design();
-    let fit = glm_mu_native_wald_builder()
-        .fit_size_factors_and_base_means_with_design(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        glm_mu_native_wald_builder()
+            .run(&Analysis::new(&counts, &design).stop_after(Stage::SizeFactors)),
+    )
+    .unwrap();
 
     assert!(fit.variance_stabilizing_transform(&counts).is_err());
 

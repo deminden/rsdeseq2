@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::run_fit;
+use rsdeseq2::prelude::{Analysis, MeanModel, Stage};
 
 #[test]
 fn native_glm_mu_cox_reid_gene_wise_matches_deseq2_reference() {
@@ -8,14 +10,20 @@ fn native_glm_mu_cox_reid_gene_wise_matches_deseq2_reference() {
 
     let counts = reference_counts();
     let design = reference_full_design();
-    let fit = DeseqBuilder::new()
-        .size_factors(size_factors)
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            niter: 2,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .fit_gene_wise_dispersions_glm_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .size_factors(size_factors)
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                niter: 2,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::GlmMu)
+                    .stop_after(Stage::GeneWise),
+            ),
+    )
+    .unwrap();
     let disp_gene_est = fit.disp_gene_est.as_ref().unwrap();
     let disp_gene_iter = fit.disp_gene_iter.as_ref().unwrap();
     let mu = fit.mu.as_ref().unwrap();
@@ -84,15 +92,21 @@ fn native_weighted_glm_mu_cox_reid_gene_wise_matches_deseq2_reference() {
 
     let counts = reference_counts();
     let design = reference_full_design();
-    let fit = DeseqBuilder::new()
-        .size_factors(size_factors)
-        .observation_weights(observation_weights)
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            niter: 2,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .fit_gene_wise_dispersions_glm_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .size_factors(size_factors)
+            .observation_weights(observation_weights)
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                niter: 2,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::GlmMu)
+                    .stop_after(Stage::GeneWise),
+            ),
+    )
+    .unwrap();
     let disp_gene_est = fit.disp_gene_est.as_ref().unwrap();
     let disp_gene_iter = fit.disp_gene_iter.as_ref().unwrap();
     let mu = fit.mu.as_ref().unwrap();

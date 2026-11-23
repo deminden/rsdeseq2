@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::run_results;
+use rsdeseq2::prelude::{Analysis, ResultColumn};
 
 #[test]
 fn fixed_dispersion_wald_pipeline_uses_intercept_shortcut() {
@@ -14,14 +16,20 @@ fn fixed_dispersion_wald_pipeline_uses_intercept_shortcut() {
         DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], Some(vec!["Intercept".into()]))
             .unwrap();
 
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0])
-        .irls_options(IrlsOptions {
-            ridge_lambda: 0.0,
-            ..IrlsOptions::default()
-        })
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.1, 0.2], 0)
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0])
+            .irls_options(IrlsOptions {
+                ridge_lambda: 0.0,
+                ..IrlsOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1, 0.2])
+                    .result(ResultColumn::Coefficient(0)),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(fit.design.as_ref().unwrap().n_coefficients(), 1);
     assert_eq!(fit.dispersion.as_deref(), Some(&[0.1, 0.2][..]));
@@ -71,13 +79,19 @@ fn fixed_dispersion_wald_pipeline_uses_normalization_factors_for_offsets() {
         DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], Some(vec!["Intercept".into()]))
             .unwrap();
 
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(vec![100.0, 100.0, 100.0])
-        .normalization_factors(normalization_factors.clone())
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.1], 0)
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![100.0, 100.0, 100.0])
+            .normalization_factors(normalization_factors.clone())
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1])
+                    .result(ResultColumn::Coefficient(0)),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(fit.normalization_factors, Some(normalization_factors));
     assert_eq!(fit.size_factors, vec![100.0, 100.0, 100.0]);
@@ -132,14 +146,20 @@ fn fixed_dispersion_wald_pipeline_uses_irls_for_two_group_design() {
     )
     .unwrap();
 
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0, 1.0])
-        .irls_options(IrlsOptions {
-            ridge_lambda: 0.0,
-            ..IrlsOptions::default()
-        })
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.05], 1)
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0, 1.0])
+            .irls_options(IrlsOptions {
+                ridge_lambda: 0.0,
+                ..IrlsOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.05])
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(fit.beta.as_ref().unwrap().n_cols(), 2);
     assert!(fit.beta_converged.as_ref().unwrap()[0]);
@@ -196,17 +216,23 @@ fn fixed_dispersion_wald_pipeline_can_use_qr_irls_solver() {
     )
     .unwrap();
 
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0, 1.0])
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .irls_options(IrlsOptions {
-            solver: IrlsSolver::Qr,
-            ridge_lambda: 0.0,
-            ..IrlsOptions::default()
-        })
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.05], 1)
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0, 1.0])
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .irls_options(IrlsOptions {
+                solver: IrlsSolver::Qr,
+                ridge_lambda: 0.0,
+                ..IrlsOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.05])
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     assert!(fit.beta_converged.as_ref().unwrap()[0]);
     assert_relative_eq!(
@@ -235,17 +261,29 @@ fn fixed_dispersion_wald_pipeline_validates_inputs() {
 
     assert!(
         DeseqBuilder::new()
-            .fit_fixed_dispersion_wald(&counts, &design, &[], 0)
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[])
+                    .result(ResultColumn::Coefficient(0))
+            )
             .is_err()
     );
     assert!(
         DeseqBuilder::new()
-            .fit_fixed_dispersion_wald(&counts, &design, &[0.1], 1)
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1])
+                    .result(ResultColumn::Coefficient(1))
+            )
             .is_err()
     );
     assert!(
         DeseqBuilder::new()
-            .fit_fixed_dispersion_wald(&counts, &rank_deficient, &[0.1], 1)
+            .run(
+                &Analysis::new(&counts, &rank_deficient)
+                    .fixed_dispersion(&[0.1])
+                    .result(ResultColumn::Coefficient(1))
+            )
             .is_err()
     );
 }

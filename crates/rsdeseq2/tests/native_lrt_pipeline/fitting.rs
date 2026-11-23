@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::{run_fit, run_results};
+use rsdeseq2::prelude::{Analysis, MeanModel, ResultColumn};
 
 #[test]
 fn native_glm_mu_lrt_preserves_diagnostics_and_all_zero_rows() {
@@ -6,9 +8,15 @@ fn native_glm_mu_lrt_preserves_diagnostics_and_all_zero_rows() {
     let full = full_design();
     let reduced = reduced_design();
 
-    let (fit, results) = native_lrt_builder()
-        .fit_lrt_glm_mu(&counts, &full, &reduced, 1)
-        .unwrap();
+    let (fit, results) = run_results(
+        native_lrt_builder().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(fit.design.as_ref().unwrap(), &full);
     assert_eq!(fit.reduced_design.as_ref().unwrap(), &reduced);
@@ -77,11 +85,25 @@ fn native_glm_mu_lrt_matches_fixed_pipeline_when_reusing_final_dispersions() {
     let reduced = reduced_design();
     let builder = native_lrt_builder();
 
-    let (native_fit, native_results) = builder.fit_lrt_glm_mu(&counts, &full, &reduced, 1).unwrap();
+    let (native_fit, native_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
     let final_dispersions = native_fit.dispersion.as_ref().unwrap().clone();
-    let (fixed_fit, fixed_results) = builder
-        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &final_dispersions, 1)
-        .unwrap();
+    let (fixed_fit, fixed_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&final_dispersions)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     for gene in 0..counts.n_genes() {
         let native_disp = native_fit.dispersion.as_ref().unwrap()[gene];
@@ -157,17 +179,17 @@ fn top_level_lrt_fit_only_helpers_match_result_helpers() {
         numeric_covariates: Vec::new(),
     });
 
-    let default_fit = builder.fit_lrt(&counts, &full, &reduced).unwrap();
-    let (default_result_fit, _default_results) = builder
-        .fit_lrt_with_results(&counts, &full, &reduced)
-        .unwrap();
+    let default_fit = run_fit(builder.run(&Analysis::new(&counts, &full).lrt(&reduced))).unwrap();
+    let (default_result_fit, _default_results) =
+        run_results(builder.run(&Analysis::new(&counts, &full).lrt(&reduced))).unwrap();
     assert_lrt_fit_state_matches(&default_fit, &default_result_fit, "fit-only default LRT");
-    let formula_fit = formula_builder
-        .fit_lrt_formula(&counts, "~ condition", "~ 1")
-        .unwrap();
-    let (formula_result_fit, _formula_results) = formula_builder
-        .fit_lrt_formula_with_results(&counts, "~ condition", "~ 1")
-        .unwrap();
+    let formula_fit =
+        run_fit(formula_builder.run(&Analysis::formula(&counts, "~ condition").lrt_formula("~ 1")))
+            .unwrap();
+    let (formula_result_fit, _formula_results) = run_results(
+        formula_builder.run(&Analysis::formula(&counts, "~ condition").lrt_formula("~ 1")),
+    )
+    .unwrap();
     assert_lrt_fit_state_matches(&formula_fit, &default_fit, "fit-only formula LRT");
     assert_lrt_fit_state_matches(
         &formula_fit,
@@ -175,19 +197,39 @@ fn top_level_lrt_fit_only_helpers_match_result_helpers() {
         "fit-only formula LRT result companion",
     );
 
-    let named_fit = builder
-        .fit_lrt_name(&counts, &full, &reduced, "condition_B_vs_A")
-        .unwrap();
-    let (named_result_fit, _named_results) = builder
-        .fit_lrt_with_results_name(&counts, &full, &reduced, "condition_B_vs_A")
-        .unwrap();
+    let named_fit = run_fit(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::Name("condition_B_vs_A")),
+        ),
+    )
+    .unwrap();
+    let (named_result_fit, _named_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::Name("condition_B_vs_A")),
+        ),
+    )
+    .unwrap();
     assert_lrt_fit_state_matches(&named_fit, &named_result_fit, "fit-only named LRT");
-    let formula_named_fit = formula_builder
-        .fit_lrt_formula_name(&counts, "~ condition", "~ 1", "condition_B_vs_A")
-        .unwrap();
-    let (formula_named_result_fit, _formula_named_results) = formula_builder
-        .fit_lrt_formula_with_results_name(&counts, "~ condition", "~ 1", "condition_B_vs_A")
-        .unwrap();
+    let formula_named_fit = run_fit(
+        formula_builder.run(
+            &Analysis::formula(&counts, "~ condition")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Name("condition_B_vs_A")),
+        ),
+    )
+    .unwrap();
+    let (formula_named_result_fit, _formula_named_results) = run_results(
+        formula_builder.run(
+            &Analysis::formula(&counts, "~ condition")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Name("condition_B_vs_A")),
+        ),
+    )
+    .unwrap();
     assert_lrt_fit_state_matches(&formula_named_fit, &named_fit, "fit-only formula named LRT");
     assert_lrt_fit_state_matches(
         &formula_named_fit,
@@ -195,24 +237,44 @@ fn top_level_lrt_fit_only_helpers_match_result_helpers() {
         "fit-only formula named LRT result companion",
     );
 
-    let contrast_fit = builder
-        .fit_lrt_contrast(&counts, &full, &reduced, &[0.0, 1.0])
-        .unwrap();
-    let (contrast_result_fit, _contrast_results) = builder
-        .fit_lrt_with_results_contrast(&counts, &full, &reduced, &[0.0, 1.0])
-        .unwrap();
+    let contrast_fit = run_fit(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
+    let (contrast_result_fit, _contrast_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
     assert_lrt_fit_state_matches(
         &contrast_fit,
         &contrast_result_fit,
         "fit-only numeric LRT contrast",
     );
 
-    let spec_fit = builder
-        .fit_lrt_contrast_spec(&counts, &full, &reduced, &spec)
-        .unwrap();
-    let (spec_result_fit, _spec_results) = builder
-        .fit_lrt_with_results_contrast_spec(&counts, &full, &reduced, &spec)
-        .unwrap();
+    let spec_fit = run_fit(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::Spec(&spec)),
+        ),
+    )
+    .unwrap();
+    let (spec_result_fit, _spec_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::Spec(&spec)),
+        ),
+    )
+    .unwrap();
     assert_lrt_fit_state_matches(&spec_fit, &spec_result_fit, "fit-only named LRT contrast");
 
     let factor_contrast = FactorLevelContrast {
@@ -222,12 +284,22 @@ fn top_level_lrt_fit_only_helpers_match_result_helpers() {
         reference: None,
         sample_levels: &levels,
     };
-    let factor_fit = builder
-        .fit_lrt_factor_level_contrast(&counts, &full, &reduced, factor_contrast)
-        .unwrap();
-    let (factor_result_fit, _factor_results) = builder
-        .fit_lrt_with_results_factor_level_contrast(&counts, &full, &reduced, factor_contrast)
-        .unwrap();
+    let factor_fit = run_fit(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::FactorLevel(factor_contrast)),
+        ),
+    )
+    .unwrap();
+    let (factor_result_fit, _factor_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::FactorLevel(factor_contrast)),
+        ),
+    )
+    .unwrap();
     assert_lrt_fit_state_matches(
         &factor_fit,
         &factor_result_fit,
@@ -242,8 +314,16 @@ fn top_level_fit_lrt_runs_default_automatic_lrt_for_last_coefficient() {
     let reduced = reduced_design();
     let builder = native_lrt_builder().automatic_dispersion_means();
 
-    let top_level_fit = builder.fit_lrt(&counts, &full, &reduced).unwrap();
-    let (lrt_fit, _results) = builder.fit_lrt_glm_mu(&counts, &full, &reduced, 1).unwrap();
+    let top_level_fit = run_fit(builder.run(&Analysis::new(&counts, &full).lrt(&reduced))).unwrap();
+    let (lrt_fit, _results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(top_level_fit.counts_summary, lrt_fit.counts_summary);
     assert_eq!(top_level_fit.design, lrt_fit.design);
@@ -282,10 +362,17 @@ fn top_level_fit_lrt_with_results_returns_default_lrt_results() {
     let reduced = reduced_design();
     let builder = native_lrt_builder().automatic_dispersion_means();
 
-    let (top_level_fit, top_level_results) = builder
-        .fit_lrt_with_results(&counts, &full, &reduced)
-        .unwrap();
-    let (lrt_fit, lrt_results) = builder.fit_lrt_glm_mu(&counts, &full, &reduced, 1).unwrap();
+    let (top_level_fit, top_level_results) =
+        run_results(builder.run(&Analysis::new(&counts, &full).lrt(&reduced))).unwrap();
+    let (lrt_fit, lrt_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(top_level_fit.lrt, lrt_fit.lrt);
     assert_lrt_fit_state_matches(&top_level_fit, &lrt_fit, "top-level LRT results");
@@ -304,18 +391,34 @@ fn top_level_fit_lrt_with_results_accepts_coefficient_name() {
     let reduced = reduced_design();
     let builder = native_lrt_builder().automatic_dispersion_means();
 
-    let (named_fit, named_results) = builder
-        .fit_lrt_with_results_name(&counts, &full, &reduced, "condition_B_vs_A")
-        .unwrap();
-    let (indexed_fit, indexed_results) =
-        builder.fit_lrt_glm_mu(&counts, &full, &reduced, 1).unwrap();
+    let (named_fit, named_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::Name("condition_B_vs_A")),
+        ),
+    )
+    .unwrap();
+    let (indexed_fit, indexed_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(named_fit.lrt, indexed_fit.lrt);
     assert_lrt_fit_state_matches(&named_fit, &indexed_fit, "named LRT");
     assert_eq!(named_results, indexed_results);
     assert!(
         builder
-            .fit_lrt_with_results_name(&counts, &full, &reduced, "missing")
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&reduced)
+                    .result(ResultColumn::Name("missing"))
+            )
             .is_err()
     );
 }
@@ -327,11 +430,23 @@ fn top_level_fit_lrt_with_results_accepts_r_cleaned_coefficient_name_alias() {
     let reduced = reduced_design();
     let builder = native_lrt_builder().automatic_dispersion_means();
 
-    let (named_fit, named_results) = builder
-        .fit_lrt_with_results_name(&counts, &full, &reduced, "condition-B 1")
-        .unwrap();
-    let (indexed_fit, indexed_results) =
-        builder.fit_lrt_glm_mu(&counts, &full, &reduced, 1).unwrap();
+    let (named_fit, named_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::Name("condition-B 1")),
+        ),
+    )
+    .unwrap();
+    let (indexed_fit, indexed_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(named_fit.lrt, indexed_fit.lrt);
     assert_lrt_fit_state_matches(&named_fit, &indexed_fit, "R-cleaned named LRT");
@@ -345,13 +460,25 @@ fn native_linear_mu_lrt_matches_fixed_pipeline_when_reusing_final_dispersions() 
     let reduced = reduced_design();
     let builder = native_lrt_builder();
 
-    let (native_fit, native_results) = builder
-        .fit_lrt_linear_mu(&counts, &full, &reduced, 1)
-        .unwrap();
+    let (native_fit, native_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
     let final_dispersions = native_fit.dispersion.as_ref().unwrap().clone();
-    let (fixed_fit, fixed_results) = builder
-        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &final_dispersions, 1)
-        .unwrap();
+    let (fixed_fit, fixed_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&final_dispersions)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert!(native_fit.disp_prior_var.unwrap().is_finite());
     assert_eq!(native_fit.lrt.as_ref().unwrap().degrees_of_freedom, 1);
@@ -380,13 +507,25 @@ fn native_linear_mu_local_lrt_matches_fixed_pipeline_when_reusing_final_dispersi
     let reduced = reduced_design();
     let builder = native_lrt_builder().fit_type(FitType::Local);
 
-    let (native_fit, native_results) = builder
-        .fit_lrt_linear_mu(&counts, &full, &reduced, 1)
-        .unwrap();
+    let (native_fit, native_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
     let final_dispersions = native_fit.dispersion.as_ref().unwrap().clone();
-    let (fixed_fit, fixed_results) = builder
-        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &final_dispersions, 1)
-        .unwrap();
+    let (fixed_fit, fixed_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&final_dispersions)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert!(native_fit.disp_prior_var.unwrap().is_finite());
     assert_eq!(
@@ -419,11 +558,25 @@ fn native_glm_mu_local_lrt_matches_fixed_pipeline_when_reusing_final_dispersions
     let reduced = reduced_design();
     let builder = native_lrt_builder().fit_type(FitType::Local);
 
-    let (native_fit, native_results) = builder.fit_lrt_glm_mu(&counts, &full, &reduced, 1).unwrap();
+    let (native_fit, native_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
     let final_dispersions = native_fit.dispersion.as_ref().unwrap().clone();
-    let (fixed_fit, fixed_results) = builder
-        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &final_dispersions, 1)
-        .unwrap();
+    let (fixed_fit, fixed_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&final_dispersions)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert!(native_fit.disp_prior_var.unwrap().is_finite());
     assert_eq!(

@@ -1,4 +1,6 @@
+use crate::support::run::run_results;
 use rsdeseq2::DeseqError;
+use rsdeseq2::prelude::Analysis;
 use rsdeseq2::prelude::{CountMatrix, DeseqBuilder, DesignMatrix};
 use std::assert_matches;
 
@@ -76,8 +78,7 @@ fn non_nested_lrt_fails_before_dispersion_estimation() {
         None,
     )
     .unwrap();
-    let err = DeseqBuilder::new()
-        .fit_lrt_with_results(&counts, &full, &reduced)
+    let err = run_results(DeseqBuilder::new().run(&Analysis::new(&counts, &full).lrt(&reduced)))
         .unwrap_err();
     assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Options);
     assert_matches!(

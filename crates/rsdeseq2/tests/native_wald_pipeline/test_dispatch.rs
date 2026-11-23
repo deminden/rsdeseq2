@@ -1,4 +1,8 @@
 use super::*;
+use crate::support::run::{
+    run_fit, run_lrt_replacement, run_replacement, run_results, run_wald_replacement,
+};
+use rsdeseq2::prelude::{Analysis, DesignInput, MeanModel, ResultColumn, TestRequest};
 
 #[test]
 fn top_level_fit_contrast_specs_return_default_automatic_wald_fits() {
@@ -10,27 +14,24 @@ fn top_level_fit_contrast_specs_return_default_automatic_wald_fits() {
         .map(String::from)
         .collect::<Vec<_>>();
 
-    let named_fit = builder
-        .fit_contrast_spec(
-            &counts,
-            &design,
-            &ContrastSpec::coefficient_name("condition_B_vs_A"),
-        )
-        .unwrap();
-    let factor_fit = builder
-        .fit_factor_level_contrast(
-            &counts,
-            &design,
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-        )
-        .unwrap();
-    let (expected_fit, _expected_results) = builder
-        .fit_wald_glm_mu_contrast_spec(
-            &counts,
-            &design,
-            &ContrastSpec::coefficient_name("condition_B_vs_A"),
-        )
-        .unwrap();
+    let named_fit = run_fit(builder.run(&Analysis::new(&counts, &design).result(
+        ResultColumn::Spec(&ContrastSpec::coefficient_name("condition_B_vs_A")),
+    )))
+    .unwrap();
+    let factor_fit = run_fit(builder.run(&Analysis::new(&counts, &design).result(
+        ResultColumn::FactorLevel(FactorLevelContrast::new("condition", "B", "A", &levels)),
+    )))
+    .unwrap();
+    let (expected_fit, _expected_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Spec(&ContrastSpec::coefficient_name(
+                    "condition_B_vs_A",
+                ))),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(named_fit.wald, expected_fit.wald);
     assert_eq!(factor_fit.wald, expected_fit.wald);
@@ -56,31 +57,41 @@ fn top_level_fit_with_results_contrast_spec_cooks_replacement_preserves_metadata
         which_samples: None,
     };
 
-    let named_output = builder
-        .fit_with_results_contrast_spec_with_cooks_replacement(
-            &counts,
-            &design,
-            &ContrastSpec::coefficient_name("condition_B_vs_A"),
-            &replacement_options,
-        )
-        .unwrap();
-    let factor_output = builder
-        .fit_with_results_factor_level_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-            &replacement_options,
-        )
-        .unwrap();
-    let request_output = builder
-        .fit_with_test_results_contrast_request_with_cooks_replacement(
-            &counts,
-            &design,
-            &ResultsContrast::character("condition", "B", "A"),
-            Some(&levels),
-            &replacement_options,
-        )
-        .unwrap();
+    let named_output = run_wald_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .result(ResultColumn::Spec(&ContrastSpec::coefficient_name(
+                    "condition_B_vs_A",
+                )))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let factor_output = run_wald_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                    "condition",
+                    "B",
+                    "A",
+                    &levels,
+                )))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let request_output = run_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "B", "A"),
+                    sample_levels: Some(&levels),
+                    model_frame: None,
+                })
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
     let model_frame = FormulaModelFrame {
         factors: vec![FormulaFactorColumn {
             name: "condition".to_string(),
@@ -90,33 +101,40 @@ fn top_level_fit_with_results_contrast_spec_cooks_replacement_preserves_metadata
         }],
         numeric_covariates: Vec::new(),
     };
-    let model_frame_request_output = builder
-        .fit_with_test_results_contrast_request_from_model_frame_with_cooks_replacement(
-            &counts,
-            &design,
-            &ResultsContrast::character("condition", "B", "A"),
-            &model_frame,
-            &replacement_options,
-        )
-        .unwrap();
-    let stored_model_frame_request_output = builder
-        .clone()
-        .model_frame(model_frame.clone())
-        .fit_with_test_results_contrast_request_with_cooks_replacement::<String>(
-            &counts,
-            &design,
-            &ResultsContrast::character("condition", "B", "A"),
-            None,
-            &replacement_options,
-        )
-        .unwrap();
-    let (expected_fit, _expected_results) = builder
-        .fit_wald_glm_mu_contrast_spec(
-            &counts,
-            &design,
-            &ContrastSpec::coefficient_name("condition_B_vs_A"),
-        )
-        .unwrap();
+    let model_frame_request_output = run_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "B", "A"),
+                    sample_levels: None,
+                    model_frame: Some(&model_frame),
+                })
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let stored_model_frame_request_output = run_replacement(
+        builder.clone().model_frame(model_frame.clone()).run(
+            &Analysis::new(&counts, &design)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "B", "A"),
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let (expected_fit, _expected_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Spec(&ContrastSpec::coefficient_name(
+                    "condition_B_vs_A",
+                ))),
+        ),
+    )
+    .unwrap();
     let CooksReplacementTestOutput::Wald(request_output) = request_output else {
         panic!("results contrast request should route to Wald");
     };
@@ -167,33 +185,42 @@ fn top_level_fit_with_results_contrast_spec_cooks_replacement_preserves_metadata
 }
 
 #[test]
-fn top_level_fit_keeps_lrt_explicit_until_reduced_design_is_supplied() {
+fn lrt_requires_a_reduced_design() {
     let counts = native_wald_counts_with_zero_row();
     let design = two_group_design();
     let err = glm_mu_native_wald_builder()
-        .test(TestType::Lrt)
-        .fit(&counts, &design)
+        .run(&Analysis::new(&counts, &design).test(TestRequest::Lrt {
+            reduced: DesignInput::None,
+        }))
         .unwrap_err();
-
-    assert!(matches!(err, DeseqError::UnsupportedFeature { .. }));
+    assert!(matches!(
+        err,
+        DeseqError::InvalidRun {
+            conflict: rsdeseq2::errors::RunConflict::ReducedDesignRequired,
+            ..
+        }
+    ));
 }
 
 #[test]
-fn top_level_fit_uses_stored_reduced_design_for_lrt() {
+fn top_level_fit_uses_supplied_reduced_design_for_lrt() {
     let counts = native_wald_counts_with_zero_row();
     let full_design = two_group_design();
     let reduced_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
-    let builder = glm_mu_native_wald_builder()
-        .test(TestType::Lrt)
-        .reduced_design(reduced_design.clone())
-        .automatic_dispersion_means();
+    let builder = glm_mu_native_wald_builder().automatic_dispersion_means();
 
-    let top_level_fit = builder.fit(&counts, &full_design).unwrap();
-    let (expected_fit, _expected_results) = builder
-        .fit_lrt_glm_mu(&counts, &full_design, &reduced_design, 1)
-        .unwrap();
+    let top_level_fit =
+        run_fit(builder.run(&Analysis::new(&counts, &full_design).lrt(&reduced_design))).unwrap();
+    let (expected_fit, _expected_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
-    assert_eq!(builder.current_reduced_design(), Some(&reduced_design));
     assert_eq!(top_level_fit.lrt, expected_fit.lrt);
     assert_eq!(top_level_fit.reduced_design, expected_fit.reduced_design);
     assert_wald_fit_state_matches(&top_level_fit, &expected_fit, "top-level LRT");
@@ -205,21 +232,29 @@ fn top_level_fit_uses_stored_reduced_design_for_lrt() {
 }
 
 #[test]
-fn top_level_fit_with_results_name_uses_stored_reduced_design_for_lrt() {
+fn top_level_fit_with_results_name_uses_supplied_reduced_design_for_lrt() {
     let counts = native_wald_counts_with_zero_row();
     let full_design = two_group_design();
     let reduced_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
-    let builder = glm_mu_native_wald_builder()
-        .test(TestType::Lrt)
-        .reduced_design(reduced_design.clone())
-        .automatic_dispersion_means();
+    let builder = glm_mu_native_wald_builder().automatic_dispersion_means();
 
-    let (top_level_fit, top_level_results) = builder
-        .fit_with_results_name(&counts, &full_design, "condition_B_vs_A")
-        .unwrap();
-    let (expected_fit, expected_results) = builder
-        .fit_lrt_glm_mu(&counts, &full_design, &reduced_design, 1)
-        .unwrap();
+    let (top_level_fit, top_level_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .result(ResultColumn::Name("condition_B_vs_A")),
+        ),
+    )
+    .unwrap();
+    let (expected_fit, expected_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(top_level_fit.lrt, expected_fit.lrt);
     assert_eq!(top_level_results, expected_results);
@@ -227,73 +262,56 @@ fn top_level_fit_with_results_name_uses_stored_reduced_design_for_lrt() {
 }
 
 #[test]
-fn top_level_fit_with_results_contrast_keeps_lrt_explicit() {
-    let counts = native_wald_counts_with_zero_row();
-    let design = two_group_design();
-    let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
-        .into_iter()
-        .map(String::from)
-        .collect::<Vec<_>>();
-    let err = glm_mu_native_wald_builder()
-        .test(TestType::Lrt)
-        .fit_with_results_contrast(&counts, &design, &[0.0, 1.0])
-        .unwrap_err();
-    let spec_err = glm_mu_native_wald_builder()
-        .test(TestType::Lrt)
-        .fit_with_results_contrast_spec(
-            &counts,
-            &design,
-            &ContrastSpec::coefficient_name("condition_B_vs_A"),
-        )
-        .unwrap_err();
-    let factor_err = glm_mu_native_wald_builder()
-        .test(TestType::Lrt)
-        .fit_with_results_factor_level_contrast(
-            &counts,
-            &design,
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-        )
-        .unwrap_err();
-
-    assert!(matches!(err, DeseqError::UnsupportedFeature { .. }));
-    assert!(matches!(spec_err, DeseqError::UnsupportedFeature { .. }));
-    assert!(matches!(factor_err, DeseqError::UnsupportedFeature { .. }));
-}
-
-#[test]
-fn top_level_lrt_contrast_methods_use_stored_reduced_design() {
+fn top_level_lrt_contrast_methods_use_supplied_reduced_design() {
     let counts = native_wald_counts_with_zero_row();
     let full_design = two_group_design();
     let reduced_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
-    let builder = glm_mu_native_wald_builder()
-        .test(TestType::Lrt)
-        .reduced_design(reduced_design.clone())
-        .automatic_dispersion_means();
+    let builder = glm_mu_native_wald_builder().automatic_dispersion_means();
     let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
         .into_iter()
         .map(String::from)
         .collect::<Vec<_>>();
 
-    let (numeric_fit, numeric_results) = builder
-        .fit_with_results_contrast(&counts, &full_design, &[0.0, 1.0])
-        .unwrap();
-    let (spec_fit, spec_results) = builder
-        .fit_with_results_contrast_spec(
-            &counts,
-            &full_design,
-            &ContrastSpec::coefficient_name("condition_B_vs_A"),
-        )
-        .unwrap();
-    let (factor_fit, factor_results) = builder
-        .fit_with_results_factor_level_contrast(
-            &counts,
-            &full_design,
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-        )
-        .unwrap();
-    let (expected_fit, expected_results) = builder
-        .fit_lrt_glm_mu_contrast(&counts, &full_design, &reduced_design, &[0.0, 1.0])
-        .unwrap();
+    let (numeric_fit, numeric_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
+    let (spec_fit, spec_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .result(ResultColumn::Spec(&ContrastSpec::coefficient_name(
+                    "condition_B_vs_A",
+                ))),
+        ),
+    )
+    .unwrap();
+    let (factor_fit, factor_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                    "condition",
+                    "B",
+                    "A",
+                    &levels,
+                ))),
+        ),
+    )
+    .unwrap();
+    let (expected_fit, expected_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(numeric_fit.lrt, expected_fit.lrt);
     assert_eq!(spec_fit.lrt, expected_fit.lrt);
@@ -337,16 +355,19 @@ fn fixed_lrt_model_frame_contrast_retains_formula_derived_metadata() {
     let dispersions = vec![0.1; counts.n_genes()];
     let contrast = ResultsContrast::character("factor.condition..levels...c..A....B...", "B", "A");
 
-    let (fit, mut results) = builder
-        .fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
-            &counts,
-            &formula_design.design.standard_design,
-            &reduced_design,
-            &dispersions,
-            &contrast,
-            &formula_design.model_frame,
-        )
-        .unwrap();
+    let (fit, mut results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &formula_design.design.standard_design)
+                .lrt(&reduced_design)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &contrast,
+                    sample_levels: None,
+                    model_frame: Some(&formula_design.model_frame),
+                }),
+        ),
+    )
+    .unwrap();
     results.independent_filtering = None;
     let object_results = fit
         .results_contrast_request(&counts, &contrast, counts.gene_names())
@@ -366,60 +387,7 @@ fn fixed_lrt_model_frame_contrast_retains_formula_derived_metadata() {
 }
 
 #[test]
-fn top_level_fit_with_results_cooks_replacement_keeps_lrt_explicit() {
-    let counts = native_wald_counts_with_zero_row();
-    let design = two_group_design();
-    let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
-        .into_iter()
-        .map(String::from)
-        .collect::<Vec<_>>();
-    let err = glm_mu_native_wald_builder()
-        .test(TestType::Lrt)
-        .fit_with_results_with_cooks_replacement(
-            &counts,
-            &design,
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap_err();
-    let contrast_err = glm_mu_native_wald_builder()
-        .test(TestType::Lrt)
-        .fit_with_results_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.0, 1.0],
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap_err();
-    let spec_err = glm_mu_native_wald_builder()
-        .test(TestType::Lrt)
-        .fit_with_results_contrast_spec_with_cooks_replacement(
-            &counts,
-            &design,
-            &ContrastSpec::coefficient_name("condition_B_vs_A"),
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap_err();
-    let factor_err = glm_mu_native_wald_builder()
-        .test(TestType::Lrt)
-        .fit_with_results_factor_level_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap_err();
-
-    assert!(matches!(err, DeseqError::UnsupportedFeature { .. }));
-    assert!(matches!(
-        contrast_err,
-        DeseqError::UnsupportedFeature { .. }
-    ));
-    assert!(matches!(spec_err, DeseqError::UnsupportedFeature { .. }));
-    assert!(matches!(factor_err, DeseqError::UnsupportedFeature { .. }));
-}
-
-#[test]
-fn top_level_test_output_routes_lrt_cooks_replacement_with_stored_reduced_design() {
+fn top_level_test_output_routes_lrt_cooks_replacement_with_supplied_reduced_design() {
     let counts = native_wald_counts_with_zero_row();
     let full_design = two_group_design();
     let reduced_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
@@ -437,33 +405,41 @@ fn top_level_test_output_routes_lrt_cooks_replacement_with_stored_reduced_design
         }],
         numeric_covariates: Vec::new(),
     };
-    let builder = glm_mu_native_wald_builder()
-        .test(TestType::Lrt)
-        .reduced_design(reduced_design.clone())
-        .model_frame(model_frame);
+    let builder = glm_mu_native_wald_builder().model_frame(model_frame);
 
-    let top_level = builder
-        .fit_with_test_results_with_cooks_replacement(&counts, &full_design, &options)
-        .unwrap();
-    let formula_top_level = builder
-        .fit_formula_with_test_results_with_cooks_replacement(&counts, "~ condition", &options)
-        .unwrap();
-    let formula_named_top_level = builder
-        .fit_formula_with_test_results_name_with_cooks_replacement(
-            &counts,
-            "~ condition",
-            "condition_B_vs_A",
-            &options,
-        )
-        .unwrap();
-    let expected = builder
-        .fit_lrt_with_results_with_cooks_replacement(
-            &counts,
-            &full_design,
-            &reduced_design,
-            &options,
-        )
-        .unwrap();
+    let top_level = run_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let formula_top_level = run_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ condition")
+                .lrt(&reduced_design)
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let formula_named_top_level = run_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ condition")
+                .lrt(&reduced_design)
+                .result(ResultColumn::Name("condition_B_vs_A"))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let expected = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(top_level.test_type(), TestType::Lrt);
     assert_eq!(top_level.results(), &expected.results);

@@ -20,9 +20,8 @@ fit-only, result, replacement and beta-prior output. Use `fit()` to borrow
 the fitted state or `into_fit_and_results()` to consume the output and
 assemble the final fit and result, including merged replacement rows.
 
-The legacy builder fit methods are deprecated in 0.6.0. Their Rust API docs
-show the equivalent `Analysis` request. The [run equivalence tests](../../crates/rsdeseq2/tests/run_equivalence.rs)
-compare the two entry points.
+Use `Analysis::lrt(reduced)` or `Analysis::lrt_formula(reduced)`
+to supply the reduced design as part of the request.
 
 ## Preferred public API
 

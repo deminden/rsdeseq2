@@ -1,13 +1,19 @@
 use super::*;
+use crate::support::run::run_fit;
+use rsdeseq2::prelude::{Analysis, MeanModel, Stage};
 
 #[test]
 fn fitted_trend_state_drives_norm_and_vst_transforms() {
     let counts = native_wald_counts_with_zero_row();
     let design = two_group_design();
-    let fit = glm_mu_native_wald_builder()
-        .fit_type(FitType::Local)
-        .fit_dispersion_trend_glm_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        glm_mu_native_wald_builder().fit_type(FitType::Local).run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::Trend),
+        ),
+    )
+    .unwrap();
 
     assert!(matches!(
         fit.dispersion_trend.as_ref(),
@@ -31,10 +37,14 @@ fn fitted_trend_state_drives_rlog_transform() {
     let full_counts = native_wald_counts_with_zero_row();
     let counts = full_counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
     let design = two_group_design();
-    let fit = glm_mu_native_wald_builder()
-        .fit_type(FitType::Mean)
-        .fit_map_dispersions_glm_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        glm_mu_native_wald_builder().fit_type(FitType::Mean).run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::Map),
+        ),
+    )
+    .unwrap();
 
     let output = fit.rlog(&counts).unwrap();
     let expected = rlog_with_estimated_prior_and_size_factors(
@@ -82,11 +92,17 @@ fn fitted_trend_state_drives_rlog_transform_with_normalization_factors() {
     let normalization_factors =
         RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), factor_values)
             .unwrap();
-    let fit = glm_mu_native_wald_builder()
-        .fit_type(FitType::Mean)
-        .normalization_factors(normalization_factors.clone())
-        .fit_map_dispersions_glm_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        glm_mu_native_wald_builder()
+            .fit_type(FitType::Mean)
+            .normalization_factors(normalization_factors.clone())
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::GlmMu)
+                    .stop_after(Stage::Map),
+            ),
+    )
+    .unwrap();
 
     let output = fit.rlog(&counts).unwrap();
     let expected = rlog_with_estimated_prior_and_normalization_factors(
@@ -124,10 +140,14 @@ fn fitted_trend_state_drives_frozen_rlog_transform() {
     let full_counts = native_wald_counts_with_zero_row();
     let counts = full_counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
     let design = two_group_design();
-    let fit = glm_mu_native_wald_builder()
-        .fit_type(FitType::Mean)
-        .fit_map_dispersions_glm_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        glm_mu_native_wald_builder().fit_type(FitType::Mean).run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::Map),
+        ),
+    )
+    .unwrap();
     let learned = fit.rlog(&counts).unwrap();
 
     let output = fit
@@ -166,11 +186,17 @@ fn fitted_trend_state_drives_frozen_rlog_transform_with_normalization_factors() 
     let normalization_factors =
         RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), factor_values)
             .unwrap();
-    let fit = glm_mu_native_wald_builder()
-        .fit_type(FitType::Mean)
-        .normalization_factors(normalization_factors)
-        .fit_map_dispersions_glm_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        glm_mu_native_wald_builder()
+            .fit_type(FitType::Mean)
+            .normalization_factors(normalization_factors)
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::GlmMu)
+                    .stop_after(Stage::Map),
+            ),
+    )
+    .unwrap();
     let learned = fit.rlog(&counts).unwrap();
 
     let output = fit
@@ -200,10 +226,14 @@ fn fitted_rlog_uses_trend_dispersions_and_rejects_mismatched_counts() {
         .select_rows(&[1, 2, 3, 4, 5, 6, 7])
         .unwrap();
     let design = two_group_design();
-    let fit = glm_mu_native_wald_builder()
-        .fit_type(FitType::Mean)
-        .fit_dispersion_trend_glm_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        glm_mu_native_wald_builder().fit_type(FitType::Mean).run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::Trend),
+        ),
+    )
+    .unwrap();
     let output = fit.rlog(&counts).unwrap();
     assert_eq!(output.transformed.n_rows(), counts.n_genes());
 
@@ -217,18 +247,26 @@ fn fitted_frozen_rlog_uses_trend_dispersions_and_validates_inputs() {
         .select_rows(&[1, 2, 3, 4, 5, 6, 7])
         .unwrap();
     let design = two_group_design();
-    let fit = glm_mu_native_wald_builder()
-        .fit_type(FitType::Mean)
-        .fit_dispersion_trend_glm_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        glm_mu_native_wald_builder().fit_type(FitType::Mean).run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::Trend),
+        ),
+    )
+    .unwrap();
     let frozen_intercept = vec![1.0; counts.n_genes()];
     let output = fit.frozen_rlog(&counts, &frozen_intercept, 1.0).unwrap();
     assert_eq!(output.transformed.n_rows(), counts.n_genes());
 
-    let map_fit = glm_mu_native_wald_builder()
-        .fit_type(FitType::Mean)
-        .fit_map_dispersions_glm_mu(&counts, &design)
-        .unwrap();
+    let map_fit = run_fit(
+        glm_mu_native_wald_builder().fit_type(FitType::Mean).run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::Map),
+        ),
+    )
+    .unwrap();
     assert!(map_fit.frozen_rlog(&counts, &[1.0; 2], 1.0).is_err());
     assert!(
         map_fit
@@ -243,12 +281,22 @@ fn fitted_rlog_expands_all_zero_rows_as_zero_transform_rows() {
     let compact_counts = counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
     let design = two_group_design();
     let builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
-    let mut fit = builder
-        .fit_map_dispersions_glm_mu(&counts, &design)
-        .unwrap();
-    let mut compact_fit = builder
-        .fit_map_dispersions_glm_mu(&compact_counts, &design)
-        .unwrap();
+    let mut fit = run_fit(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::Map),
+        ),
+    )
+    .unwrap();
+    let mut compact_fit = run_fit(
+        builder.run(
+            &Analysis::new(&compact_counts, &design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::Map),
+        ),
+    )
+    .unwrap();
 
     for use_cell_factors in [false, true] {
         if use_cell_factors {
@@ -302,12 +350,22 @@ fn fitted_frozen_rlog_expands_all_zero_rows_with_frozen_intercepts() {
     let compact_counts = counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
     let design = two_group_design();
     let builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
-    let fit = builder
-        .fit_map_dispersions_glm_mu(&counts, &design)
-        .unwrap();
-    let compact_fit = builder
-        .fit_map_dispersions_glm_mu(&compact_counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::Map),
+        ),
+    )
+    .unwrap();
+    let compact_fit = run_fit(
+        builder.run(
+            &Analysis::new(&compact_counts, &design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::Map),
+        ),
+    )
+    .unwrap();
     let frozen_intercept = vec![0.75, 3.1, 2.9, 3.2, 4.0, 2.7, 3.4, 3.8];
     let compact_intercept = frozen_intercept[1..].to_vec();
 
@@ -342,9 +400,14 @@ fn builder_rlog_glm_mu_matches_manual_fit_state_transform() {
 
     let output = builder.rlog_glm_mu(&counts, &design).unwrap();
     let diagnostic_output = builder.rlog_glm_mu_with_fit(&counts, &design).unwrap();
-    let fit = builder
-        .fit_map_dispersions_glm_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::Map),
+        ),
+    )
+    .unwrap();
     let expected = fit.rlog(&counts).unwrap();
 
     assert_eq!(output.metadata(), expected.metadata());

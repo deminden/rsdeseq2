@@ -1944,6 +1944,18 @@ manifest on extraction. The packet includes the existing native platform
 and Windows R check commands. Native Intel macOS and Windows x64 runs remain
 open.
 
+### Analysis API cleanup
+
+0.6.0 removes 140 deprecated builder methods and the builder-level test and
+reduced-design settings. `Analysis` carries the workflow options and
+`DeseqBuilder::run` executes them. The numerical reference tests now call
+this API directly. The request-validation and trend-override tests remain.
+
+On macOS arm64, 1,029 integration checks passed per numeric profile, and
+both golden manifests matched all 8,032 fields. The R backend type-checked
+with Rust 1.96.0. The offline R 4.6.2 package passed the native smoke check,
+and 31 fresh fits and 118 later queries matched standalone Rust bit for bit.
+
 ## Review plan verification for 0.6.0
 
 The maintainer scoped the 23 November development closeout to macOS arm64
@@ -1955,7 +1967,7 @@ and Linux arm64. The release workflow defines the broader platform matrix.
 | 2. Per-gene parallelism | MAP, Cook's distance, robust dispersion and replacement, and the rlog prior run in parallel with ordered errors and results. See the [thread-scaling probe](#local-verification-and-benchmark). |
 | 3. Borrowed offsets | Sample factors stay in a sample vector through fitting. Selected dispersion, Wald, LRT, beta-prior and rlog fits borrow source rows. Where the API returns gene-by-sample factors, the matrix is created for that output. |
 | 4. Numerical profiles | The crate and CLI default to portable arithmetic. The R bridge selects its host profile. The [platform workflow](../../.github/workflows/platform-checks.yml) checks the release panel and portable golden hashes on five targets. The [batched release checks](#batched-acceptance-after-the-portable-arithmetic-changes) cover macOS arm64 and both Linux targets. Native Intel macOS and Windows x64 runtime results are still open. |
-| 5. One workflow entry point | The builder, CLI and R bridge use `DeseqBuilder::run(&Analysis)`. The [API migration](../design/run-entry-point.md) keeps deprecated wrappers in 0.6 and schedules removal in 0.7. |
+| 5. One workflow entry point | The Rust library, CLI and R bridge use `DeseqBuilder::run(&Analysis)`. The [analysis guide](../design/run-entry-point.md) describes the request API after removal of the builder aliases. |
 | 6. Real-data probability gates | The [compact GTEx end-to-end gate](../reproducibility.md#compact-and-full-gene-replay) estimates normalization and dispersions with default filtering. It checks Cook's replacement, log-scale probability, nonfinite values, underflow and significance flips. The [full replay](#native-rlog-smoke-and-full-gtex-probability-replay) checks all 56,200 genes under both profiles, including log-scale error for p-values and adjusted p-values. |
 | 7. Shared checked arithmetic | `rcompat-numeric` owns the checked arithmetic, matrix allocation and validation primitives. The [summation rules](../summation-rules.md) specify the reduction used for each R primitive. |
 | 8. Structured errors | The non-exhaustive error enum carries domains, dimensions, indices and rejected values. The [diagnostics work](#structured-design-and-glm-diagnostics) covers the early input stages, GLM, contrasts and probability calculations. [Weight errors](#observation-weight-rank-workspace-and-diagnostics) expose both gene and sample. |

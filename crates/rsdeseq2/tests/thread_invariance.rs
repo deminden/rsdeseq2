@@ -1,4 +1,5 @@
 use crate::support as common;
+use crate::support::run::{run_fit, run_results};
 use rsdeseq2::prelude::*;
 
 fn assert_numbers(a: &[f64], b: &[f64], label: &str) {
@@ -123,14 +124,16 @@ fn native_wald_and_lrt_are_identical_across_thread_counts_with_and_without_weigh
                 pool.install(|| {
                     assert_eq!(rayon::current_num_threads(), threads);
                     let b = builder.clone().threads(threads);
-                    let normalization = DeseqBuilder::new()
-                        .threads(threads)
-                        .fit_size_factors_and_base_means(&common::reference_counts())
-                        .unwrap();
+                    let normalization = run_fit(
+                        DeseqBuilder::new()
+                            .threads(threads)
+                            .run(&Analysis::without_design(&common::reference_counts())),
+                    )
+                    .unwrap();
                     let fitted = if lrt {
-                        b.fit_lrt_with_results(&counts, &design, &reduced)
+                        run_results(b.run(&Analysis::new(&counts, &design).lrt(&reduced)))
                     } else {
-                        b.fit_with_results(&counts, &design)
+                        run_results(b.run(&Analysis::new(&counts, &design)))
                     }
                     .unwrap();
                     (normalization, fitted)

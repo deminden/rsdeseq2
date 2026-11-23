@@ -3,6 +3,7 @@
 //! Inputs are small random count matrices, so each case runs in milliseconds;
 //! the case count is kept low because the fits are deterministic per input.
 
+use crate::support::run::run_results;
 use crate::support::two_group_design;
 use proptest::prelude::*;
 use proptest::test_runner::FileFailurePersistence;
@@ -119,11 +120,9 @@ proptest! {
         let design = two_group_design(SAMPLES, None);
         let dispersions = vec![dispersion; genes];
         let builder = DeseqBuilder::new();
-        let (_, forward) = builder
-            .fit_fixed_dispersion_wald_contrast(&counts, &design, &dispersions, &[0.0, 1.0])
+        let (_, forward) = run_results(builder.run(&Analysis::new(&counts, &design).fixed_dispersion(&dispersions).result(ResultColumn::Numeric(&[0.0, 1.0]))))
             .unwrap();
-        let (_, backward) = builder
-            .fit_fixed_dispersion_wald_contrast(&counts, &design, &dispersions, &[0.0, -1.0])
+        let (_, backward) = run_results(builder.run(&Analysis::new(&counts, &design).fixed_dispersion(&dispersions).result(ResultColumn::Numeric(&[0.0, -1.0]))))
             .unwrap();
         for (a, b) in forward.rows.iter().zip(&backward.rows) {
             prop_assert_eq!(a.log2_fold_change.map(|v| -v), b.log2_fold_change);
@@ -140,13 +139,11 @@ proptest! {
         let counts = matrix(genes, values);
         let design = two_group_design(SAMPLES, None);
         let dispersions = vec![dispersion; genes];
-        let one = DeseqBuilder::new()
-            .threads(1)
-            .fit_fixed_dispersion_wald(&counts, &design, &dispersions, 1)
+        let one = run_results(DeseqBuilder::new()
+            .threads(1).run(&Analysis::new(&counts, &design).fixed_dispersion(&dispersions).result(ResultColumn::Coefficient(1))))
             .unwrap();
-        let four = DeseqBuilder::new()
-            .threads(4)
-            .fit_fixed_dispersion_wald(&counts, &design, &dispersions, 1)
+        let four = run_results(DeseqBuilder::new()
+            .threads(4).run(&Analysis::new(&counts, &design).fixed_dispersion(&dispersions).result(ResultColumn::Coefficient(1))))
             .unwrap();
         // Debug text is exact for every non-NaN f64 and treats NaN equal to
         // itself, unlike PartialEq on the fit's optional NaN fields.
@@ -164,9 +161,8 @@ proptest! {
         let counts = matrix(genes, values);
         let design = two_group_design(SAMPLES, None);
         let dispersions = vec![dispersion; genes];
-        let (_, results) = DeseqBuilder::new()
-            .size_factors(vec![1.0; SAMPLES])
-            .fit_fixed_dispersion_wald(&counts, &design, &dispersions, 1)
+        let (_, results) = run_results(DeseqBuilder::new()
+            .size_factors(vec![1.0; SAMPLES]).run(&Analysis::new(&counts, &design).fixed_dispersion(&dispersions).result(ResultColumn::Coefficient(1))))
             .unwrap();
         let row = &results.rows[zero_gene];
         prop_assert_eq!(row.base_mean, 0.0);

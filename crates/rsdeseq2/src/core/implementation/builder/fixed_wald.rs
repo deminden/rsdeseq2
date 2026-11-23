@@ -1,7 +1,6 @@
 use super::*;
 use crate::errors::{ErrorKind, missing_prerequisite};
 impl DeseqBuilder {
-    /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_fixed_dispersion_wald(
         &self,
         counts: &CountMatrix,
@@ -33,7 +32,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald_contrast`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_fixed_dispersion_wald_contrast(
         &self,
         counts: &CountMatrix,
@@ -68,68 +66,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Run a supplied-dispersion Wald pipeline for a DESeq2 `results(contrast=...)` request.
-    ///
-    /// Character triplet contrasts require one sample level per count-matrix
-    /// column so the Rust core can apply DESeq2's character contrast all-zero
-    /// handling. List and numeric contrasts ignore `sample_levels` and use the
-    /// numeric all-zero rule.
-    #[deprecated(
-        since = "0.6.0",
-        note = "use DeseqBuilder::run(&Analysis::new(counts, design).fixed_dispersion(dispersions).result(ResultColumn::Results { contrast, sample_levels, model_frame: None }))"
-    )]
-    pub fn fit_fixed_dispersion_wald_results_contrast<S: AsRef<str>>(
-        &self,
-        counts: &CountMatrix,
-        design: &DesignMatrix,
-        dispersions: &[f64],
-        contrast: &ResultsContrast,
-        sample_levels: Option<&[S]>,
-    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        let levels = owned_levels(sample_levels);
-        self.run(
-            &Analysis::new(counts, design)
-                .fixed_dispersion(dispersions)
-                .result(ResultColumn::Results {
-                    contrast,
-                    sample_levels: levels.as_deref(),
-                    model_frame: None,
-                }),
-        )?
-        .into_results_pair()
-    }
-
-    /// Run a supplied-dispersion Wald pipeline for a DESeq2
-    /// `results(contrast=...)` request using formula model-frame metadata.
-    ///
-    /// Character triplet contrasts resolve their factor reference and
-    /// per-sample levels from `model_frame`. List and numeric contrasts use the
-    /// same numeric all-zero handling as [`Self::fit_fixed_dispersion_wald_results_contrast`].
-    #[deprecated(
-        since = "0.6.0",
-        note = "use DeseqBuilder::run(&Analysis::new(counts, design).fixed_dispersion(dispersions).result(ResultColumn::Results { contrast, sample_levels: None, model_frame: Some(model_frame) }))"
-    )]
-    pub fn fit_fixed_dispersion_wald_results_contrast_from_model_frame(
-        &self,
-        counts: &CountMatrix,
-        design: &DesignMatrix,
-        dispersions: &[f64],
-        contrast: &ResultsContrast,
-        model_frame: &FormulaModelFrame,
-    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.run(
-            &Analysis::new(counts, design)
-                .fixed_dispersion(dispersions)
-                .result(ResultColumn::Results {
-                    contrast,
-                    sample_levels: None,
-                    model_frame: Some(model_frame),
-                }),
-        )?
-        .into_results_pair()
-    }
-
-    /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald_with_cooks_replacement`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_fixed_dispersion_wald_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -200,7 +136,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald_contrast_with_cooks_replacement`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_fixed_dispersion_wald_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -271,7 +206,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald_contrast_spec_with_cooks_replacement`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -299,63 +233,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Run supplied-dispersion Wald replacement refit for a DESeq2 `results(contrast=...)` request.
-    #[deprecated(
-        since = "0.6.0",
-        note = "use DeseqBuilder::run(&Analysis::new(counts, design).fixed_dispersion(dispersions).result(ResultColumn::Results { contrast, sample_levels, model_frame: None }).cooks_replacement(replacement_options))"
-    )]
-    pub fn fit_fixed_dispersion_wald_results_contrast_with_cooks_replacement<S: AsRef<str>>(
-        &self,
-        counts: &CountMatrix,
-        design: &DesignMatrix,
-        dispersions: &[f64],
-        contrast: &ResultsContrast,
-        sample_levels: Option<&[S]>,
-        replacement_options: &CooksReplacementOptions,
-    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
-        let levels = owned_levels(sample_levels);
-        self.run(
-            &Analysis::new(counts, design)
-                .fixed_dispersion(dispersions)
-                .result(ResultColumn::Results {
-                    contrast,
-                    sample_levels: levels.as_deref(),
-                    model_frame: None,
-                })
-                .cooks_replacement(replacement_options),
-        )?
-        .into_wald_replacement()
-    }
-
-    /// Run supplied-dispersion Wald replacement refit for a DESeq2
-    /// `results(contrast=...)` request using formula model-frame metadata.
-    #[deprecated(
-        since = "0.6.0",
-        note = "use DeseqBuilder::run(&Analysis::new(counts, design).fixed_dispersion(dispersions).result(ResultColumn::Results { contrast, sample_levels: None, model_frame: Some(model_frame) }).cooks_replacement(replacement_options))"
-    )]
-    pub fn fit_fixed_dispersion_wald_results_contrast_from_model_frame_with_cooks_replacement(
-        &self,
-        counts: &CountMatrix,
-        design: &DesignMatrix,
-        dispersions: &[f64],
-        contrast: &ResultsContrast,
-        model_frame: &FormulaModelFrame,
-        replacement_options: &CooksReplacementOptions,
-    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
-        self.run(
-            &Analysis::new(counts, design)
-                .fixed_dispersion(dispersions)
-                .result(ResultColumn::Results {
-                    contrast,
-                    sample_levels: None,
-                    model_frame: Some(model_frame),
-                })
-                .cooks_replacement(replacement_options),
-        )?
-        .into_wald_replacement()
-    }
-
-    /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald_contrast_spec`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_fixed_dispersion_wald_contrast_spec(
         &self,
         counts: &CountMatrix,
@@ -380,7 +257,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald_factor_level_contrast`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_fixed_dispersion_wald_factor_level_contrast(
         &self,
         counts: &CountMatrix,
@@ -463,7 +339,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,

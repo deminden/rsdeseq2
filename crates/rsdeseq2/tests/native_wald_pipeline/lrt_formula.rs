@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::{run_lrt_replacement, run_replacement, run_results};
+use rsdeseq2::prelude::{Analysis, ResultColumn};
 
 #[test]
 fn top_level_lrt_formula_replacement_refit_retains_formula_derived_metadata() {
@@ -18,10 +20,7 @@ fn top_level_lrt_formula_replacement_refit_retains_formula_derived_metadata() {
         }],
         numeric_covariates: Vec::new(),
     };
-    let builder = glm_mu_native_wald_builder()
-        .test(TestType::Lrt)
-        .reduced_design(reduced_design.clone())
-        .model_frame(model_frame);
+    let builder = glm_mu_native_wald_builder().model_frame(model_frame);
     let replacement_options = CooksReplacementOptions {
         trim: 0.2,
         cooks_cutoff: 0.0,
@@ -29,23 +28,31 @@ fn top_level_lrt_formula_replacement_refit_retains_formula_derived_metadata() {
         which_samples: Some(vec![true, false, false, false, false, false, false, false]),
     };
 
-    let expected = builder
-        .fit_lrt_with_results_with_cooks_replacement(
-            &counts,
-            &full_design,
-            &reduced_design,
-            &replacement_options,
-        )
-        .unwrap();
-    let transformed = builder
-        .fit_lrt_formula_with_results_contrast_request_with_cooks_replacement(
-            &counts,
-            "~ factor(condition, levels=c('A','B'))",
-            "~ 1",
-            &ResultsContrast::character("factor.condition..levels...c..A....B...", "B", "A"),
-            &replacement_options,
-        )
-        .unwrap();
+    let expected = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let transformed = run_lrt_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ factor(condition, levels=c('A','B'))")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character(
+                        "factor.condition..levels...c..A....B...",
+                        "B",
+                        "A",
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
 
     assert!(transformed.refit_plan.should_refit);
     assert_eq!(transformed.refit_plan, expected.refit_plan);
@@ -83,47 +90,59 @@ fn top_level_test_output_routes_lrt_cooks_replacement_contrasts() {
     let full_design = two_group_design();
     let reduced_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
     let options = CooksReplacementOptions::new(f64::MAX);
-    let builder = glm_mu_native_wald_builder()
-        .test(TestType::Lrt)
-        .reduced_design(reduced_design.clone());
+    let builder = glm_mu_native_wald_builder();
     let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
         .into_iter()
         .map(String::from)
         .collect::<Vec<_>>();
 
-    let numeric = builder
-        .fit_with_test_results_contrast_with_cooks_replacement(
-            &counts,
-            &full_design,
-            &[0.0, 1.0],
-            &options,
-        )
-        .unwrap();
-    let spec = builder
-        .fit_with_test_results_contrast_spec_with_cooks_replacement(
-            &counts,
-            &full_design,
-            &ContrastSpec::coefficient_name("condition_B_vs_A"),
-            &options,
-        )
-        .unwrap();
-    let factor = builder
-        .fit_with_test_results_factor_level_contrast_with_cooks_replacement(
-            &counts,
-            &full_design,
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-            &options,
-        )
-        .unwrap();
-    let request = builder
-        .fit_with_test_results_contrast_request_with_cooks_replacement(
-            &counts,
-            &full_design,
-            &ResultsContrast::character("condition", "B", "A"),
-            Some(&levels),
-            &options,
-        )
-        .unwrap();
+    let numeric = run_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .result(ResultColumn::Numeric(&[0.0, 1.0]))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let spec = run_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .result(ResultColumn::Spec(&ContrastSpec::coefficient_name(
+                    "condition_B_vs_A",
+                )))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let factor = run_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                    "condition",
+                    "B",
+                    "A",
+                    &levels,
+                )))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let request = run_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "B", "A"),
+                    sample_levels: Some(&levels),
+                    model_frame: None,
+                })
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
     let model_frame = FormulaModelFrame {
         factors: vec![FormulaFactorColumn {
             name: "condition".to_string(),
@@ -136,24 +155,28 @@ fn top_level_test_output_routes_lrt_cooks_replacement_contrasts() {
             values: vec![0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
         }],
     };
-    let model_frame_request = builder
-        .fit_with_test_results_contrast_request_from_model_frame_with_cooks_replacement(
-            &counts,
-            &full_design,
-            &ResultsContrast::character("condition", "B", "A"),
-            &model_frame,
-            &options,
-        )
-        .unwrap();
-    let expected = builder
-        .fit_lrt_with_results_contrast_with_cooks_replacement(
-            &counts,
-            &full_design,
-            &reduced_design,
-            &[0.0, 1.0],
-            &options,
-        )
-        .unwrap();
+    let model_frame_request = run_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "B", "A"),
+                    sample_levels: None,
+                    model_frame: Some(&model_frame),
+                })
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let expected = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .result(ResultColumn::Numeric(&[0.0, 1.0]))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     let CooksReplacementTestOutput::Lrt(numeric) = numeric else {
         panic!("numeric contrast should route to LRT");
@@ -204,29 +227,40 @@ fn top_level_lrt_formula_contrast_uses_formula_derived_factor_metadata() {
         }],
         numeric_covariates: Vec::new(),
     };
-    let builder = glm_mu_native_wald_builder()
-        .test(TestType::Lrt)
-        .model_frame(model_frame);
+    let builder = glm_mu_native_wald_builder().model_frame(model_frame);
     let formula = "~ factor(condition, levels=c('B','A'))";
     let reduced = "~ 1";
     let contrast = ResultsContrast::character("factor.condition..levels...c..B....A...", "A", "B");
 
-    let (fit, mut results) = builder
-        .fit_lrt_formula_with_results_contrast_request(&counts, formula, reduced, &contrast)
-        .unwrap();
+    let (fit, mut results) = run_results(
+        builder.run(
+            &Analysis::formula(&counts, formula)
+                .lrt_formula(reduced)
+                .result(ResultColumn::Results {
+                    contrast: &contrast,
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
     results.independent_filtering = None;
     let object_results = fit
         .results_contrast_request(&counts, &contrast, counts.gene_names())
         .unwrap();
-    let replacement = builder
-        .fit_lrt_formula_with_results_contrast_request_with_cooks_replacement(
-            &counts,
-            formula,
-            reduced,
-            &contrast,
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap();
+    let replacement = run_lrt_replacement(
+        builder.run(
+            &Analysis::formula(&counts, formula)
+                .lrt_formula(reduced)
+                .result(ResultColumn::Results {
+                    contrast: &contrast,
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&CooksReplacementOptions::new(f64::MAX)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(replacement.refit_plan.n_refit, 0);
     assert_eq!(replacement.results.rows, results.rows);
@@ -244,39 +278,55 @@ fn top_level_lrt_formula_contrast_uses_formula_derived_factor_metadata() {
 
     let ordered_formula = "~ ordered(condition, levels=c('B','A'))";
     let ordered_contrast = ResultsContrast::numeric(vec![0.0, 1.0]);
-    let invalid = builder
-        .fit_lrt_formula_with_results_contrast_request(
-            &counts,
-            ordered_formula,
-            reduced,
-            &ResultsContrast::character("ordered.condition..levels...c..B....A...", "A", "B"),
-        )
-        .unwrap_err();
+    let invalid = run_results(
+        builder.run(
+            &Analysis::formula(&counts, ordered_formula)
+                .lrt_formula(reduced)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character(
+                        "ordered.condition..levels...c..B....A...",
+                        "A",
+                        "B",
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap_err();
     crate::support::assert_ordered_factor_contrast_error(
         invalid,
         r#"ordered(condition, levels = c("B", "A"))"#,
     );
-    let (ordered_fit, mut ordered_results) = builder
-        .fit_lrt_formula_with_results_contrast_request(
-            &counts,
-            ordered_formula,
-            reduced,
-            &ordered_contrast,
-        )
-        .unwrap();
+    let (ordered_fit, mut ordered_results) = run_results(
+        builder.run(
+            &Analysis::formula(&counts, ordered_formula)
+                .lrt_formula(reduced)
+                .result(ResultColumn::Results {
+                    contrast: &ordered_contrast,
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
     ordered_results.independent_filtering = None;
     let ordered_object_results = ordered_fit
         .results_contrast_request(&counts, &ordered_contrast, counts.gene_names())
         .unwrap();
-    let ordered_replacement = builder
-        .fit_lrt_formula_with_results_contrast_request_with_cooks_replacement(
-            &counts,
-            ordered_formula,
-            reduced,
-            &ordered_contrast,
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap();
+    let ordered_replacement = run_lrt_replacement(
+        builder.run(
+            &Analysis::formula(&counts, ordered_formula)
+                .lrt_formula(reduced)
+                .result(ResultColumn::Results {
+                    contrast: &ordered_contrast,
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&CooksReplacementOptions::new(f64::MAX)),
+        ),
+    )
+    .unwrap();
     assert_eq!(ordered_replacement.refit_plan.n_refit, 0);
     assert_eq!(ordered_replacement.results.rows, ordered_results.rows);
     assert_eq!(
@@ -299,27 +349,35 @@ fn top_level_lrt_formula_contrast_uses_formula_derived_factor_metadata() {
         "treated",
         "control",
     );
-    let (relabeled_fit, mut relabeled_results) = builder
-        .fit_lrt_formula_with_results_contrast_request(
-            &counts,
-            relabeled_formula,
-            reduced,
-            &relabeled_contrast,
-        )
-        .unwrap();
+    let (relabeled_fit, mut relabeled_results) = run_results(
+        builder.run(
+            &Analysis::formula(&counts, relabeled_formula)
+                .lrt_formula(reduced)
+                .result(ResultColumn::Results {
+                    contrast: &relabeled_contrast,
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
     relabeled_results.independent_filtering = None;
     let relabeled_object_results = relabeled_fit
         .results_contrast_request(&counts, &relabeled_contrast, counts.gene_names())
         .unwrap();
-    let relabeled_replacement = builder
-        .fit_lrt_formula_with_results_contrast_request_with_cooks_replacement(
-            &counts,
-            relabeled_formula,
-            reduced,
-            &relabeled_contrast,
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap();
+    let relabeled_replacement = run_lrt_replacement(
+        builder.run(
+            &Analysis::formula(&counts, relabeled_formula)
+                .lrt_formula(reduced)
+                .result(ResultColumn::Results {
+                    contrast: &relabeled_contrast,
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&CooksReplacementOptions::new(f64::MAX)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(relabeled_replacement.refit_plan.n_refit, 0);
     assert_eq!(relabeled_replacement.results.rows, relabeled_results.rows);
@@ -337,18 +395,25 @@ fn top_level_lrt_formula_contrast_uses_formula_derived_factor_metadata() {
         )
     );
 
-    let error = builder
-        .fit_lrt_formula_with_results_contrast_request(
-            &counts,
-            "~ ordered(condition, levels=c('A','B'), labels=c('control','treated'))",
-            reduced,
-            &ResultsContrast::character(
-                "ordered.condition..levels...c..A....B....labels...c..control....treated...",
-                "treated",
-                "control",
-            ),
-        )
-        .unwrap_err();
+    let error = run_results(
+        builder.run(
+            &Analysis::formula(
+                &counts,
+                "~ ordered(condition, levels=c('A','B'), labels=c('control','treated'))",
+            )
+            .lrt_formula(reduced)
+            .result(ResultColumn::Results {
+                contrast: &ResultsContrast::character(
+                    "ordered.condition..levels...c..A....B....labels...c..control....treated...",
+                    "treated",
+                    "control",
+                ),
+                sample_levels: None,
+                model_frame: None,
+            }),
+        ),
+    )
+    .unwrap_err();
     crate::support::assert_ordered_factor_contrast_error(
         error,
         r#"ordered(condition, levels = c("A", "B"), labels = c("control", "treated"))"#,

@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::{run_lrt_replacement, run_results};
+use rsdeseq2::prelude::{Analysis, MeanModel, ResultColumn};
 
 #[test]
 fn native_glm_mu_lrt_cooks_replacement_refit_merges_refit_rows() {
@@ -7,20 +9,23 @@ fn native_glm_mu_lrt_cooks_replacement_refit_merges_refit_rows() {
     let reduced = reduced_design();
     let builder = native_lrt_builder();
 
-    let output = builder
-        .fit_lrt_glm_mu_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            1,
-            &CooksReplacementOptions {
-                trim: 0.2,
-                cooks_cutoff: 0.0,
-                min_replicates: 3,
-                which_samples: Some(vec![true, false, false, false, false, false, false, false]),
-            },
-        )
-        .unwrap();
+    let output = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1))
+                .cooks_replacement(&CooksReplacementOptions {
+                    trim: 0.2,
+                    cooks_cutoff: 0.0,
+                    min_replicates: 3,
+                    which_samples: Some(vec![
+                        true, false, false, false, false, false, false, false,
+                    ]),
+                }),
+        ),
+    )
+    .unwrap();
 
     assert!(output.original_fit.lrt.is_some());
     assert!(output.refit_plan.n_refit > 0);
@@ -157,24 +162,28 @@ fn native_glm_mu_lrt_contrast_cooks_replacement_refit_merges_refit_rows() {
         which_samples: Some(vec![true, false, false, false, false, false, false, false]),
     };
 
-    let output = builder
-        .fit_lrt_glm_mu_contrast_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &[0.0, 1.0],
-            &options,
-        )
-        .unwrap();
-    let named_output = builder
-        .fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &ContrastSpec::coefficient_name("condition_B_vs_A"),
-            &options,
-        )
-        .unwrap();
+    let output = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(&[0.0, 1.0]))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let named_output = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Spec(&ContrastSpec::coefficient_name(
+                    "condition_B_vs_A",
+                )))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     assert!(output.original_fit.lrt.is_some());
     assert!(output.refit_plan.should_refit);
@@ -222,24 +231,35 @@ fn native_glm_mu_lrt_factor_level_contrast_cooks_replacement_preserves_metadata(
         .map(String::from)
         .collect::<Vec<_>>();
 
-    let (expected_fit, expected_results) = builder
-        .clone()
-        .fit_lrt_glm_mu_contrast(&counts, &full, &reduced, &[0.0, 1.0])
-        .unwrap();
-    let output = builder
-        .fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-            &CooksReplacementOptions {
-                trim: 0.2,
-                cooks_cutoff: f64::MAX,
-                min_replicates: 3,
-                which_samples: None,
-            },
-        )
-        .unwrap();
+    let (expected_fit, expected_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
+    let output = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                    "condition",
+                    "B",
+                    "A",
+                    &levels,
+                )))
+                .cooks_replacement(&CooksReplacementOptions {
+                    trim: 0.2,
+                    cooks_cutoff: f64::MAX,
+                    min_replicates: 3,
+                    which_samples: None,
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(output.refit_plan.n_refit, 0);
     assert!(output.refit_fit.is_none());
@@ -338,26 +358,24 @@ fn native_lrt_replacement_numeric_contrasts_do_not_infer_low_count_gate_from_mul
         .cooks_cutoff_threshold(0.0)
         .disable_independent_filtering();
 
-    let generic = builder
-        .clone()
-        .fit_lrt_with_results_contrast_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &[0.0, 1.0, 0.0],
-            &options,
-        )
-        .unwrap();
-    let formula = builder
-        .model_frame(model_frame)
-        .fit_lrt_with_results_contrast_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &[0.0, 1.0, 0.0],
-            &options,
-        )
-        .unwrap();
+    let generic = run_lrt_replacement(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::Numeric(&[0.0, 1.0, 0.0]))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let formula = run_lrt_replacement(
+        builder.model_frame(model_frame).run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::Numeric(&[0.0, 1.0, 0.0]))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(generic.results.rows[0].gene.as_deref(), Some("low_count"));
     assert_eq!(formula.results.rows, generic.results.rows);
@@ -395,20 +413,32 @@ fn top_level_fit_lrt_with_results_cooks_replacement_runs_default_automatic_lrt()
         which_samples: Some(vec![true, false, false, false, false, false, false, false]),
     };
 
-    let top_level_output = builder
-        .fit_lrt_with_results_with_cooks_replacement(&counts, &full, &reduced, &replacement_options)
-        .unwrap();
-    let formula_output = builder
-        .fit_lrt_formula_with_results_with_cooks_replacement(
-            &counts,
-            "~ condition",
-            "~ 1",
-            &replacement_options,
-        )
-        .unwrap();
-    let lrt_output = builder
-        .fit_lrt_glm_mu_with_cooks_replacement(&counts, &full, &reduced, 1, &replacement_options)
-        .unwrap();
+    let top_level_output = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let formula_output = run_lrt_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ condition")
+                .lrt_formula("~ 1")
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let lrt_output = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
     let offset_values = builder.current_model_frame().unwrap().numeric_covariates[0]
         .values
         .to_vec();
@@ -421,24 +451,25 @@ fn top_level_fit_lrt_with_results_cooks_replacement_runs_default_automatic_lrt()
     let normalization_factors =
         RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), normalization_values)
             .unwrap();
-    let explicit_offset_output = builder
-        .clone()
-        .normalization_factors(normalization_factors.clone())
-        .fit_lrt_formula_with_results_with_cooks_replacement(
-            &counts,
-            "~ condition",
-            "~ 1",
-            &replacement_options,
-        )
-        .unwrap();
-    let formula_offset_output = builder
-        .fit_lrt_formula_with_results_with_cooks_replacement(
-            &counts,
-            "~ condition + offset(exposure)",
-            "~ 1",
-            &replacement_options,
-        )
-        .unwrap();
+    let explicit_offset_output = run_lrt_replacement(
+        builder
+            .clone()
+            .normalization_factors(normalization_factors.clone())
+            .run(
+                &Analysis::formula(&counts, "~ condition")
+                    .lrt_formula("~ 1")
+                    .cooks_replacement(&replacement_options),
+            ),
+    )
+    .unwrap();
+    let formula_offset_output = run_lrt_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ condition + offset(exposure)")
+                .lrt_formula("~ 1")
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(top_level_output.refit_plan, lrt_output.refit_plan);
     assert_eq!(formula_output.refit_plan, lrt_output.refit_plan);
@@ -543,27 +574,34 @@ fn top_level_fit_lrt_with_results_cooks_replacement_accepts_coefficient_name() {
         which_samples: Some(vec![true, false, false, false, false, false, false, false]),
     };
 
-    let named_output = builder
-        .fit_lrt_with_results_name_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            "condition_B_vs_A",
-            &replacement_options,
-        )
-        .unwrap();
-    let indexed_output = builder
-        .fit_lrt_glm_mu_with_cooks_replacement(&counts, &full, &reduced, 1, &replacement_options)
-        .unwrap();
-    let formula_named_output = builder
-        .fit_lrt_formula_with_results_name_with_cooks_replacement(
-            &counts,
-            "~ condition",
-            "~ 1",
-            "condition_B_vs_A",
-            &replacement_options,
-        )
-        .unwrap();
+    let named_output = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::Name("condition_B_vs_A"))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let indexed_output = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let formula_named_output = run_lrt_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ condition")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Name("condition_B_vs_A"))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(named_output.refit_plan, indexed_output.refit_plan);
     assert_eq!(formula_named_output.refit_plan, indexed_output.refit_plan);
@@ -586,14 +624,14 @@ fn top_level_fit_lrt_with_results_cooks_replacement_validates_reduced_design() {
     let counts = counts_with_zero_row();
     let full = full_design();
     let invalid_reduced = full_design();
-    let err = native_lrt_builder()
-        .fit_lrt_with_results_with_cooks_replacement(
-            &counts,
-            &full,
-            &invalid_reduced,
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap_err();
+    let err = run_lrt_replacement(
+        native_lrt_builder().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&invalid_reduced)
+                .cooks_replacement(&CooksReplacementOptions::new(f64::MAX)),
+        ),
+    )
+    .unwrap_err();
 
     assert!(matches!(err, DeseqError::InvalidDimensions { .. }));
 }
@@ -605,24 +643,30 @@ fn native_glm_mu_lrt_cooks_replacement_refit_skips_when_no_rows_are_marked() {
     let reduced = reduced_design();
     let builder = native_lrt_builder();
 
-    let (expected_fit, expected_results) = builder
-        .clone()
-        .fit_lrt_glm_mu(&counts, &full, &reduced, 1)
-        .unwrap();
-    let output = builder
-        .fit_lrt_glm_mu_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            1,
-            &CooksReplacementOptions {
-                trim: 0.2,
-                cooks_cutoff: f64::MAX,
-                min_replicates: 3,
-                which_samples: None,
-            },
-        )
-        .unwrap();
+    let (expected_fit, expected_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let output = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1))
+                .cooks_replacement(&CooksReplacementOptions {
+                    trim: 0.2,
+                    cooks_cutoff: f64::MAX,
+                    min_replicates: 3,
+                    which_samples: None,
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(output.refit_plan.n_refit, 0);
     assert!(!output.refit_plan.should_refit);

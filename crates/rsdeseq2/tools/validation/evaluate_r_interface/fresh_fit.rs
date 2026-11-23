@@ -56,6 +56,9 @@ pub fn run(c: &Case) -> Result<Value, Box<dyn Error>> {
         raw.n_cols(),
         raw.as_slice().iter().map(|v| *v as u32).collect(),
     )?;
+    if !matches!(c.test.as_str(), "Wald" | "LRT") {
+        return Err("unknown test".into());
+    }
     let mut builder = DeseqBuilder::new()
         .automatic_dispersion_means()
         .threads(c.threads)
@@ -64,11 +67,6 @@ pub fn run(c: &Case) -> Result<Value, Box<dyn Error>> {
             "local" => FitType::Local,
             "parametric" => FitType::Parametric,
             _ => return Err("unknown fit type".into()),
-        })
-        .test(match c.test.as_str() {
-            "Wald" => TestType::Wald,
-            "LRT" => TestType::Lrt,
-            _ => return Err("unknown test".into()),
         });
     // Match the public wrapper's argument precedence before constructing the
     // lower-level builder, which can retain unused sample-scale metadata.
@@ -83,15 +81,17 @@ pub fn run(c: &Case) -> Result<Value, Box<dyn Error>> {
     if let Some(v) = &c.weights {
         builder = builder.observation_weights(matrix(v)?);
     }
-    if let Some(v) = &c.reduced {
+    let reduced_design = if let Some(v) = &c.reduced {
         let m = matrix(v)?;
-        builder = builder.reduced_design(DesignMatrix::from_row_major(
+        Some(DesignMatrix::from_row_major(
             m.n_rows(),
             m.n_cols(),
             m.into_values(),
             None,
-        )?);
-    }
+        )?)
+    } else {
+        None
+    };
     let (fit, results, plan) = if let Some(formula) = &c.formula {
         formula.fit(builder, &counts, c)?
     } else {
@@ -103,8 +103,7 @@ pub fn run(c: &Case) -> Result<Value, Box<dyn Error>> {
         let design =
             DesignMatrix::from_row_major(dm.n_rows(), dm.n_cols(), dm.into_values(), None)?;
         let mut request = Analysis::new(&counts, &design);
-        let reduced_design = builder.current_reduced_design().cloned();
-        if builder.current_test() == TestType::Lrt {
+        if c.test == "LRT" {
             request = request.lrt(
                 reduced_design
                     .as_ref()

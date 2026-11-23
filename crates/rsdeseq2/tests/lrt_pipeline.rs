@@ -1,4 +1,5 @@
 use crate::support::assert_ambiguous_name;
+use crate::support::run::{run_lrt_replacement, run_results};
 use approx::assert_relative_eq;
 use rsdeseq2::errors::NameScope;
 use rsdeseq2::prelude::*;
@@ -53,16 +54,23 @@ fn fixed_dispersion_lrt_pipeline_fits_full_and_reduced_models() {
     .unwrap();
     let reduced = DesignMatrix::from_row_major(4, 1, vec![1.0, 1.0, 1.0, 1.0], None).unwrap();
 
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0, 1.0])
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .irls_options(IrlsOptions {
-            ridge_lambda: 0.0,
-            ..IrlsOptions::default()
-        })
-        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &[0.05], 1)
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0, 1.0])
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .irls_options(IrlsOptions {
+                ridge_lambda: 0.0,
+                ..IrlsOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&reduced)
+                    .fixed_dispersion(&[0.05])
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(fit.design.as_ref().unwrap().n_coefficients(), 2);
     assert_eq!(fit.reduced_design.as_ref().unwrap().n_coefficients(), 1);
@@ -130,17 +138,24 @@ fn fixed_dispersion_lrt_pipeline_uses_normalization_factors_for_offsets() {
     .unwrap();
     let reduced = DesignMatrix::from_row_major(4, 1, vec![1.0, 1.0, 1.0, 1.0], None).unwrap();
 
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(vec![100.0, 100.0, 100.0, 100.0])
-        .normalization_factors(normalization_factors.clone())
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .irls_options(IrlsOptions {
-            ridge_lambda: 0.0,
-            ..IrlsOptions::default()
-        })
-        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &[0.05], 1)
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![100.0, 100.0, 100.0, 100.0])
+            .normalization_factors(normalization_factors.clone())
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .irls_options(IrlsOptions {
+                ridge_lambda: 0.0,
+                ..IrlsOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&reduced)
+                    .fixed_dispersion(&[0.05])
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(fit.normalization_factors, Some(normalization_factors));
     assert_relative_eq!(fit.base_mean[0], 15.0, epsilon = 1e-12);
@@ -173,16 +188,23 @@ fn fixed_dispersion_lrt_pipeline_expands_all_zero_rows() {
             .unwrap();
     let reduced = DesignMatrix::from_row_major(4, 1, vec![1.0, 1.0, 1.0, 1.0], None).unwrap();
 
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0, 1.0])
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .irls_options(IrlsOptions {
-            ridge_lambda: 0.0,
-            ..IrlsOptions::default()
-        })
-        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &[0.1, 0.05], 1)
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0, 1.0])
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .irls_options(IrlsOptions {
+                ridge_lambda: 0.0,
+                ..IrlsOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&reduced)
+                    .fixed_dispersion(&[0.1, 0.05])
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(fit.all_zero, vec![true, false]);
     assert!(fit.beta.as_ref().unwrap().row(0).unwrap()[0].is_nan());
@@ -295,18 +317,24 @@ fn fixed_dispersion_lrt_factor_level_contrast_only_zeroes_lfc() {
         sample_levels: &levels,
     };
 
-    let (_coefficient_fit, coefficient_results) = builder
-        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &dispersions, 2)
-        .unwrap();
-    let (_contrast_fit, contrast_results) = builder
-        .fit_fixed_dispersion_lrt_factor_level_contrast(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            contrast,
-        )
-        .unwrap();
+    let (_coefficient_fit, coefficient_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Coefficient(2)),
+        ),
+    )
+    .unwrap();
+    let (_contrast_fit, contrast_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::FactorLevel(contrast)),
+        ),
+    )
+    .unwrap();
     let model_frame = FormulaModelFrame {
         factors: vec![FormulaFactorColumn {
             name: "condition".to_string(),
@@ -316,28 +344,32 @@ fn fixed_dispersion_lrt_factor_level_contrast_only_zeroes_lfc() {
         }],
         numeric_covariates: Vec::new(),
     };
-    let (model_frame_fit, model_frame_results) = builder
-        .fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            &ResultsContrast::character("condition", "D", "B"),
-            &model_frame,
-        )
-        .unwrap();
-    let (stored_model_frame_fit, stored_model_frame_results) = builder
-        .clone()
-        .model_frame(model_frame.clone())
-        .fit_fixed_dispersion_lrt_results_contrast::<String>(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            &ResultsContrast::character("condition", "D", "B"),
-            None,
-        )
-        .unwrap();
+    let (model_frame_fit, model_frame_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "D", "B"),
+                    sample_levels: None,
+                    model_frame: Some(&model_frame),
+                }),
+        ),
+    )
+    .unwrap();
+    let (stored_model_frame_fit, stored_model_frame_results) = run_results(
+        builder.clone().model_frame(model_frame.clone()).run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "D", "B"),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(
         contrast_results.rows[1].gene.as_deref(),
@@ -422,26 +454,36 @@ fn fixed_dispersion_lrt_model_frame_contrast_uses_declared_factor_levels() {
         .disable_independent_filtering();
     let dispersions = vec![0.1, 0.1];
 
-    let (_explicit_fit, explicit_results) = builder
-        .clone()
-        .fit_fixed_dispersion_lrt_factor_level_contrast(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            FactorLevelContrast::with_reference("condition", "C", "B", "A", &observed_levels),
-        )
-        .unwrap();
-    let (_model_frame_fit, model_frame_results) = builder
-        .fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            &ResultsContrast::character("condition", "C", "B"),
-            &model_frame,
-        )
-        .unwrap();
+    let (_explicit_fit, explicit_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::FactorLevel(
+                    FactorLevelContrast::with_reference(
+                        "condition",
+                        "C",
+                        "B",
+                        "A",
+                        &observed_levels,
+                    ),
+                )),
+        ),
+    )
+    .unwrap();
+    let (_model_frame_fit, model_frame_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "C", "B"),
+                    sample_levels: None,
+                    model_frame: Some(&model_frame),
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(model_frame_results, explicit_results);
     assert_eq!(
@@ -491,33 +533,38 @@ fn fixed_dispersion_lrt_list_contrast_accepts_cleaned_positive_and_negative_alia
         .disable_cooks_cutoff()
         .disable_independent_filtering();
 
-    let (_cleaned_fit, cleaned_results) = builder
-        .clone()
-        .fit_fixed_dispersion_lrt_results_contrast(
-            &counts,
-            &full,
-            &reduced,
-            &[0.1, 0.1],
-            &ResultsContrast::list(
-                vec!["cell.type_NK.cell_vs_T.cell".into()],
-                vec!["cell.type_B.cell_vs_T.cell".into()],
-            ),
-            None::<&[String]>,
-        )
-        .unwrap();
-    let (_raw_fit, raw_results) = builder
-        .fit_fixed_dispersion_lrt_results_contrast(
-            &counts,
-            &full,
-            &reduced,
-            &[0.1, 0.1],
-            &ResultsContrast::list(
-                vec!["cell type_NK cell_vs_T cell".into()],
-                vec!["cell type_B cell_vs_T cell".into()],
-            ),
-            None::<&[String]>,
-        )
-        .unwrap();
+    let (_cleaned_fit, cleaned_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell.type_NK.cell_vs_T.cell".into()],
+                        vec!["cell.type_B.cell_vs_T.cell".into()],
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
+    let (_raw_fit, raw_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell type_NK cell_vs_T cell".into()],
+                        vec!["cell type_B cell_vs_T cell".into()],
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(cleaned_results.rows, raw_results.rows);
     assert_eq!(
@@ -576,35 +623,40 @@ fn fixed_dispersion_lrt_list_contrast_replacement_accepts_cleaned_positive_and_n
         .disable_independent_filtering();
     let options = CooksReplacementOptions::new(f64::MAX);
 
-    let cleaned = builder
-        .clone()
-        .fit_fixed_dispersion_lrt_results_contrast_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &[0.1, 0.1],
-            &ResultsContrast::list(
-                vec!["cell.type_NK.cell_vs_T.cell".into()],
-                vec!["cell.type_B.cell_vs_T.cell".into()],
-            ),
-            None::<&[String]>,
-            &options,
-        )
-        .unwrap();
-    let raw = builder
-        .fit_fixed_dispersion_lrt_results_contrast_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &[0.1, 0.1],
-            &ResultsContrast::list(
-                vec!["cell type_NK cell_vs_T cell".into()],
-                vec!["cell type_B cell_vs_T cell".into()],
-            ),
-            None::<&[String]>,
-            &options,
-        )
-        .unwrap();
+    let cleaned = run_lrt_replacement(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell.type_NK.cell_vs_T.cell".into()],
+                        vec!["cell.type_B.cell_vs_T.cell".into()],
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let raw = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell type_NK cell_vs_T cell".into()],
+                        vec!["cell type_B cell_vs_T cell".into()],
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(cleaned.refit_plan, raw.refit_plan);
     assert_eq!(cleaned.results.rows, raw.results.rows);
@@ -665,26 +717,36 @@ fn fixed_dispersion_lrt_model_frame_contrast_uses_unused_declared_reference_with
         .disable_independent_filtering();
     let dispersions = [0.1, 0.1];
 
-    let (_explicit_fit, explicit_results) = builder
-        .clone()
-        .fit_fixed_dispersion_lrt_factor_level_contrast(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            FactorLevelContrast::with_reference("condition", "C", "B", "A", &observed_levels),
-        )
-        .unwrap();
-    let (_model_frame_fit, model_frame_results) = builder
-        .fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            &ResultsContrast::character("condition", "C", "B"),
-            &model_frame,
-        )
-        .unwrap();
+    let (_explicit_fit, explicit_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::FactorLevel(
+                    FactorLevelContrast::with_reference(
+                        "condition",
+                        "C",
+                        "B",
+                        "A",
+                        &observed_levels,
+                    ),
+                )),
+        ),
+    )
+    .unwrap();
+    let (_model_frame_fit, model_frame_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "C", "B"),
+                    sample_levels: None,
+                    model_frame: Some(&model_frame),
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(model_frame_results, explicit_results);
     assert_eq!(
@@ -746,61 +808,73 @@ fn fixed_dispersion_lrt_model_frame_contrast_accepts_cleaned_factor_name_alias()
         .disable_independent_filtering();
     let dispersions = [0.1, 0.1];
 
-    let (_explicit_fit, explicit_results) = builder
-        .clone()
-        .fit_fixed_dispersion_lrt_factor_level_contrast(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            FactorLevelContrast::new("cell type", "B-1", "A 0", &levels),
-        )
-        .unwrap();
-    let (model_frame_fit, model_frame_results) = builder
-        .clone()
-        .fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            &ResultsContrast::character("cell.type", "B-1", "A 0"),
-            &model_frame,
-        )
-        .unwrap();
-    let (stored_fit, stored_results) = builder
-        .clone()
-        .model_frame(model_frame.clone())
-        .fit_fixed_dispersion_lrt_results_contrast::<String>(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            &ResultsContrast::character("cell.type", "B-1", "A 0"),
-            None,
-        )
-        .unwrap();
-    let (_alias_fit, alias_results) = builder
-        .clone()
-        .fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            &ResultsContrast::character("cell.type", "B.1", "A.0"),
-            &model_frame,
-        )
-        .unwrap();
-    let replacement = builder
-        .fit_fixed_dispersion_lrt_results_contrast_from_model_frame_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            &ResultsContrast::character("cell.type", "B-1", "A 0"),
-            &model_frame,
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap();
+    let (_explicit_fit, explicit_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                    "cell type",
+                    "B-1",
+                    "A 0",
+                    &levels,
+                ))),
+        ),
+    )
+    .unwrap();
+    let (model_frame_fit, model_frame_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("cell.type", "B-1", "A 0"),
+                    sample_levels: None,
+                    model_frame: Some(&model_frame),
+                }),
+        ),
+    )
+    .unwrap();
+    let (stored_fit, stored_results) = run_results(
+        builder.clone().model_frame(model_frame.clone()).run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("cell.type", "B-1", "A 0"),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
+    let (_alias_fit, alias_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("cell.type", "B.1", "A.0"),
+                    sample_levels: None,
+                    model_frame: Some(&model_frame),
+                }),
+        ),
+    )
+    .unwrap();
+    let replacement = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("cell.type", "B-1", "A 0"),
+                    sample_levels: None,
+                    model_frame: Some(&model_frame),
+                })
+                .cooks_replacement(&CooksReplacementOptions::new(f64::MAX)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(model_frame_results, explicit_results);
     assert_eq!(stored_results, explicit_results);
@@ -858,44 +932,51 @@ fn fixed_dispersion_lrt_formula_ordered_contrast_requires_polynomial_selectors()
     let model_frame = &formula_design.model_frame;
     let dispersions = [0.1, 0.1];
     let invalid = ResultsContrast::character("ordered.condition..levels...c..B....A...", "A", "B");
-    let error = builder
-        .clone()
-        .fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
-            &counts,
-            full,
-            &reduced,
-            &dispersions,
-            &invalid,
-            model_frame,
-        )
-        .unwrap_err();
+    let error = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, full)
+                .lrt(&reduced)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &invalid,
+                    sample_levels: None,
+                    model_frame: Some(model_frame),
+                }),
+        ),
+    )
+    .unwrap_err();
     crate::support::assert_ordered_factor_contrast_error(
         error,
         r#"ordered(condition, levels = c("B", "A"))"#,
     );
     let numeric = ResultsContrast::numeric(vec![0.0, 1.0]);
     let named = ResultsContrast::list(vec![full.coefficient_names().unwrap()[1].clone()], vec![]);
-    let (_, numerical) = builder
-        .clone()
-        .fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
-            &counts,
-            full,
-            &reduced,
-            &dispersions,
-            &numeric,
-            model_frame,
-        )
-        .unwrap();
-    let (_, selected) = builder
-        .fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
-            &counts,
-            full,
-            &reduced,
-            &dispersions,
-            &named,
-            model_frame,
-        )
-        .unwrap();
+    let (_, numerical) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, full)
+                .lrt(&reduced)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &numeric,
+                    sample_levels: None,
+                    model_frame: Some(model_frame),
+                }),
+        ),
+    )
+    .unwrap();
+    let (_, selected) = run_results(
+        builder.run(
+            &Analysis::new(&counts, full)
+                .lrt(&reduced)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &named,
+                    sample_levels: None,
+                    model_frame: Some(model_frame),
+                }),
+        ),
+    )
+    .unwrap();
     assert_eq!(numerical.rows, selected.rows);
 }
 
@@ -930,18 +1011,24 @@ fn fixed_dispersion_lrt_factor_level_contrast_applies_low_count_cooks_gate() {
         .map(String::from)
         .collect::<Vec<_>>();
 
-    let (_fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0; 6])
-        .cooks_cutoff_threshold(0.0)
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_lrt_factor_level_contrast(
-            &counts,
-            &full,
-            &reduced,
-            &[0.1],
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-        )
-        .unwrap();
+    let (_fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 6])
+            .cooks_cutoff_threshold(0.0)
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&reduced)
+                    .fixed_dispersion(&[0.1])
+                    .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                        "condition",
+                        "B",
+                        "A",
+                        &levels,
+                    ))),
+            ),
+    )
+    .unwrap();
 
     assert!(results.rows[0].max_cooks.unwrap() > 0.0);
     assert_eq!(results.rows[0].cooks_outlier, Some(false));
@@ -992,34 +1079,48 @@ fn fixed_dispersion_lrt_coefficient_uses_stored_formula_low_count_cooks_gate() {
         .cooks_cutoff_threshold(0.0)
         .disable_independent_filtering();
 
-    let (_generic_fit, generic_results) = builder
-        .clone()
-        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &[0.1], 1)
-        .unwrap();
+    let (_generic_fit, generic_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
     // A model frame alone cannot give a primitive matrix formula semantics.
     let matrix_design = full.clone().with_origin(DesignOrigin::matrix());
-    let (_, matrix_results) = builder
-        .clone()
-        .model_frame(model_frame.clone())
-        .fit_fixed_dispersion_lrt(&counts, &matrix_design, &reduced, &[0.1], 1)
-        .unwrap();
+    let (_, matrix_results) = run_results(
+        builder.clone().model_frame(model_frame.clone()).run(
+            &Analysis::new(&counts, &matrix_design)
+                .lrt(&reduced)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
     assert_eq!(matrix_results.rows[0].cooks_outlier, Some(true));
     assert_eq!(matrix_results.rows[0].pvalue, None);
     let formula_builder = builder.clone().model_frame(model_frame);
-    let (_formula_fit, formula_results) = formula_builder
-        .clone()
-        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &[0.1], 1)
-        .unwrap();
-    let replacement = formula_builder
-        .fit_fixed_dispersion_lrt_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &[0.1],
-            1,
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap();
+    let (_formula_fit, formula_results) = run_results(
+        formula_builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let replacement = run_lrt_replacement(
+        formula_builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Coefficient(1))
+                .cooks_replacement(&CooksReplacementOptions::new(f64::MAX)),
+        ),
+    )
+    .unwrap();
 
     assert!(formula_results.rows[0].max_cooks.unwrap() > 0.0);
     assert_eq!(generic_results.rows[0].cooks_outlier, Some(true));
@@ -1071,25 +1172,35 @@ fn fixed_dispersion_lrt_coefficient_uses_cleaned_stored_reference_for_cooks_gate
         .cooks_cutoff_threshold(0.0)
         .disable_independent_filtering();
 
-    let (_generic_fit, generic_results) = builder
-        .clone()
-        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &[0.1], 1)
-        .unwrap();
+    let (_generic_fit, generic_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
     let formula_builder = builder.clone().model_frame(model_frame);
-    let (_formula_fit, formula_results) = formula_builder
-        .clone()
-        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &[0.1], 1)
-        .unwrap();
-    let replacement = formula_builder
-        .fit_fixed_dispersion_lrt_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &[0.1],
-            1,
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap();
+    let (_formula_fit, formula_results) = run_results(
+        formula_builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let replacement = run_lrt_replacement(
+        formula_builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Coefficient(1))
+                .cooks_replacement(&CooksReplacementOptions::new(f64::MAX)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(generic_results.rows[0].cooks_outlier, Some(true));
     assert_eq!(generic_results.rows[0].pvalue, None);
@@ -1139,28 +1250,26 @@ fn fixed_dispersion_lrt_named_replacement_uses_stored_formula_low_count_cooks_ga
     let contrast = ContrastSpec::coefficient_name("condition_B_vs_A");
     let options = CooksReplacementOptions::new(f64::MAX);
 
-    let generic = builder
-        .clone()
-        .fit_fixed_dispersion_lrt_contrast_spec_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &[0.1],
-            &contrast,
-            &options,
-        )
-        .unwrap();
-    let formula = builder
-        .model_frame(model_frame)
-        .fit_fixed_dispersion_lrt_contrast_spec_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &[0.1],
-            &contrast,
-            &options,
-        )
-        .unwrap();
+    let generic = run_lrt_replacement(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Spec(&contrast))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let formula = run_lrt_replacement(
+        builder.model_frame(model_frame).run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Spec(&contrast))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     assert!(formula.results.rows[0].max_cooks.unwrap() > 0.0);
     assert_eq!(generic.results.rows[0].cooks_outlier, Some(true));
@@ -1212,28 +1321,26 @@ fn fixed_dispersion_lrt_reverse_numeric_replacement_uses_stored_formula_low_coun
         .disable_independent_filtering();
     let options = CooksReplacementOptions::new(f64::MAX);
 
-    let generic = builder
-        .clone()
-        .fit_fixed_dispersion_lrt_contrast_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &[0.1],
-            &[0.0, -1.0],
-            &options,
-        )
-        .unwrap();
-    let formula = builder
-        .model_frame(model_frame)
-        .fit_fixed_dispersion_lrt_contrast_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &[0.1],
-            &[0.0, -1.0],
-            &options,
-        )
-        .unwrap();
+    let generic = run_lrt_replacement(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Numeric(&[0.0, -1.0]))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let formula = run_lrt_replacement(
+        builder.model_frame(model_frame).run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Numeric(&[0.0, -1.0]))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     assert!(formula.results.rows[0].max_cooks.unwrap() > 0.0);
     assert_eq!(generic.results.rows[0].cooks_outlier, Some(true));
@@ -1298,18 +1405,19 @@ fn replacement_lrt_fixture() -> (
 fn fixed_dispersion_lrt_cooks_replacement_refits_marked_rows() {
     let (counts, full, reduced, dispersions, options) = replacement_lrt_fixture();
 
-    let output = DeseqBuilder::new()
-        .size_factors(vec![1.0; 8])
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_lrt_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            1,
-            &options,
-        )
-        .unwrap();
+    let output = run_lrt_replacement(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 8])
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&reduced)
+                    .fixed_dispersion(&dispersions)
+                    .result(ResultColumn::Coefficient(1))
+                    .cooks_replacement(&options),
+            ),
+    )
+    .unwrap();
 
     assert!(output.refit_plan.n_refit > 0);
     assert!(output.refit_plan.should_refit);
@@ -1337,18 +1445,21 @@ fn fixed_dispersion_lrt_cooks_replacement_refits_marked_rows() {
 fn fixed_dispersion_lrt_contrast_replacement_preserves_metadata() {
     let (counts, full, reduced, dispersions, options) = replacement_lrt_fixture();
 
-    let named = DeseqBuilder::new()
-        .size_factors(vec![1.0; 8])
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_lrt_contrast_spec_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            &ContrastSpec::coefficient_name("condition_B_vs_A"),
-            &options,
-        )
-        .unwrap();
+    let named = run_lrt_replacement(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 8])
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&reduced)
+                    .fixed_dispersion(&dispersions)
+                    .result(ResultColumn::Spec(&ContrastSpec::coefficient_name(
+                        "condition_B_vs_A",
+                    )))
+                    .cooks_replacement(&options),
+            ),
+    )
+    .unwrap();
 
     assert!(named.refit_plan.n_refit > 0);
     assert_eq!(
@@ -1387,31 +1498,41 @@ fn fixed_dispersion_lrt_factor_level_replacement_preserves_metadata() {
         .map(String::from)
         .collect::<Vec<_>>();
 
-    let output = DeseqBuilder::new()
-        .size_factors(vec![1.0; 8])
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-            &options,
-        )
-        .unwrap();
-    let request = DeseqBuilder::new()
-        .size_factors(vec![1.0; 8])
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_lrt_results_contrast_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            &ResultsContrast::character("condition", "B", "A"),
-            Some(&levels),
-            &options,
-        )
-        .unwrap();
+    let output = run_lrt_replacement(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 8])
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&reduced)
+                    .fixed_dispersion(&dispersions)
+                    .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                        "condition",
+                        "B",
+                        "A",
+                        &levels,
+                    )))
+                    .cooks_replacement(&options),
+            ),
+    )
+    .unwrap();
+    let request = run_lrt_replacement(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 8])
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&reduced)
+                    .fixed_dispersion(&dispersions)
+                    .result(ResultColumn::Results {
+                        contrast: &ResultsContrast::character("condition", "B", "A"),
+                        sample_levels: Some(&levels),
+                        model_frame: None,
+                    })
+                    .cooks_replacement(&options),
+            ),
+    )
+    .unwrap();
     let model_frame = FormulaModelFrame {
         factors: vec![FormulaFactorColumn {
             name: "condition".to_string(),
@@ -1421,19 +1542,23 @@ fn fixed_dispersion_lrt_factor_level_replacement_preserves_metadata() {
         }],
         numeric_covariates: Vec::new(),
     };
-    let model_frame_request = DeseqBuilder::new()
-        .size_factors(vec![1.0; 8])
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_lrt_results_contrast_from_model_frame_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            &ResultsContrast::character("condition", "B", "A"),
-            &model_frame,
-            &options,
-        )
-        .unwrap();
+    let model_frame_request = run_lrt_replacement(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 8])
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&reduced)
+                    .fixed_dispersion(&dispersions)
+                    .result(ResultColumn::Results {
+                        contrast: &ResultsContrast::character("condition", "B", "A"),
+                        sample_levels: None,
+                        model_frame: Some(&model_frame),
+                    })
+                    .cooks_replacement(&options),
+            ),
+    )
+    .unwrap();
 
     assert!(output.refit_plan.n_refit > 0);
     assert_eq!(request.results, output.results);
@@ -1507,20 +1632,24 @@ fn lrt_replacement_numeric_contrast_validates_stored_model_frame_metadata() {
     };
     let options = CooksReplacementOptions::new(f64::MAX);
 
-    let error = DeseqBuilder::new()
-        .size_factors(vec![1.0; 2])
-        .model_frame(ambiguous)
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_lrt_results_contrast_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &[0.1, 0.1],
-            &ResultsContrast::numeric(vec![0.0, 1.0]),
-            None::<&[String]>,
-            &options,
-        )
-        .unwrap_err();
+    let error = run_lrt_replacement(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 2])
+            .model_frame(ambiguous)
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&reduced)
+                    .fixed_dispersion(&[0.1, 0.1])
+                    .result(ResultColumn::Results {
+                        contrast: &ResultsContrast::numeric(vec![0.0, 1.0]),
+                        sample_levels: None,
+                        model_frame: None,
+                    })
+                    .cooks_replacement(&options),
+            ),
+    )
+    .unwrap_err();
 
     assert_ambiguous_name(
         error,
@@ -1535,18 +1664,19 @@ fn lrt_replacement_numeric_contrast_validates_stored_model_frame_metadata() {
 fn fixed_dispersion_lrt_replacement_skips_when_no_rows_are_marked() {
     let (counts, full, reduced, dispersions, _options) = replacement_lrt_fixture();
 
-    let output = DeseqBuilder::new()
-        .size_factors(vec![1.0; 8])
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_lrt_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &dispersions,
-            1,
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap();
+    let output = run_lrt_replacement(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 8])
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&reduced)
+                    .fixed_dispersion(&dispersions)
+                    .result(ResultColumn::Coefficient(1))
+                    .cooks_replacement(&CooksReplacementOptions::new(f64::MAX)),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(output.refit_plan.n_refit, 0);
     assert!(!output.refit_plan.should_refit);
@@ -1588,27 +1718,52 @@ fn fixed_dispersion_lrt_pipeline_validates_inputs() {
 
     assert!(
         DeseqBuilder::new()
-            .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &[], 1)
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&reduced)
+                    .fixed_dispersion(&[])
+                    .result(ResultColumn::Coefficient(1))
+            )
             .is_err()
     );
     assert!(
         DeseqBuilder::new()
-            .fit_fixed_dispersion_lrt(&counts, &full, &same_rank, &[0.1], 1)
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&same_rank)
+                    .fixed_dispersion(&[0.1])
+                    .result(ResultColumn::Coefficient(1))
+            )
             .is_err()
     );
     assert!(
         DeseqBuilder::new()
-            .fit_fixed_dispersion_lrt(&counts, &full, &rank_deficient_reduced, &[0.1], 1)
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&rank_deficient_reduced)
+                    .fixed_dispersion(&[0.1])
+                    .result(ResultColumn::Coefficient(1))
+            )
             .is_err()
     );
     assert!(
         DeseqBuilder::new()
-            .fit_fixed_dispersion_lrt(&counts, &full, &bad_samples, &[0.1], 1)
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&bad_samples)
+                    .fixed_dispersion(&[0.1])
+                    .result(ResultColumn::Coefficient(1))
+            )
             .is_err()
     );
     assert!(
         DeseqBuilder::new()
-            .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &[0.1], 2)
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&reduced)
+                    .fixed_dispersion(&[0.1])
+                    .result(ResultColumn::Coefficient(2))
+            )
             .is_err()
     );
 }

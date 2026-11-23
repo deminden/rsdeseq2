@@ -16,7 +16,6 @@ OUTPUT_STUDY_ROOT/02_deseq2_outputs/	scripts/references/generate_real_data_refer
 results/fixtures/real_optimizer_locfit_2026-05-31/	scripts/references/generate_real_port_fixtures.R	Manual optimizer and locfit replay against the saved study diagnostics	Research fixtures extracted from compiled original R routines.
 Requested uniform CDF reference TSV	scripts/references/generate_uniform_cdf_reference.R	RSDESEQ2_UNIFORM_CDF_REFERENCE=OUTPUT cargo test --locked -p rsdeseq2 --test integration bounded_posterior::	Windows and Intel macOS release runners generate this reference.
 crates/rsdeseq2/tests/data/gtex_v8_real_wald/{counts,reference_results}.tsv	scripts/references/stage_gtex_full_fixture.py	RSDESEQ2_FULL_GTEX=1 python3 -m unittest scripts.tests.test_gtex_parity_tools.CompactFixtureTests	Restores by pinned Git revision and SHA-256.
-crates/rsdeseq2/tests/run_equivalence.rs	crates/rsdeseq2/tools/validation/gen_run_equivalence.py	cargo test --locked -p rsdeseq2 --test integration run_equivalence::	-
 crates/rsdeseq2/tools/validation/golden/*.tsv	crates/rsdeseq2/tools/validation/golden.rs	cargo golden --check	Run with the host R and portable profiles.
 rsdeseq2_VERSION.tar.gz	scripts/release/build_r_source.sh	R CMD check --no-manual --no-build-vignettes ARCHIVE	See the no-skip gate in docs/testing-parity.md.
 r-pkg/rsdeseq2/src/rust/vendor/	scripts/release/sync_r_vendor.py	scripts/release/sync_r_vendor.sh --check	Generates the workspace portions of the R vendoring tree.

@@ -1,4 +1,5 @@
 use crate::support as common;
+use crate::support::run::{run_fit, run_results};
 
 use common::*;
 use rsdeseq2::prelude::*;
@@ -79,9 +80,7 @@ fn normalization_stage_matches_deseq2_reference() {
     let expected_base = read_reference_tsv("base_metadata_ratio.tsv");
 
     let counts = reference_counts();
-    let fit = DeseqBuilder::new()
-        .fit_size_factors_and_base_means(&counts)
-        .unwrap();
+    let fit = run_fit(DeseqBuilder::new().run(&Analysis::without_design(&counts))).unwrap();
 
     assert_eq!(fit.size_factors.len(), expected_size_factors.len());
     for (sample, (actual, expected)) in fit
@@ -183,10 +182,12 @@ fn normalization_factors_match_deseq2_reference() {
         }
     }
 
-    let fit = DeseqBuilder::new()
-        .normalization_factors(normalization_factors)
-        .fit_size_factors_and_base_means(&counts)
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .normalization_factors(normalization_factors)
+            .run(&Analysis::without_design(&counts)),
+    )
+    .unwrap();
     for (gene, row) in expected_base.iter().enumerate() {
         assert_float_close(
             fit.base_mean[gene],
@@ -213,11 +214,16 @@ fn weighted_base_metadata_matches_deseq2_reference() {
     let observation_weights = read_reference_matrix("observation_weights.tsv");
     let size_factors = read_size_factors("size_factors_ratio.tsv");
 
-    let fit = DeseqBuilder::new()
-        .size_factors(size_factors)
-        .observation_weights(observation_weights)
-        .fit_size_factors_and_base_means_with_design(&reference_counts(), &reference_full_design())
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .size_factors(size_factors)
+            .observation_weights(observation_weights)
+            .run(
+                &Analysis::new(&reference_counts(), &reference_full_design())
+                    .stop_after(Stage::SizeFactors),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(
         fit.weights_design_rank,
@@ -261,18 +267,24 @@ fn native_glm_mu_mean_wald_results_match_deseq2_reference() {
     let rows = read_reference_tsv("native_glm_mu_mean_results_wald.tsv");
     let size_factors = read_size_factors("size_factors_ratio.tsv");
 
-    let (_, results) = DeseqBuilder::new()
-        .size_factors(size_factors)
-        .fit_type(FitType::Mean)
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            use_cox_reid: false,
-            niter: 2,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_wald_glm_mu(&reference_counts(), &reference_full_design(), 1)
-        .unwrap();
+    let (_, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(size_factors)
+            .fit_type(FitType::Mean)
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                use_cox_reid: false,
+                niter: 2,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&reference_counts(), &reference_full_design())
+                    .means(MeanModel::GlmMu)
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     assert_result_rows_match_reference(&results, &rows, "native GLM-mu mean Wald results");
 }
@@ -282,23 +294,25 @@ fn native_glm_mu_mean_lrt_results_match_deseq2_reference() {
     let rows = read_reference_tsv("native_glm_mu_mean_results_lrt.tsv");
     let size_factors = read_size_factors("size_factors_ratio.tsv");
 
-    let (_, results) = DeseqBuilder::new()
-        .size_factors(size_factors)
-        .fit_type(FitType::Mean)
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            use_cox_reid: false,
-            niter: 2,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_lrt_glm_mu(
-            &reference_counts(),
-            &reference_full_design(),
-            &reference_reduced_design(),
-            1,
-        )
-        .unwrap();
+    let (_, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(size_factors)
+            .fit_type(FitType::Mean)
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                use_cox_reid: false,
+                niter: 2,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&reference_counts(), &reference_full_design())
+                    .lrt(&reference_reduced_design())
+                    .means(MeanModel::GlmMu)
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     assert_result_rows_match_reference(&results, &rows, "native GLM-mu mean LRT results");
 }
@@ -319,18 +333,23 @@ fn native_glm_mu_local_results_match_deseq2_references() {
         })
         .disable_cooks_cutoff()
         .disable_independent_filtering();
-    let (_, wald_results) = builder
-        .clone()
-        .fit_wald_glm_mu(&reference_counts(), &reference_full_design(), 1)
-        .unwrap();
-    let (_, lrt_results) = builder
-        .fit_lrt_glm_mu(
-            &reference_counts(),
-            &reference_full_design(),
-            &reference_reduced_design(),
-            1,
-        )
-        .unwrap();
+    let (_, wald_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&reference_counts(), &reference_full_design())
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let (_, lrt_results) = run_results(
+        builder.run(
+            &Analysis::new(&reference_counts(), &reference_full_design())
+                .lrt(&reference_reduced_design())
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert_result_rows_match_reference(
         &wald_results,
@@ -355,18 +374,23 @@ fn native_glm_mu_local_cox_reid_results_match_deseq2_references() {
         })
         .disable_cooks_cutoff()
         .disable_independent_filtering();
-    let (_, wald_results) = builder
-        .clone()
-        .fit_wald_glm_mu(&reference_counts(), &reference_full_design(), 1)
-        .unwrap();
-    let (_, lrt_results) = builder
-        .fit_lrt_glm_mu(
-            &reference_counts(),
-            &reference_full_design(),
-            &reference_reduced_design(),
-            1,
-        )
-        .unwrap();
+    let (_, wald_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&reference_counts(), &reference_full_design())
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let (_, lrt_results) = run_results(
+        builder.run(
+            &Analysis::new(&reference_counts(), &reference_full_design())
+                .lrt(&reference_reduced_design())
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert_result_rows_match_reference(
         &wald_results,
@@ -397,18 +421,23 @@ fn native_weighted_glm_mu_mean_cox_reid_results_match_deseq2_references() {
         })
         .disable_cooks_cutoff()
         .disable_independent_filtering();
-    let (_, wald_results) = builder
-        .clone()
-        .fit_wald_glm_mu(&reference_counts(), &reference_full_design(), 1)
-        .unwrap();
-    let (_, lrt_results) = builder
-        .fit_lrt_glm_mu(
-            &reference_counts(),
-            &reference_full_design(),
-            &reference_reduced_design(),
-            1,
-        )
-        .unwrap();
+    let (_, wald_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&reference_counts(), &reference_full_design())
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let (_, lrt_results) = run_results(
+        builder.run(
+            &Analysis::new(&reference_counts(), &reference_full_design())
+                .lrt(&reference_reduced_design())
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert_result_rows_match_reference(
         &wald_results,
@@ -440,18 +469,23 @@ fn native_weighted_glm_mu_local_results_match_deseq2_references() {
         })
         .disable_cooks_cutoff()
         .disable_independent_filtering();
-    let (_, wald_results) = builder
-        .clone()
-        .fit_wald_glm_mu(&reference_counts(), &reference_full_design(), 1)
-        .unwrap();
-    let (_, lrt_results) = builder
-        .fit_lrt_glm_mu(
-            &reference_counts(),
-            &reference_full_design(),
-            &reference_reduced_design(),
-            1,
-        )
-        .unwrap();
+    let (_, wald_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&reference_counts(), &reference_full_design())
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let (_, lrt_results) = run_results(
+        builder.run(
+            &Analysis::new(&reference_counts(), &reference_full_design())
+                .lrt(&reference_reduced_design())
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert_result_rows_match_reference(
         &wald_results,
@@ -482,18 +516,23 @@ fn native_weighted_glm_mu_local_cox_reid_results_match_deseq2_references() {
         })
         .disable_cooks_cutoff()
         .disable_independent_filtering();
-    let (_, wald_results) = builder
-        .clone()
-        .fit_wald_glm_mu(&reference_counts(), &reference_full_design(), 1)
-        .unwrap();
-    let (_, lrt_results) = builder
-        .fit_lrt_glm_mu(
-            &reference_counts(),
-            &reference_full_design(),
-            &reference_reduced_design(),
-            1,
-        )
-        .unwrap();
+    let (_, wald_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&reference_counts(), &reference_full_design())
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let (_, lrt_results) = run_results(
+        builder.run(
+            &Analysis::new(&reference_counts(), &reference_full_design())
+                .lrt(&reference_reduced_design())
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert_result_rows_match_reference(
         &wald_results,

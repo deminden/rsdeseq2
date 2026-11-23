@@ -1256,7 +1256,7 @@ selected-coefficient Wald replacement refits reuse the two-group low-count
 Cook's condition when the selected coefficient is the non-reference
 comparison for one two-level factor. An LRT is `Analysis::lrt(reduced)` (or
 `lrt_formula` with a formula design), because callers must provide a reduced
-design. The deprecated `DeseqBuilder::fit*` methods wrap `run`.
+design.
 LRT contrast result tables report the requested full-model
 effect size, but keep the full-vs-reduced LRT statistic and p-value; when
 DESeq2's numeric or character/factor-level `contrastAllZero` rule applies,

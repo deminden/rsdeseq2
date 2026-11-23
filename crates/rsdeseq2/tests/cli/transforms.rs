@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::run_results;
+use rsdeseq2::prelude::Analysis;
 
 #[test]
 fn cli_rlog_rejects_incomplete_option_combinations() {
@@ -49,8 +51,8 @@ fn cli_weighted_wald_and_rlog_match_library_numerically_and_differ_from_unweight
         .disable_cooks_cutoff()
         .disable_independent_filtering();
     let weighted = base.clone().observation_weights(weights);
-    let (_, expected) = weighted.fit_with_results(&counts, &design).unwrap();
-    let (_, unweighted) = base.fit_with_results(&counts, &design).unwrap();
+    let (_, expected) = run_results(weighted.run(&Analysis::new(&counts, &design))).unwrap();
+    let (_, unweighted) = run_results(base.run(&Analysis::new(&counts, &design))).unwrap();
     assert_ne!(
         expected.rows, unweighted.rows,
         "weights must change Wald values"

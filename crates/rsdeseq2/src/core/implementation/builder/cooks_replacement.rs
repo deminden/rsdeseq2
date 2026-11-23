@@ -1,6 +1,5 @@
 use super::*;
 impl DeseqBuilder {
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_with_cooks_replacement`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_glm_mu_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -80,7 +79,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_contrast_with_cooks_replacement`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_glm_mu_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -160,7 +158,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_contrast_spec_with_cooks_replacement`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_glm_mu_contrast_spec_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -186,7 +183,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -308,7 +304,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_glm_mu_with_cooks_replacement`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_glm_mu_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -389,7 +384,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_glm_mu_contrast_with_cooks_replacement`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_glm_mu_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -475,7 +469,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -604,7 +597,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_glm_mu_contrast_spec_with_cooks_replacement`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_glm_mu_contrast_spec_with_cooks_replacement(
         &self,
         counts: &CountMatrix,

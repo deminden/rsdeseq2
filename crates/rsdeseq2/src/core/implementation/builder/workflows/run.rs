@@ -7,11 +7,10 @@ use crate::errors::{ErrorKind, RunConflict, invalid_dimensions, missing_prerequi
 use std::borrow::Cow;
 
 use super::super::{
-    Analysis, ContrastSpec, CooksReplacementLrtOutput, CooksReplacementOptions,
-    CooksReplacementTestOutput, CooksReplacementWaldOutput, CountMatrix, DeseqBuilder, DeseqError,
-    DeseqFit, DeseqResults, DesignInput, DesignMatrix, DispersionRequest, FactorLevelContrast,
-    FitType, MeanModel, Replacement, ResultColumn, ResultsContrast, RunOutput, Stage, TestRequest,
-    TestType, default_results_coefficient, factor_level_contrast_from_model_frame,
+    Analysis, ContrastSpec, CooksReplacementOptions, CooksReplacementTestOutput, CountMatrix,
+    DeseqBuilder, DeseqError, DeseqFit, DeseqResults, DesignInput, DesignMatrix, DispersionRequest,
+    FactorLevelContrast, FitType, MeanModel, Replacement, ResultColumn, ResultsContrast, RunOutput,
+    Stage, TestRequest, default_results_coefficient, factor_level_contrast_from_model_frame,
     factor_level_contrast_from_sample_levels, resolve_coefficient_index,
 };
 
@@ -639,19 +638,6 @@ impl DeseqBuilder {
     }
 }
 
-impl DeseqBuilder {
-    /// The test a top-level `fit*` method runs: the builder's test type,
-    /// with its stored reduced design for an LRT.
-    pub(super) fn top_level_test(&self) -> Result<TestRequest<'_>, DeseqError> {
-        Ok(match self.test {
-            TestType::Wald => TestRequest::Wald,
-            TestType::Lrt => TestRequest::Lrt {
-                reduced: DesignInput::Matrix(self.reduced_design_for_top_level_lrt()?),
-            },
-        })
-    }
-}
-
 fn shape_error(expected: &str, output: &RunOutput) -> DeseqError {
     let actual = match output {
         RunOutput::Fit(_) => "an early-stage fit",
@@ -666,46 +652,10 @@ fn shape_error(expected: &str, output: &RunOutput) -> DeseqError {
 }
 
 impl RunOutput {
-    pub(in super::super) fn into_results_pair(
-        self,
-    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        match self {
-            Self::Results { fit, results } => Ok((fit, results)),
-            other => Err(shape_error("a fit with results", &other)),
-        }
-    }
-
     pub(in super::super) fn into_fit_only(self) -> Result<DeseqFit, DeseqError> {
         match self {
             Self::Fit(fit) | Self::Results { fit, .. } => Ok(fit),
             other => Err(shape_error("a fit", &other)),
-        }
-    }
-
-    pub(in super::super) fn into_replacement(
-        self,
-    ) -> Result<CooksReplacementTestOutput, DeseqError> {
-        match self {
-            Self::Replacement(output) => Ok(output),
-            other => Err(shape_error("a replacement output", &other)),
-        }
-    }
-
-    pub(in super::super) fn into_wald_replacement(
-        self,
-    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
-        match self {
-            Self::Replacement(CooksReplacementTestOutput::Wald(output)) => Ok(output),
-            other => Err(shape_error("a Wald replacement output", &other)),
-        }
-    }
-
-    pub(in super::super) fn into_lrt_replacement(
-        self,
-    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        match self {
-            Self::Replacement(CooksReplacementTestOutput::Lrt(output)) => Ok(output),
-            other => Err(shape_error("an LRT replacement output", &other)),
         }
     }
 }

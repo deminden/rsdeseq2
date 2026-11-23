@@ -82,7 +82,6 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
         let mut builder = DeseqBuilder::new()
             .automatic_dispersion_means()
             .fit_type(selected_fit_type)
-            .test(selected_test_type)
             .threads(threads.max(1));
         if !size_factors_values.is_null() {
             builder = builder.size_factors(

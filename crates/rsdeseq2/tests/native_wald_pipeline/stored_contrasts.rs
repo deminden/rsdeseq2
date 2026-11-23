@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::{run_replacement, run_results};
+use rsdeseq2::prelude::{Analysis, ResultColumn};
 
 #[test]
 fn fitted_wald_object_uses_stored_model_frame_for_character_contrast_results() {
@@ -22,13 +24,14 @@ fn fitted_wald_object_uses_stored_model_frame_for_character_contrast_results() {
         .disable_independent_filtering()
         .model_frame(model_frame);
 
-    let (fit, mut expected_results) = builder
-        .fit_formula_with_results_contrast_request(
-            &counts,
-            "~ `cell type`",
-            &ResultsContrast::character("cell.type", "B cell", "T cell"),
-        )
-        .unwrap();
+    let (fit, mut expected_results) = run_results(builder.run(
+        &Analysis::formula(&counts, "~ `cell type`").result(ResultColumn::Results {
+            contrast: &ResultsContrast::character("cell.type", "B cell", "T cell"),
+            sample_levels: None,
+            model_frame: None,
+        }),
+    ))
+    .unwrap();
     expected_results.independent_filtering = None;
     let object_results = fit
         .wald_results_contrast_request(
@@ -83,13 +86,14 @@ fn fitted_wald_object_uses_stored_model_frame_for_character_contrast_results() {
     let transformed_formula = "~ factor(condition, levels=c('B','A'))";
     let transformed_contrast =
         ResultsContrast::character("factor.condition..levels...c..B....A...", "A", "B");
-    let (transformed_fit, mut expected_transformed_results) = transformed_builder
-        .fit_formula_with_results_contrast_request(
-            &counts,
-            transformed_formula,
-            &transformed_contrast,
-        )
-        .unwrap();
+    let (transformed_fit, mut expected_transformed_results) = run_results(transformed_builder.run(
+        &Analysis::formula(&counts, transformed_formula).result(ResultColumn::Results {
+            contrast: &transformed_contrast,
+            sample_levels: None,
+            model_frame: None,
+        }),
+    ))
+    .unwrap();
     expected_transformed_results.independent_filtering = None;
     let object_transformed_results = transformed_fit
         .results_contrast_request(&counts, &transformed_contrast, counts.gene_names())
@@ -103,9 +107,14 @@ fn fitted_wald_object_uses_stored_model_frame_for_character_contrast_results() {
 
     let ordered_formula = "~ ordered(condition, levels=c('B','A'))";
     let ordered_contrast = ResultsContrast::numeric(vec![0.0, 1.0]);
-    let (ordered_fit, mut expected_ordered_results) = transformed_builder
-        .fit_formula_with_results_contrast_request(&counts, ordered_formula, &ordered_contrast)
-        .unwrap();
+    let (ordered_fit, mut expected_ordered_results) = run_results(transformed_builder.run(
+        &Analysis::formula(&counts, ordered_formula).result(ResultColumn::Results {
+            contrast: &ordered_contrast,
+            sample_levels: None,
+            model_frame: None,
+        }),
+    ))
+    .unwrap();
     expected_ordered_results.independent_filtering = None;
     let object_ordered_results = ordered_fit
         .results_contrast_request(&counts, &ordered_contrast, counts.gene_names())
@@ -158,9 +167,14 @@ fn fitted_wald_object_uses_stored_model_frame_for_character_contrast_results() {
         "treated",
         "control",
     );
-    let (relabeled_fit, mut expected_relabeled_results) = relabeled_builder
-        .fit_formula_with_results_contrast_request(&counts, relabeled_formula, &relabeled_contrast)
-        .unwrap();
+    let (relabeled_fit, mut expected_relabeled_results) = run_results(relabeled_builder.run(
+        &Analysis::formula(&counts, relabeled_formula).result(ResultColumn::Results {
+            contrast: &relabeled_contrast,
+            sample_levels: None,
+            model_frame: None,
+        }),
+    ))
+    .unwrap();
     expected_relabeled_results.independent_filtering = None;
     let object_relabeled_results = relabeled_fit
         .results_contrast_request(&counts, &relabeled_contrast, counts.gene_names())
@@ -179,17 +193,24 @@ fn fitted_wald_object_uses_stored_model_frame_for_character_contrast_results() {
         )
     );
 
-    let error = relabeled_builder
-        .fit_formula_with_results_contrast_request(
-            &counts,
-            "~ ordered(condition, levels=c('A','B'), labels=c('control','treated'))",
-            &ResultsContrast::character(
-                "ordered.condition..levels...c..A....B....labels...c..control....treated...",
-                "treated",
-                "control",
-            ),
-        )
-        .unwrap_err();
+    let error = run_results(
+        relabeled_builder.run(
+            &Analysis::formula(
+                &counts,
+                "~ ordered(condition, levels=c('A','B'), labels=c('control','treated'))",
+            )
+            .result(ResultColumn::Results {
+                contrast: &ResultsContrast::character(
+                    "ordered.condition..levels...c..A....B....labels...c..control....treated...",
+                    "treated",
+                    "control",
+                ),
+                sample_levels: None,
+                model_frame: None,
+            }),
+        ),
+    )
+    .unwrap_err();
     crate::support::assert_ordered_factor_contrast_error(
         error,
         r#"ordered(condition, levels = c("A", "B"), labels = c("control", "treated"))"#,
@@ -237,15 +258,18 @@ fn fitted_wald_object_applies_numeric_contrast_all_zero_from_stored_design() {
         .unwrap()
         .standard_design;
     let dispersions = vec![0.2; counts.n_genes()];
-    let (fit, character_results) = builder
-        .fit_fixed_dispersion_wald_results_contrast_from_model_frame(
-            &counts,
-            &design,
-            &dispersions,
-            &ResultsContrast::character("condition", "B", "A"),
-            builder.current_model_frame().unwrap(),
-        )
-        .unwrap();
+    let (fit, character_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "B", "A"),
+                    sample_levels: None,
+                    model_frame: Some(builder.current_model_frame().unwrap()),
+                }),
+        ),
+    )
+    .unwrap();
     let list_results = fit
         .results_contrast_request(
             &counts,
@@ -276,15 +300,18 @@ fn fitted_wald_object_applies_numeric_contrast_all_zero_from_stored_design() {
         .unwrap();
     let transformed_contrast =
         ResultsContrast::character("factor.condition..levels...c..A....B....C...", "B", "A");
-    let (formula_fit, mut formula_results) = builder
-        .fit_fixed_dispersion_wald_results_contrast_from_model_frame(
-            &counts,
-            &formula_design.design.standard_design,
-            &dispersions,
-            &transformed_contrast,
-            &formula_design.model_frame,
-        )
-        .unwrap();
+    let (formula_fit, mut formula_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &formula_design.design.standard_design)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &transformed_contrast,
+                    sample_levels: None,
+                    model_frame: Some(&formula_design.model_frame),
+                }),
+        ),
+    )
+    .unwrap();
     formula_results.independent_filtering = None;
     let formula_object_results = formula_fit
         .results_contrast_request(&counts, &transformed_contrast, counts.gene_names())
@@ -329,23 +356,36 @@ fn top_level_formula_list_contrast_cooks_replacement_accepts_r_cleaned_quoted_co
         .model_frame(model_frame);
     let options = CooksReplacementOptions::new(f64::MAX);
 
-    let cleaned_output = builder
-        .clone()
-        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
-            &counts,
-            "~ `cell type`",
-            &ResultsContrast::list(vec!["cell.type_B.cell_vs_T.cell".into()], Vec::new()),
-            &options,
-        )
-        .unwrap();
-    let raw_output = builder
-        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
-            &counts,
-            "~ `cell type`",
-            &ResultsContrast::list(vec!["cell type_B cell_vs_T cell".into()], Vec::new()),
-            &options,
-        )
-        .unwrap();
+    let cleaned_output = run_replacement(
+        builder.clone().run(
+            &Analysis::formula(&counts, "~ `cell type`")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell.type_B.cell_vs_T.cell".into()],
+                        Vec::new(),
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let raw_output = run_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ `cell type`")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell type_B cell_vs_T cell".into()],
+                        Vec::new(),
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     let CooksReplacementTestOutput::Wald(cleaned_output) = cleaned_output else {
         panic!("formula list contrast replacement should route to Wald");
@@ -393,23 +433,36 @@ fn top_level_formula_list_contrast_cooks_replacement_accepts_cleaned_numeric_tra
         .model_frame(model_frame);
     let options = CooksReplacementOptions::new(f64::MAX);
 
-    let cleaned_output = builder
-        .clone()
-        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
-            &counts,
-            "~ as.double(`cell type`)",
-            &ResultsContrast::list(vec!["cell.type_as.double".into()], Vec::new()),
-            &options,
-        )
-        .unwrap();
-    let raw_output = builder
-        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
-            &counts,
-            "~ as.double(`cell type`)",
-            &ResultsContrast::list(vec!["cell type_as.double".into()], Vec::new()),
-            &options,
-        )
-        .unwrap();
+    let cleaned_output = run_replacement(
+        builder.clone().run(
+            &Analysis::formula(&counts, "~ as.double(`cell type`)")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell.type_as.double".into()],
+                        Vec::new(),
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let raw_output = run_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ as.double(`cell type`)")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell type_as.double".into()],
+                        Vec::new(),
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     let CooksReplacementTestOutput::Wald(cleaned_output) = cleaned_output else {
         panic!("formula numeric-transform list replacement should route to Wald");
@@ -468,14 +521,18 @@ fn top_level_formula_numeric_contrast_cooks_replacement_retains_numeric_transfor
         .model_frame(model_frame);
     let options = CooksReplacementOptions::new(f64::MAX);
 
-    let numeric_output = builder
-        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
-            &counts,
-            "~ as.double(`cell type`)",
-            &ResultsContrast::numeric(vec![0.0, 1.0]),
-            &options,
-        )
-        .unwrap();
+    let numeric_output = run_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ as.double(`cell type`)")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::numeric(vec![0.0, 1.0]),
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     let CooksReplacementTestOutput::Wald(numeric_output) = numeric_output else {
         panic!("formula numeric-transform numeric replacement should route to Wald");
@@ -526,29 +583,36 @@ fn top_level_formula_list_contrast_cooks_replacement_accepts_cleaned_positive_an
         .model_frame(model_frame);
     let options = CooksReplacementOptions::new(f64::MAX);
 
-    let cleaned_output = builder
-        .clone()
-        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
-            &counts,
-            "~ `cell type`",
-            &ResultsContrast::list(
-                vec!["cell.type_NK.cell_vs_T.cell".into()],
-                vec!["cell.type_B.cell_vs_T.cell".into()],
-            ),
-            &options,
-        )
-        .unwrap();
-    let raw_output = builder
-        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
-            &counts,
-            "~ `cell type`",
-            &ResultsContrast::list(
-                vec!["cell type_NK cell_vs_T cell".into()],
-                vec!["cell type_B cell_vs_T cell".into()],
-            ),
-            &options,
-        )
-        .unwrap();
+    let cleaned_output = run_replacement(
+        builder.clone().run(
+            &Analysis::formula(&counts, "~ `cell type`")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell.type_NK.cell_vs_T.cell".into()],
+                        vec!["cell.type_B.cell_vs_T.cell".into()],
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let raw_output = run_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ `cell type`")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell type_NK cell_vs_T cell".into()],
+                        vec!["cell type_B cell_vs_T cell".into()],
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     let CooksReplacementTestOutput::Wald(cleaned_output) = cleaned_output else {
         panic!("formula list contrast replacement should route to Wald");

@@ -66,12 +66,6 @@ impl FormulaCase {
         let mut request = Analysis::formula(counts, &self.full);
         if let Some(reduced) = reduced {
             request = request.lrt_formula(reduced);
-        } else if builder.current_test() == TestType::Lrt {
-            request = request.lrt(
-                builder
-                    .current_reduced_design()
-                    .ok_or("top-level LRT fit without a reduced design")?,
-            );
         }
         let mut options = CooksReplacementOptions::new(super::super::parse_numeric_input(
             &case.replacement_cutoff,

@@ -1,8 +1,3 @@
-//! Public builder entry points, organized by workflow.
+//! Public builder entry point.
 
-mod contrasts;
-mod entry;
-mod lrt;
-mod lrt_replacement;
-mod replacement;
 mod run;

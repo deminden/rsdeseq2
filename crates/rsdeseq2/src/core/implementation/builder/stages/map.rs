@@ -3,7 +3,6 @@ use super::*;
 use crate::errors::{ErrorKind, missing_prerequisite};
 
 impl DeseqBuilder {
-    /// Leaf workflow behind [`DeseqBuilder::fit_map_dispersions_linear_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_map_dispersions_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -15,7 +14,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_map_dispersions_linear_mu_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_map_dispersions_linear_mu_parametric(
         &self,
         counts: &CountMatrix,
@@ -27,7 +25,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_map_dispersions_glm_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_map_dispersions_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -39,7 +36,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_map_dispersions_glm_mu_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_map_dispersions_glm_mu_parametric(
         &self,
         counts: &CountMatrix,

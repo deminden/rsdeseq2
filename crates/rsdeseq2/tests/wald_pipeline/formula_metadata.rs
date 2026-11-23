@@ -1,6 +1,8 @@
 use super::*;
 use crate::support::assert_ambiguous_name;
+use crate::support::run::run_results;
 use rsdeseq2::errors::NameScope;
+use rsdeseq2::prelude::{Analysis, ResultColumn};
 
 #[test]
 fn builder_try_model_frame_validates_wrapper_metadata() {
@@ -72,18 +74,22 @@ fn model_frame_contrast_routes_validate_metadata_for_numeric_requests() {
         }],
     };
 
-    let error = DeseqBuilder::new()
-        .size_factors(vec![1.0; 2])
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald_results_contrast_from_model_frame(
-            &counts,
-            &design,
-            &[0.1],
-            &ResultsContrast::numeric(vec![0.0, 1.0]),
-            &ambiguous,
-        )
-        .unwrap_err();
+    let error = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 2])
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1])
+                    .result(ResultColumn::Results {
+                        contrast: &ResultsContrast::numeric(vec![0.0, 1.0]),
+                        sample_levels: None,
+                        model_frame: Some(&ambiguous),
+                    }),
+            ),
+    )
+    .unwrap_err();
 
     assert_ambiguous_name(
         error,
@@ -141,39 +147,47 @@ fn fixed_dispersion_wald_results_character_contrast_uses_formula_model_frame() {
         .disable_cooks_cutoff()
         .disable_independent_filtering();
 
-    let (_explicit_fit, explicit_results) = builder
-        .clone()
-        .fit_fixed_dispersion_wald_results_contrast(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ResultsContrast::character("condition", "B", "A"),
-            Some(&levels),
-        )
-        .unwrap();
-    let (model_frame_fit, model_frame_results) = builder
-        .fit_fixed_dispersion_wald_results_contrast_from_model_frame(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ResultsContrast::character("condition", "B", "A"),
-            &model_frame,
-        )
-        .unwrap();
+    let (_explicit_fit, explicit_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "B", "A"),
+                    sample_levels: Some(&levels),
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
+    let (model_frame_fit, model_frame_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "B", "A"),
+                    sample_levels: None,
+                    model_frame: Some(&model_frame),
+                }),
+        ),
+    )
+    .unwrap();
     let builder_with_model_frame = builder.clone().model_frame(model_frame.clone());
     assert_eq!(
         builder_with_model_frame.current_model_frame(),
         Some(&model_frame)
     );
-    let (stored_model_frame_fit, stored_model_frame_results) = builder_with_model_frame
-        .fit_fixed_dispersion_wald_results_contrast::<String>(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ResultsContrast::character("condition", "B", "A"),
-            None,
-        )
-        .unwrap();
+    let (stored_model_frame_fit, stored_model_frame_results) = run_results(
+        builder_with_model_frame.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "B", "A"),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(model_frame_results, explicit_results);
     assert_eq!(stored_model_frame_results, explicit_results);
@@ -237,25 +251,34 @@ fn fixed_dispersion_wald_model_frame_contrast_uses_declared_factor_levels() {
         .disable_cooks_cutoff()
         .disable_independent_filtering();
 
-    let (_explicit_fit, explicit_results) = builder
-        .clone()
-        .fit_fixed_dispersion_wald_factor_level_contrast(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            FactorLevelContrast::with_reference("condition", "C", "B", "A", &observed_levels),
-        )
-        .unwrap();
-    let (_model_frame_fit, model_frame_results) = builder
-        .clone()
-        .fit_fixed_dispersion_wald_results_contrast_from_model_frame(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ResultsContrast::character("condition", "C", "B"),
-            &model_frame,
-        )
-        .unwrap();
+    let (_explicit_fit, explicit_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::FactorLevel(
+                    FactorLevelContrast::with_reference(
+                        "condition",
+                        "C",
+                        "B",
+                        "A",
+                        &observed_levels,
+                    ),
+                )),
+        ),
+    )
+    .unwrap();
+    let (_model_frame_fit, model_frame_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "C", "B"),
+                    sample_levels: None,
+                    model_frame: Some(&model_frame),
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(model_frame_results, explicit_results);
     assert_eq!(
@@ -310,24 +333,34 @@ fn fixed_dispersion_wald_model_frame_contrast_uses_unused_declared_reference_wit
         .disable_cooks_cutoff()
         .disable_independent_filtering();
 
-    let (_explicit_fit, explicit_results) = builder
-        .clone()
-        .fit_fixed_dispersion_wald_factor_level_contrast(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            FactorLevelContrast::with_reference("condition", "C", "B", "A", &observed_levels),
-        )
-        .unwrap();
-    let (_model_frame_fit, model_frame_results) = builder
-        .fit_fixed_dispersion_wald_results_contrast_from_model_frame(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ResultsContrast::character("condition", "C", "B"),
-            &model_frame,
-        )
-        .unwrap();
+    let (_explicit_fit, explicit_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::FactorLevel(
+                    FactorLevelContrast::with_reference(
+                        "condition",
+                        "C",
+                        "B",
+                        "A",
+                        &observed_levels,
+                    ),
+                )),
+        ),
+    )
+    .unwrap();
+    let (_model_frame_fit, model_frame_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "C", "B"),
+                    sample_levels: None,
+                    model_frame: Some(&model_frame),
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(model_frame_results, explicit_results);
     assert_eq!(
@@ -381,52 +414,63 @@ fn fixed_dispersion_wald_model_frame_contrast_accepts_cleaned_factor_name_alias(
         .disable_cooks_cutoff()
         .disable_independent_filtering();
 
-    let (_explicit_fit, explicit_results) = builder
-        .clone()
-        .fit_fixed_dispersion_wald_factor_level_contrast(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            FactorLevelContrast::new("cell type", "B-1", "A 0", &levels),
-        )
-        .unwrap();
-    let (_model_frame_fit, model_frame_results) = builder
-        .fit_fixed_dispersion_wald_results_contrast_from_model_frame(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ResultsContrast::character("cell.type", "B-1", "A 0"),
-            &model_frame,
-        )
-        .unwrap();
-    let (_stored_fit, stored_results) = builder
-        .clone()
-        .model_frame(model_frame)
-        .fit_fixed_dispersion_wald_results_contrast::<String>(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ResultsContrast::character("cell.type", "B-1", "A 0"),
-            None,
-        )
-        .unwrap();
-    let (_alias_fit, alias_results) = builder
-        .fit_fixed_dispersion_wald_results_contrast_from_model_frame(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ResultsContrast::character("cell.type", "B.1", "A.0"),
-            &FormulaModelFrame {
-                factors: vec![FormulaFactorColumn {
-                    name: "cell type".to_string(),
-                    sample_levels: levels.clone(),
-                    levels: Some(vec!["A 0".to_string(), "B-1".to_string()]),
-                    reference: None,
-                }],
-                numeric_covariates: Vec::new(),
-            },
-        )
-        .unwrap();
+    let (_explicit_fit, explicit_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                    "cell type",
+                    "B-1",
+                    "A 0",
+                    &levels,
+                ))),
+        ),
+    )
+    .unwrap();
+    let (_model_frame_fit, model_frame_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("cell.type", "B-1", "A 0"),
+                    sample_levels: None,
+                    model_frame: Some(&model_frame),
+                }),
+        ),
+    )
+    .unwrap();
+    let (_stored_fit, stored_results) = run_results(
+        builder.clone().model_frame(model_frame).run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("cell.type", "B-1", "A 0"),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
+    let (_alias_fit, alias_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("cell.type", "B.1", "A.0"),
+                    sample_levels: None,
+                    model_frame: Some(&FormulaModelFrame {
+                        factors: vec![FormulaFactorColumn {
+                            name: "cell type".to_string(),
+                            sample_levels: levels.clone(),
+                            levels: Some(vec!["A 0".to_string(), "B-1".to_string()]),
+                            reference: None,
+                        }],
+                        numeric_covariates: Vec::new(),
+                    }),
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(model_frame_results, explicit_results);
     assert_eq!(stored_results, explicit_results);
@@ -476,40 +520,47 @@ fn fixed_dispersion_wald_formula_ordered_contrast_requires_polynomial_selectors(
     let model_frame = &formula_design.model_frame;
     let dispersions = [0.1, 0.1];
     let invalid = ResultsContrast::character("ordered.condition..levels...c..B....A...", "A", "B");
-    let error = builder
-        .clone()
-        .fit_fixed_dispersion_wald_results_contrast_from_model_frame(
-            &counts,
-            design,
-            &dispersions,
-            &invalid,
-            model_frame,
-        )
-        .unwrap_err();
+    let error = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, design)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &invalid,
+                    sample_levels: None,
+                    model_frame: Some(model_frame),
+                }),
+        ),
+    )
+    .unwrap_err();
     crate::support::assert_ordered_factor_contrast_error(
         error,
         r#"ordered(condition, levels = c("B", "A"))"#,
     );
     let numeric = ResultsContrast::numeric(vec![0.0, 1.0]);
     let named = ResultsContrast::list(vec![design.coefficient_names().unwrap()[1].clone()], vec![]);
-    let (_, numerical) = builder
-        .clone()
-        .fit_fixed_dispersion_wald_results_contrast_from_model_frame(
-            &counts,
-            design,
-            &dispersions,
-            &numeric,
-            model_frame,
-        )
-        .unwrap();
-    let (_, selected) = builder
-        .fit_fixed_dispersion_wald_results_contrast_from_model_frame(
-            &counts,
-            design,
-            &dispersions,
-            &named,
-            model_frame,
-        )
-        .unwrap();
+    let (_, numerical) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, design)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &numeric,
+                    sample_levels: None,
+                    model_frame: Some(model_frame),
+                }),
+        ),
+    )
+    .unwrap();
+    let (_, selected) = run_results(
+        builder.run(
+            &Analysis::new(&counts, design)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &named,
+                    sample_levels: None,
+                    model_frame: Some(model_frame),
+                }),
+        ),
+    )
+    .unwrap();
     assert_eq!(numerical.rows, selected.rows);
 }

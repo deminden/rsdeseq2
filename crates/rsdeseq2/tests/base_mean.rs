@@ -1,3 +1,4 @@
+use crate::support::run::{run_fit, run_results};
 use crate::support::two_group_design;
 use approx::assert_relative_eq;
 use rsdeseq2::errors::{CalculationLocation, ErrorKind};
@@ -177,10 +178,12 @@ fn normalization_factors_validate_dimensions_and_positive_values() {
 #[test]
 fn builder_returns_initial_fit_state() {
     let counts = CountMatrix::from_row_major_u32(2, 3, vec![2, 4, 8, 4, 8, 16]).unwrap();
-    let fit = DeseqBuilder::new()
-        .size_factor_method(SizeFactorMethod::Ratio)
-        .fit_size_factors_and_base_means(&counts)
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .size_factor_method(SizeFactorMethod::Ratio)
+            .run(&Analysis::without_design(&counts)),
+    )
+    .unwrap();
 
     assert_eq!(fit.counts_summary.n_genes, 2);
     assert_eq!(fit.counts_summary.n_samples, 3);
@@ -198,11 +201,13 @@ fn builder_uses_normalization_factors_for_initial_fit_state() {
     let normalization_factors =
         RowMajorMatrix::from_row_major(2, 3, vec![1.0, 2.0, 5.0, 2.0, 3.0, 4.0]).unwrap();
 
-    let fit = DeseqBuilder::new()
-        .size_factors(vec![100.0, 100.0, 100.0])
-        .normalization_factors(normalization_factors.clone())
-        .fit_size_factors_and_base_means(&counts)
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .size_factors(vec![100.0, 100.0, 100.0])
+            .normalization_factors(normalization_factors.clone())
+            .run(&Analysis::without_design(&counts)),
+    )
+    .unwrap();
 
     assert_eq!(fit.size_factors, vec![100.0, 100.0, 100.0]);
     assert_eq!(fit.normalization_factors, Some(normalization_factors));
@@ -215,10 +220,12 @@ fn builder_with_normalization_factors_does_not_require_estimable_size_factors() 
     let counts = CountMatrix::from_row_major_u32(1, 3, vec![0, 0, 0]).unwrap();
     let normalization_factors = RowMajorMatrix::from_row_major(1, 3, vec![1.0, 1.5, 2.0]).unwrap();
 
-    let fit = DeseqBuilder::new()
-        .normalization_factors(normalization_factors)
-        .fit_size_factors_and_base_means(&counts)
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .normalization_factors(normalization_factors)
+            .run(&Analysis::without_design(&counts)),
+    )
+    .unwrap();
 
     assert_eq!(fit.size_factors, vec![1.0, 1.0, 1.0]);
     assert_eq!(fit.base_mean, vec![0.0]);
@@ -397,11 +404,13 @@ fn builder_uses_observation_weights_for_initial_base_metadata() {
     let counts = CountMatrix::from_row_major_u32(1, 3, vec![10, 20, 30]).unwrap();
     let weights = RowMajorMatrix::from_row_major(1, 3, vec![1.0, 0.5, 0.0]).unwrap();
 
-    let fit = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0])
-        .observation_weights(weights.clone())
-        .fit_size_factors_and_base_means(&counts)
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0])
+            .observation_weights(weights.clone())
+            .run(&Analysis::without_design(&counts)),
+    )
+    .unwrap();
 
     assert_eq!(fit.observation_weights, Some(weights));
     assert_eq!(fit.weights_fail, None);
@@ -432,14 +441,16 @@ fn builder_preprocesses_observation_weights_when_design_is_supplied() {
     )
     .unwrap();
 
-    let fit = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0, 1.0])
-        .observation_weights(weights)
-        .fit_size_factors_and_base_means_with_design(
-            &counts,
-            &two_group_design(4, Some("condition_B_vs_A")),
-        )
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0, 1.0])
+            .observation_weights(weights)
+            .run(
+                &Analysis::new(&counts, &two_group_design(4, Some("condition_B_vs_A")))
+                    .stop_after(Stage::SizeFactors),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(fit.weights_design_rank, Some(2));
     assert_eq!(fit.weights_fail, Some(vec![false, true]));
@@ -478,17 +489,18 @@ fn fixed_dispersion_wald_pipeline_marks_weight_failed_rows_as_skipped() {
     )
     .unwrap();
 
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0, 1.0])
-        .observation_weights(weights)
-        .disable_cooks_cutoff()
-        .fit_fixed_dispersion_wald(
-            &counts,
-            &two_group_design(4, Some("condition_B_vs_A")),
-            &[0.1, 0.1],
-            1,
-        )
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0, 1.0])
+            .observation_weights(weights)
+            .disable_cooks_cutoff()
+            .run(
+                &Analysis::new(&counts, &two_group_design(4, Some("condition_B_vs_A")))
+                    .fixed_dispersion(&[0.1, 0.1])
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(fit.weights_fail, Some(vec![false, true]));
     assert_eq!(fit.all_zero, vec![false, true]);

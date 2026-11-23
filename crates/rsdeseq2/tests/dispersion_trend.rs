@@ -1,3 +1,4 @@
+use crate::support::run::{run_fit, run_results};
 use crate::support::two_group_design;
 use approx::assert_relative_eq;
 use rsdeseq2::errors::CalculationLocation;
@@ -932,16 +933,22 @@ fn builder_mean_fit_type_dispatch_populates_constant_disp_fit() {
     .unwrap();
     let design = DesignMatrix::from_row_major(4, 1, vec![1.0, 1.0, 1.0, 1.0], None).unwrap();
 
-    let fit = DeseqBuilder::new()
-        .fit_type(FitType::Mean)
-        .size_factors(vec![1.0; 4])
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            use_cox_reid: false,
-            fit_method: GeneWiseDispersionFitMethod::Grid,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .fit_dispersion_trend_linear_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .fit_type(FitType::Mean)
+            .size_factors(vec![1.0; 4])
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                use_cox_reid: false,
+                fit_method: GeneWiseDispersionFitMethod::Grid,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::LinearMu)
+                    .stop_after(Stage::Trend),
+            ),
+    )
+    .unwrap();
 
     let disp_fit = fit.disp_fit.unwrap();
     assert_eq!(disp_fit.len(), counts.n_genes());
@@ -965,16 +972,22 @@ fn builder_local_fit_type_dispatch_populates_local_disp_fit() {
     .unwrap();
     let design = DesignMatrix::from_row_major(4, 1, vec![1.0, 1.0, 1.0, 1.0], None).unwrap();
 
-    let fit = DeseqBuilder::new()
-        .fit_type(FitType::Local)
-        .size_factors(vec![1.0; 4])
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            use_cox_reid: false,
-            fit_method: GeneWiseDispersionFitMethod::Grid,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .fit_dispersion_trend_linear_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .fit_type(FitType::Local)
+            .size_factors(vec![1.0; 4])
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                use_cox_reid: false,
+                fit_method: GeneWiseDispersionFitMethod::Grid,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::LinearMu)
+                    .stop_after(Stage::Trend),
+            ),
+    )
+    .unwrap();
 
     let disp_fit = fit.disp_fit.unwrap();
     assert_eq!(disp_fit.len(), counts.n_genes());
@@ -1001,15 +1014,21 @@ fn failed_parametric_trend_falls_back_to_the_local_fit() {
     let counts = varied_counts(200, 6);
     let design = two_group_design(6, None);
     let fit_with = |fit_type| {
-        DeseqBuilder::new()
-            .fit_type(fit_type)
-            .fit_with_results(&counts, &design)
-            .unwrap()
+        run_results(
+            DeseqBuilder::new()
+                .fit_type(fit_type)
+                .run(&Analysis::new(&counts, &design)),
+        )
+        .unwrap()
     };
-    let disp_gene_est = DeseqBuilder::new()
-        .fit_type(FitType::Local)
-        .fit_gene_wise_dispersions_glm_mu(&counts, &design)
-        .unwrap();
+    let disp_gene_est = run_fit(
+        DeseqBuilder::new().fit_type(FitType::Local).run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::GeneWise),
+        ),
+    )
+    .unwrap();
     let base_mean = &disp_gene_est.base_mean;
     let gene_wise = disp_gene_est.disp_gene_est.as_ref().unwrap();
     // The parametric fit on its own fails for this data set.

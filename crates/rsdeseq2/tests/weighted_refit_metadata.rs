@@ -1,4 +1,6 @@
 //! Original replacement counts and raw-weight base metadata, independent of optimizers.
+use crate::support::run::{run_replacement, run_results};
+use rsdeseq2::prelude::{Analysis, DesignInput, TestRequest};
 use rsdeseq2::{cooks::prepare_cooks_replacement_refit_with_weights, prelude::*};
 use serde_json::Value;
 fn number(v: &Value) -> f64 {
@@ -178,13 +180,18 @@ fn weighted_failure_state_after_replacement_matches_original_fits_and_later_diag
                     .unwrap(),
             );
         }
-        if c["test"] == "LRT" {
-            builder = builder.test(TestType::Lrt).reduced_design(
-                DesignMatrix::from_row_major(samples, 1, vec![1.0; samples], None).unwrap(),
-            );
-        }
+        let reduced = DesignMatrix::intercept_only(samples).unwrap();
+        let test_request = if c["test"] == "LRT" {
+            TestRequest::Lrt {
+                reduced: DesignInput::Matrix(&reduced),
+            }
+        } else {
+            TestRequest::Wald
+        };
         let (fit, results, plan) = if c["kind"] == "disabled" {
-            let (f, r) = builder.fit_with_results(&counts, &design).unwrap();
+            let (f, r) =
+                run_results(builder.run(&Analysis::new(&counts, &design).test(test_request)))
+                    .unwrap();
             (f, r, None)
         } else {
             let mut options = CooksReplacementOptions::new(
@@ -193,11 +200,16 @@ fn weighted_failure_state_after_replacement_matches_original_fits_and_later_diag
                     .unwrap(),
             );
             options.min_replicates = 3;
-            let (f, r, p) = builder
-                .fit_with_test_results_with_cooks_replacement(&counts, &design, &options)
-                .unwrap()
-                .into_merged_fit()
-                .unwrap();
+            let (f, r, p) = run_replacement(
+                builder.run(
+                    &Analysis::new(&counts, &design)
+                        .test(test_request)
+                        .cooks_replacement(&options),
+                ),
+            )
+            .unwrap()
+            .into_merged_fit()
+            .unwrap();
             (f, r, Some(p))
         };
         assert_eq!(

@@ -1,6 +1,8 @@
 use super::*;
 use crate::support::assert_ambiguous_name;
+use crate::support::run::{run_lrt_replacement, run_results};
 use rsdeseq2::errors::{FactorLevelRole, NameScope};
+use rsdeseq2::prelude::{Analysis, MeanModel, ResultColumn};
 
 #[test]
 fn native_glm_mu_lrt_contrast_keeps_lrt_pvalues_and_reports_contrast_effect() {
@@ -10,11 +12,24 @@ fn native_glm_mu_lrt_contrast_keeps_lrt_pvalues_and_reports_contrast_effect() {
     let builder = native_lrt_builder();
     let contrast = [0.0, 1.0];
 
-    let (coefficient_fit, coefficient_results) =
-        builder.fit_lrt_glm_mu(&counts, &full, &reduced, 1).unwrap();
-    let (contrast_fit, contrast_results) = builder
-        .fit_lrt_glm_mu_contrast(&counts, &full, &reduced, &contrast)
-        .unwrap();
+    let (coefficient_fit, coefficient_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let (contrast_fit, contrast_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(&contrast)),
+        ),
+    )
+    .unwrap();
     let invalid = ResultRequest::new(
         ResultsContrast::Numeric(contrast.to_vec()),
         WaldTestOptions::t_degrees_of_freedom(6.0),
@@ -33,9 +48,15 @@ fn native_glm_mu_lrt_contrast_keeps_lrt_pvalues_and_reports_contrast_effect() {
         }
     );
     let final_dispersions = coefficient_fit.dispersion.as_ref().unwrap().clone();
-    let (fixed_contrast_fit, fixed_contrast_results) = builder
-        .fit_fixed_dispersion_lrt_contrast(&counts, &full, &reduced, &final_dispersions, &contrast)
-        .unwrap();
+    let (fixed_contrast_fit, fixed_contrast_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&final_dispersions)
+                .result(ResultColumn::Numeric(&contrast)),
+        ),
+    )
+    .unwrap();
 
     assert_lrt_fit_state_matches(&contrast_fit, &coefficient_fit, "LRT contrast");
     assert_lrt_fit_state_matches(
@@ -103,58 +124,77 @@ fn lrt_results_contrast_request_routes_character_list_and_numeric_forms() {
         numeric_covariates: Vec::new(),
     };
 
-    let (coefficient_fit, _coefficient_results) =
-        builder.fit_lrt_glm_mu(&counts, &full, &reduced, 1).unwrap();
+    let (coefficient_fit, _coefficient_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
     let final_dispersions = coefficient_fit.dispersion.as_ref().unwrap().clone();
 
-    let (_character_fit, character_results) = builder
-        .fit_lrt_with_results_contrast_request(
-            &counts,
-            &full,
-            &reduced,
-            &ResultsContrast::character("condition", "B", "A"),
-            Some(&levels),
+    let (_character_fit, character_results) =
+        run_results(
+            builder.run(&Analysis::new(&counts, &full).lrt(&reduced).result(
+                ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "B", "A"),
+                    sample_levels: Some(&levels.map(String::from)),
+                    model_frame: None,
+                },
+            )),
         )
         .unwrap();
-    let (_model_frame_fit, model_frame_results) = builder
-        .fit_lrt_with_results_contrast_request_from_model_frame(
-            &counts,
-            &full,
-            &reduced,
-            &ResultsContrast::character("condition", "B", "A"),
-            &model_frame,
+    let (_model_frame_fit, model_frame_results) =
+        run_results(
+            builder.run(&Analysis::new(&counts, &full).lrt(&reduced).result(
+                ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "B", "A"),
+                    sample_levels: None,
+                    model_frame: Some(&model_frame),
+                },
+            )),
         )
         .unwrap();
-    let (_fixed_character_fit, fixed_character_results) = builder
-        .fit_fixed_dispersion_lrt_results_contrast(
-            &counts,
-            &full,
-            &reduced,
-            &final_dispersions,
-            &ResultsContrast::character("condition", "B", "A"),
-            Some(&levels),
+    let (_fixed_character_fit, fixed_character_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&final_dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "B", "A"),
+                    sample_levels: Some(&levels.map(String::from)),
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
+    let (_list_fit, list_results) =
+        run_results(
+            builder.run(&Analysis::new(&counts, &full).lrt(&reduced).result(
+                ResultColumn::Results {
+                    contrast: &ResultsContrast::list(vec!["condition_B_vs_A".into()], vec![]),
+                    sample_levels: None,
+                    model_frame: None,
+                },
+            )),
         )
         .unwrap();
-    let (_list_fit, list_results) = builder
-        .fit_lrt_with_results_contrast_request(
-            &counts,
-            &full,
-            &reduced,
-            &ResultsContrast::list(vec!["condition_B_vs_A".into()], vec![]),
-            Option::<&[&str]>::None,
-        )
-        .unwrap();
-    let (_numeric_fit, numeric_results) = builder
-        .clone()
-        .test(TestType::Lrt)
-        .reduced_design(reduced.clone())
-        .fit_with_results_contrast_request(
-            &counts,
-            &full,
-            &ResultsContrast::numeric(vec![0.0, 1.0]),
-            Option::<&[&str]>::None,
-        )
-        .unwrap();
+    let (_numeric_fit, numeric_results) = run_results(
+        builder
+            .clone()
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&reduced)
+                    .result(ResultColumn::Results {
+                        contrast: &ResultsContrast::numeric(vec![0.0, 1.0]),
+                        sample_levels: None,
+                        model_frame: None,
+                    }),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(character_results.rows, fixed_character_results.rows);
     assert_eq!(model_frame_results, character_results);
@@ -172,13 +212,16 @@ fn lrt_results_contrast_request_routes_character_list_and_numeric_forms() {
         numeric_results.metadata.comparison.as_deref(),
         Some("primitive numeric contrast")
     );
-    let missing_levels = builder.fit_lrt_with_results_contrast_request(
-        &counts,
-        &full,
-        &reduced,
-        &ResultsContrast::character("condition", "B", "A"),
-        Option::<&[&str]>::None,
-    );
+    let missing_levels =
+        run_results(
+            builder.run(&Analysis::new(&counts, &full).lrt(&reduced).result(
+                ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "B", "A"),
+                    sample_levels: None,
+                    model_frame: None,
+                },
+            )),
+        );
     assert!(matches!(
         missing_levels,
         Err(DeseqError::InvalidOptions { .. }
@@ -215,43 +258,66 @@ fn lrt_results_contrast_request_canonicalizes_cleaned_sample_level_aliases() {
     .map(String::from)
     .collect::<Vec<_>>();
 
-    let (_factor_fit, factor_results) = builder
-        .fit_lrt_with_results_factor_level_contrast(
-            &counts,
-            &full,
-            &reduced,
-            FactorLevelContrast::new("cell type", "B cell", "A cell", &levels),
-        )
-        .unwrap();
-    let (_character_fit, character_results) = builder
-        .fit_lrt_with_results_contrast_request(
-            &counts,
-            &full,
-            &reduced,
-            &ResultsContrast::character_with_reference("cell.type", "B.cell", "A.cell", "A.cell"),
-            Some(&levels),
+    let (_factor_fit, factor_results) = run_results(
+        builder.run(&Analysis::new(&counts, &full).lrt(&reduced).result(
+            ResultColumn::FactorLevel(FactorLevelContrast::new(
+                "cell type",
+                "B cell",
+                "A cell",
+                &levels,
+            )),
+        )),
+    )
+    .unwrap();
+    let (_character_fit, character_results) =
+        run_results(
+            builder.run(&Analysis::new(&counts, &full).lrt(&reduced).result(
+                ResultColumn::Results {
+                    contrast: &ResultsContrast::character_with_reference(
+                        "cell.type",
+                        "B.cell",
+                        "A.cell",
+                        "A.cell",
+                    ),
+                    sample_levels: Some(&levels),
+                    model_frame: None,
+                },
+            )),
         )
         .unwrap();
     let replacement_options = CooksReplacementOptions::new(f64::MAX);
-    let factor_replacement = builder
-        .fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            FactorLevelContrast::new("cell type", "B cell", "A cell", &levels),
-            &replacement_options,
-        )
-        .unwrap();
-    let request_replacement = builder
-        .fit_lrt_with_results_contrast_request_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &ResultsContrast::character_with_reference("cell.type", "B.cell", "A.cell", "A.cell"),
-            Some(&levels),
-            &replacement_options,
-        )
-        .unwrap();
+    let factor_replacement = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                    "cell type",
+                    "B cell",
+                    "A cell",
+                    &levels,
+                )))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let request_replacement = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character_with_reference(
+                        "cell.type",
+                        "B.cell",
+                        "A.cell",
+                        "A.cell",
+                    ),
+                    sample_levels: Some(&levels),
+                    model_frame: None,
+                })
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(character_results.rows, factor_results.rows);
     assert_eq!(
@@ -281,13 +347,16 @@ fn lrt_results_contrast_request_canonicalizes_cleaned_sample_level_aliases() {
     .into_iter()
     .map(String::from)
     .collect::<Vec<_>>();
-    let ambiguous = builder.fit_lrt_with_results_contrast_request(
-        &counts,
-        &full,
-        &reduced,
-        &ResultsContrast::character("cell.type", "B.cell", "A.cell"),
-        Some(&ambiguous_levels),
-    );
+    let ambiguous =
+        run_results(
+            builder.run(&Analysis::new(&counts, &full).lrt(&reduced).result(
+                ResultColumn::Results {
+                    contrast: &ResultsContrast::character("cell.type", "B.cell", "A.cell"),
+                    sample_levels: Some(&ambiguous_levels),
+                    model_frame: None,
+                },
+            )),
+        );
     assert_ambiguous_name(
         ambiguous.unwrap_err(),
         ErrorKind::Options,
@@ -308,16 +377,34 @@ fn native_linear_mu_lrt_contrast_matches_fixed_pipeline_when_reusing_final_dispe
     let builder = native_lrt_builder();
     let contrast = [0.0, 1.0];
 
-    let (coefficient_fit, coefficient_results) = builder
-        .fit_lrt_linear_mu(&counts, &full, &reduced, 1)
-        .unwrap();
-    let (contrast_fit, contrast_results) = builder
-        .fit_lrt_linear_mu_contrast(&counts, &full, &reduced, &contrast)
-        .unwrap();
+    let (coefficient_fit, coefficient_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let (contrast_fit, contrast_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Numeric(&contrast)),
+        ),
+    )
+    .unwrap();
     let final_dispersions = coefficient_fit.dispersion.as_ref().unwrap().clone();
-    let (fixed_contrast_fit, fixed_contrast_results) = builder
-        .fit_fixed_dispersion_lrt_contrast(&counts, &full, &reduced, &final_dispersions, &contrast)
-        .unwrap();
+    let (fixed_contrast_fit, fixed_contrast_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .fixed_dispersion(&final_dispersions)
+                .result(ResultColumn::Numeric(&contrast)),
+        ),
+    )
+    .unwrap();
 
     assert_lrt_fit_state_matches(&contrast_fit, &coefficient_fit, "linear-mu LRT contrast");
     assert_lrt_fit_state_matches(
@@ -369,15 +456,33 @@ fn native_linear_mu_lrt_contrast_specs_set_metadata_and_factor_levels() {
         sample_levels: &levels,
     };
 
-    let (numeric_fit, numeric_results) = builder
-        .fit_lrt_linear_mu_contrast(&counts, &full, &reduced, &[0.0, 1.0])
-        .unwrap();
-    let (named_fit, named_results) = builder
-        .fit_lrt_linear_mu_contrast_spec(&counts, &full, &reduced, &spec)
-        .unwrap();
-    let (factor_fit, factor_results) = builder
-        .fit_lrt_linear_mu_factor_level_contrast(&counts, &full, &reduced, factor_contrast)
-        .unwrap();
+    let (numeric_fit, numeric_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
+    let (named_fit, named_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Spec(&spec)),
+        ),
+    )
+    .unwrap();
+    let (factor_fit, factor_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::FactorLevel(factor_contrast)),
+        ),
+    )
+    .unwrap();
 
     assert_lrt_fit_state_matches(&named_fit, &numeric_fit, "linear-mu named LRT contrast");
     assert_lrt_fit_state_matches(
@@ -425,12 +530,25 @@ fn native_lrt_parametric_contrast_helpers_ignore_builder_fit_type() {
         sample_levels: &levels,
     };
 
-    let (linear_parametric_fit, linear_parametric_results) = mean_builder
-        .fit_lrt_linear_mu_contrast_parametric(&counts, &full, &reduced, &[0.0, 1.0])
-        .unwrap();
-    let (linear_expected_fit, linear_expected_results) = parametric_builder
-        .fit_lrt_linear_mu_contrast(&counts, &full, &reduced, &[0.0, 1.0])
-        .unwrap();
+    let (linear_parametric_fit, linear_parametric_results) = run_results(
+        mean_builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
+    let (linear_expected_fit, linear_expected_results) = run_results(
+        parametric_builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
     assert_lrt_fit_state_matches(
         &linear_parametric_fit,
         &linear_expected_fit,
@@ -438,9 +556,16 @@ fn native_lrt_parametric_contrast_helpers_ignore_builder_fit_type() {
     );
     assert_eq!(linear_parametric_results, linear_expected_results);
 
-    let (linear_named_fit, linear_named_results) = mean_builder
-        .fit_lrt_linear_mu_contrast_spec_parametric(&counts, &full, &reduced, &spec)
-        .unwrap();
+    let (linear_named_fit, linear_named_results) = run_results(
+        mean_builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Spec(&spec)),
+        ),
+    )
+    .unwrap();
     assert_lrt_fit_state_matches(
         &linear_named_fit,
         &linear_expected_fit,
@@ -452,14 +577,16 @@ fn native_lrt_parametric_contrast_helpers_ignore_builder_fit_type() {
         Some("condition_B_vs_A")
     );
 
-    let (linear_factor_fit, linear_factor_results) = mean_builder
-        .fit_lrt_linear_mu_factor_level_contrast_parametric(
-            &counts,
-            &full,
-            &reduced,
-            factor_contrast,
-        )
-        .unwrap();
+    let (linear_factor_fit, linear_factor_results) = run_results(
+        mean_builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::FactorLevel(factor_contrast)),
+        ),
+    )
+    .unwrap();
     assert_lrt_fit_state_matches(
         &linear_factor_fit,
         &linear_expected_fit,
@@ -471,12 +598,25 @@ fn native_lrt_parametric_contrast_helpers_ignore_builder_fit_type() {
         Some("factor-level contrast: condition B vs A")
     );
 
-    let (glm_parametric_fit, glm_parametric_results) = mean_builder
-        .fit_lrt_glm_mu_contrast_parametric(&counts, &full, &reduced, &[0.0, 1.0])
-        .unwrap();
-    let (glm_expected_fit, glm_expected_results) = parametric_builder
-        .fit_lrt_glm_mu_contrast(&counts, &full, &reduced, &[0.0, 1.0])
-        .unwrap();
+    let (glm_parametric_fit, glm_parametric_results) = run_results(
+        mean_builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
+    let (glm_expected_fit, glm_expected_results) = run_results(
+        parametric_builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
     assert_lrt_fit_state_matches(
         &glm_parametric_fit,
         &glm_expected_fit,
@@ -484,9 +624,16 @@ fn native_lrt_parametric_contrast_helpers_ignore_builder_fit_type() {
     );
     assert_eq!(glm_parametric_results, glm_expected_results);
 
-    let (glm_named_fit, glm_named_results) = mean_builder
-        .fit_lrt_glm_mu_contrast_spec_parametric(&counts, &full, &reduced, &spec)
-        .unwrap();
+    let (glm_named_fit, glm_named_results) = run_results(
+        mean_builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Spec(&spec)),
+        ),
+    )
+    .unwrap();
     assert_lrt_fit_state_matches(
         &glm_named_fit,
         &glm_expected_fit,
@@ -498,9 +645,16 @@ fn native_lrt_parametric_contrast_helpers_ignore_builder_fit_type() {
         Some("condition_B_vs_A")
     );
 
-    let (glm_factor_fit, glm_factor_results) = mean_builder
-        .fit_lrt_glm_mu_factor_level_contrast_parametric(&counts, &full, &reduced, factor_contrast)
-        .unwrap();
+    let (glm_factor_fit, glm_factor_results) = run_results(
+        mean_builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::FactorLevel(factor_contrast)),
+        ),
+    )
+    .unwrap();
     assert_lrt_fit_state_matches(
         &glm_factor_fit,
         &glm_expected_fit,
@@ -568,11 +722,24 @@ fn native_glm_mu_lrt_contrast_all_zero_only_zeroes_lfc() {
     let builder = native_lrt_builder().size_factors(vec![1.0; 6]);
     let contrast = [0.0, -1.0, 1.0];
 
-    let (_coefficient_fit, coefficient_results) =
-        builder.fit_lrt_glm_mu(&counts, &full, &reduced, 2).unwrap();
-    let (_contrast_fit, contrast_results) = builder
-        .fit_lrt_glm_mu_contrast(&counts, &full, &reduced, &contrast)
-        .unwrap();
+    let (_coefficient_fit, coefficient_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(2)),
+        ),
+    )
+    .unwrap();
+    let (_contrast_fit, contrast_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(&contrast)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(
         contrast_results.rows[1].gene.as_deref(),
@@ -660,11 +827,24 @@ fn native_glm_mu_lrt_factor_level_contrast_uses_character_all_zero_cleanup() {
         sample_levels: &levels,
     };
 
-    let (_coefficient_fit, coefficient_results) =
-        builder.fit_lrt_glm_mu(&counts, &full, &reduced, 2).unwrap();
-    let (_contrast_fit, contrast_results) = builder
-        .fit_lrt_glm_mu_factor_level_contrast(&counts, &full, &reduced, contrast)
-        .unwrap();
+    let (_coefficient_fit, coefficient_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(2)),
+        ),
+    )
+    .unwrap();
+    let (_contrast_fit, contrast_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::FactorLevel(contrast)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(
         contrast_results.rows[1].gene.as_deref(),
@@ -742,18 +922,20 @@ fn native_glm_mu_lrt_factor_level_contrast_applies_low_count_cooks_gate() {
         })
         .cooks_cutoff_threshold(0.0)
         .disable_independent_filtering();
-    let (_numeric_fit, numeric_results) = builder
-        .clone()
-        .fit_lrt_with_results_contrast(&counts, &full, &reduced, &[0.0, 1.0])
-        .unwrap();
-    let (_fit, results) = builder
-        .fit_lrt_with_results_factor_level_contrast(
-            &counts,
-            &full,
-            &reduced,
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-        )
-        .unwrap();
+    let (_numeric_fit, numeric_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
+    let (_fit, results) = run_results(
+        builder.run(&Analysis::new(&counts, &full).lrt(&reduced).result(
+            ResultColumn::FactorLevel(FactorLevelContrast::new("condition", "B", "A", &levels)),
+        )),
+    )
+    .unwrap();
 
     assert_eq!(results.rows[0].gene.as_deref(), Some("low_count"));
     assert!(results.rows[0].max_cooks.unwrap() > 0.0);
@@ -769,12 +951,22 @@ fn top_level_lrt_contrast_spec_resolves_named_full_model_effect() {
     let builder = native_lrt_builder();
     let spec = ContrastSpec::coefficient_name("condition_B_vs_A");
 
-    let (numeric_fit, numeric_results) = builder
-        .fit_lrt_with_results_contrast(&counts, &full, &reduced, &[0.0, 1.0])
-        .unwrap();
-    let (named_fit, named_results) = builder
-        .fit_lrt_with_results_contrast_spec(&counts, &full, &reduced, &spec)
-        .unwrap();
+    let (numeric_fit, numeric_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
+    let (named_fit, named_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::Spec(&spec)),
+        ),
+    )
+    .unwrap();
 
     assert_lrt_fit_state_matches(&named_fit, &numeric_fit, "named LRT contrast");
     assert_eq!(named_results.rows, numeric_results.rows);

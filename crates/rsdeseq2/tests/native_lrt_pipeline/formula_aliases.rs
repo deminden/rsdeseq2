@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::{run_lrt_replacement, run_results};
+use rsdeseq2::prelude::{Analysis, MeanModel, ResultColumn};
 
 #[test]
 fn top_level_lrt_formula_contrast_request_uses_cleaned_stored_model_frame_factor_name() {
@@ -27,22 +29,24 @@ fn top_level_lrt_formula_contrast_request_uses_cleaned_stored_model_frame_factor
         .standard_design;
     let options = CooksReplacementOptions::new(f64::MAX);
 
-    let (_explicit_fit, explicit_results) = builder
-        .fit_lrt_with_results_factor_level_contrast(
-            &counts,
-            &full,
-            &reduced,
-            FactorLevelContrast::new("cell type", "B-1", "A 0", &levels),
-        )
-        .unwrap();
-    let (formula_fit, formula_results) = builder
-        .fit_lrt_formula_with_results_contrast_request(
-            &counts,
-            "~ `cell type`",
-            "~ 1",
-            &ResultsContrast::character("cell.type", "B-1", "A 0"),
-        )
-        .unwrap();
+    let (_explicit_fit, explicit_results) = run_results(
+        builder.run(&Analysis::new(&counts, &full).lrt(&reduced).result(
+            ResultColumn::FactorLevel(FactorLevelContrast::new("cell type", "B-1", "A 0", &levels)),
+        )),
+    )
+    .unwrap();
+    let (formula_fit, formula_results) = run_results(
+        builder.run(
+            &Analysis::formula(&counts, "~ `cell type`")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("cell.type", "B-1", "A 0"),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
     let offset_values = builder.current_model_frame().unwrap().numeric_covariates[0]
         .values
         .to_vec();
@@ -58,22 +62,30 @@ fn top_level_lrt_formula_contrast_request_uses_cleaned_stored_model_frame_factor
     let explicit_offset_builder = builder
         .clone()
         .normalization_factors(normalization_factors.clone());
-    let (explicit_offset_fit, explicit_offset_results) = explicit_offset_builder
-        .fit_lrt_formula_with_results_contrast_request(
-            &counts,
-            "~ `cell type`",
-            "~ 1",
-            &ResultsContrast::character("cell.type", "B-1", "A 0"),
-        )
-        .unwrap();
-    let (formula_offset_fit, formula_offset_results) = builder
-        .fit_lrt_formula_with_results_contrast_request(
-            &counts,
-            "~ `cell type` + offset(exposure)",
-            "~ 1",
-            &ResultsContrast::character("cell.type", "B-1", "A 0"),
-        )
-        .unwrap();
+    let (explicit_offset_fit, explicit_offset_results) = run_results(
+        explicit_offset_builder.run(
+            &Analysis::formula(&counts, "~ `cell type`")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("cell.type", "B-1", "A 0"),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
+    let (formula_offset_fit, formula_offset_results) = run_results(
+        builder.run(
+            &Analysis::formula(&counts, "~ `cell type` + offset(exposure)")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("cell.type", "B-1", "A 0"),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
     assert_eq!(
         formula_offset_fit.normalization_factors,
         Some(normalization_factors.clone())
@@ -84,44 +96,62 @@ fn top_level_lrt_formula_contrast_request_uses_cleaned_stored_model_frame_factor
         "top-level formula LRT offset contrast request",
     );
     assert_eq!(formula_offset_results.rows, explicit_offset_results.rows);
-    let formula_replacement = builder
-        .fit_lrt_formula_with_results_contrast_request_with_cooks_replacement(
-            &counts,
-            "~ `cell type`",
-            "~ 1",
-            &ResultsContrast::character("cell.type", "B-1", "A 0"),
-            &options,
-        )
-        .unwrap();
-    let explicit_replacement = builder
-        .fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            FactorLevelContrast::new("cell type", "B-1", "A 0", &levels),
-            &options,
-        )
-        .unwrap();
-    let explicit_offset_replacement = builder
-        .clone()
-        .normalization_factors(normalization_factors.clone())
-        .fit_lrt_formula_with_results_contrast_request_with_cooks_replacement(
-            &counts,
-            "~ `cell type`",
-            "~ 1",
-            &ResultsContrast::character("cell.type", "B-1", "A 0"),
-            &options,
-        )
-        .unwrap();
-    let formula_offset_replacement = builder
-        .fit_lrt_formula_with_results_contrast_request_with_cooks_replacement(
-            &counts,
-            "~ `cell type` + offset(exposure)",
-            "~ 1",
-            &ResultsContrast::character("cell.type", "B-1", "A 0"),
-            &options,
-        )
-        .unwrap();
+    let formula_replacement = run_lrt_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ `cell type`")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("cell.type", "B-1", "A 0"),
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let explicit_replacement = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                    "cell type",
+                    "B-1",
+                    "A 0",
+                    &levels,
+                )))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let explicit_offset_replacement = run_lrt_replacement(
+        builder
+            .clone()
+            .normalization_factors(normalization_factors.clone())
+            .run(
+                &Analysis::formula(&counts, "~ `cell type`")
+                    .lrt_formula("~ 1")
+                    .result(ResultColumn::Results {
+                        contrast: &ResultsContrast::character("cell.type", "B-1", "A 0"),
+                        sample_levels: None,
+                        model_frame: None,
+                    })
+                    .cooks_replacement(&options),
+            ),
+    )
+    .unwrap();
+    let formula_offset_replacement = run_lrt_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ `cell type` + offset(exposure)")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("cell.type", "B-1", "A 0"),
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(formula_results, explicit_results);
     let mut detached_fit = formula_fit.clone();
@@ -235,36 +265,40 @@ fn native_formula_lrt_default_uses_cleaned_stored_reference_for_cooks_gate() {
             ..GeneWiseDispersionOptions::default()
         })
         .cooks_cutoff_threshold(0.0)
-        .disable_independent_filtering()
-        .reduced_design(reduced.clone());
+        .disable_independent_filtering();
 
-    let (_generic_fit, generic_results) = builder
-        .clone()
-        .fit_lrt_glm_mu(&counts, &full, &reduced, 1)
-        .unwrap();
-    let generic_replacement = builder
-        .clone()
-        .fit_lrt_with_results_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap();
-    let (_formula_fit, formula_results) = builder
-        .clone()
-        .model_frame(model_frame.clone())
-        .fit_lrt_formula_with_results(&counts, "~ `cell type`", "~ 1")
-        .unwrap();
-    let formula_replacement = builder
-        .model_frame(model_frame)
-        .fit_lrt_formula_with_results_with_cooks_replacement(
-            &counts,
-            "~ `cell type`",
-            "~ 1",
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap();
+    let (_generic_fit, generic_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let generic_replacement = run_lrt_replacement(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .cooks_replacement(&CooksReplacementOptions::new(f64::MAX)),
+        ),
+    )
+    .unwrap();
+    let (_formula_fit, formula_results) = run_results(
+        builder
+            .clone()
+            .model_frame(model_frame.clone())
+            .run(&Analysis::formula(&counts, "~ `cell type`").lrt_formula("~ 1")),
+    )
+    .unwrap();
+    let formula_replacement = run_lrt_replacement(
+        builder.model_frame(model_frame).run(
+            &Analysis::formula(&counts, "~ `cell type`")
+                .lrt_formula("~ 1")
+                .cooks_replacement(&CooksReplacementOptions::new(f64::MAX)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(formula_results.rows[0].gene.as_deref(), Some("low_count"));
     assert!(formula_results.rows[0].max_cooks.unwrap() > 0.0);
@@ -304,23 +338,22 @@ fn top_level_lrt_formula_with_results_accepts_r_cleaned_quoted_coefficient_alias
     };
     let builder = native_lrt_builder().model_frame(model_frame);
 
-    let (cleaned_fit, cleaned_results) = builder
-        .clone()
-        .fit_lrt_formula_with_results_name(
-            &counts,
-            "~ `cell type`",
-            "~ 1",
-            "cell.type_B.cell_vs_T.cell",
-        )
-        .unwrap();
-    let (raw_fit, raw_results) = builder
-        .fit_lrt_formula_with_results_name(
-            &counts,
-            "~ `cell type`",
-            "~ 1",
-            "cell type_B cell_vs_T cell",
-        )
-        .unwrap();
+    let (cleaned_fit, cleaned_results) = run_results(
+        builder.clone().run(
+            &Analysis::formula(&counts, "~ `cell type`")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Name("cell.type_B.cell_vs_T.cell")),
+        ),
+    )
+    .unwrap();
+    let (raw_fit, raw_results) = run_results(
+        builder.run(
+            &Analysis::formula(&counts, "~ `cell type`")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Name("cell type_B cell_vs_T cell")),
+        ),
+    )
+    .unwrap();
 
     assert_lrt_fit_state_matches(&cleaned_fit, &raw_fit, "quoted formula R-cleaned named LRT");
     assert_eq!(cleaned_results, raw_results);
@@ -346,23 +379,36 @@ fn top_level_lrt_formula_list_contrast_accepts_r_cleaned_quoted_coefficient_alia
     };
     let builder = native_lrt_builder().model_frame(model_frame);
 
-    let (cleaned_fit, cleaned_results) = builder
-        .clone()
-        .fit_lrt_formula_with_results_contrast_request(
-            &counts,
-            "~ `cell type`",
-            "~ 1",
-            &ResultsContrast::list(vec!["cell.type_B.cell_vs_T.cell".into()], Vec::new()),
-        )
-        .unwrap();
-    let (raw_fit, raw_results) = builder
-        .fit_lrt_formula_with_results_contrast_request(
-            &counts,
-            "~ `cell type`",
-            "~ 1",
-            &ResultsContrast::list(vec!["cell type_B cell_vs_T cell".into()], Vec::new()),
-        )
-        .unwrap();
+    let (cleaned_fit, cleaned_results) = run_results(
+        builder.clone().run(
+            &Analysis::formula(&counts, "~ `cell type`")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell.type_B.cell_vs_T.cell".into()],
+                        Vec::new(),
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
+    let (raw_fit, raw_results) = run_results(
+        builder.run(
+            &Analysis::formula(&counts, "~ `cell type`")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell type_B cell_vs_T cell".into()],
+                        Vec::new(),
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_lrt_fit_state_matches(&cleaned_fit, &raw_fit, "quoted formula R-cleaned list LRT");
     assert_eq!(cleaned_results.rows, raw_results.rows);
@@ -400,29 +446,36 @@ fn top_level_lrt_formula_list_contrast_accepts_cleaned_positive_and_negative_ali
     };
     let builder = native_lrt_builder().model_frame(model_frame);
 
-    let (cleaned_fit, cleaned_results) = builder
-        .clone()
-        .fit_lrt_formula_with_results_contrast_request(
-            &counts,
-            "~ `cell type`",
-            "~ 1",
-            &ResultsContrast::list(
-                vec!["cell.type_NK.cell_vs_T.cell".into()],
-                vec!["cell.type_B.cell_vs_T.cell".into()],
-            ),
-        )
-        .unwrap();
-    let (raw_fit, raw_results) = builder
-        .fit_lrt_formula_with_results_contrast_request(
-            &counts,
-            "~ `cell type`",
-            "~ 1",
-            &ResultsContrast::list(
-                vec!["cell type_NK cell_vs_T cell".into()],
-                vec!["cell type_B cell_vs_T cell".into()],
-            ),
-        )
-        .unwrap();
+    let (cleaned_fit, cleaned_results) = run_results(
+        builder.clone().run(
+            &Analysis::formula(&counts, "~ `cell type`")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell.type_NK.cell_vs_T.cell".into()],
+                        vec!["cell.type_B.cell_vs_T.cell".into()],
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
+    let (raw_fit, raw_results) = run_results(
+        builder.run(
+            &Analysis::formula(&counts, "~ `cell type`")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell type_NK cell_vs_T cell".into()],
+                        vec!["cell type_B cell_vs_T cell".into()],
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_lrt_fit_state_matches(
         &cleaned_fit,

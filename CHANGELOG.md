@@ -41,8 +41,7 @@ Public API and user-visible behaviour changes. Version notes live in [docs/relea
   size factors only), the test, fixed or estimated dispersions, the mean
   model, the reported column (`ResultColumn`), Cook's replacement, an early
   `Stage` and an optional trend type. Invalid combinations are rejected before
-  any work. The deprecated builder workflows preserve their output and
-  include migration guidance in the Rust API documentation.
+  any work.
 
 - End-to-end parity test against `DESeq()` + `results()` defaults on a
   3,745-gene GTEx kidney-cortex panel (size factors, parametric dispersion
@@ -93,6 +92,10 @@ Public API and user-visible behaviour changes. Version notes live in [docs/relea
   I/O, parse) so callers can branch without matching message text.
 
 ### Removed
+
+- The 140 legacy `DeseqBuilder::fit_*` workflows, including the LRT
+  configuration stored on the builder. Select the test, reduced design,
+  contrast, and stage through `Analysis` and call `DeseqBuilder::run`.
 
 - `rsdeseq2::bindings` and its `language_bindings()` placeholder, which only
   returned `UnsupportedFeature`.
@@ -333,14 +336,6 @@ Public API and user-visible behaviour changes. Version notes live in [docs/relea
   and `_no_cr` variants: use `line_search_dispersion` or
   `grid_search_dispersion` with a `DispersionFitInput`. `_no_cr` is a
   `DispersionFitInput` without a design. Output is unchanged; removal in 0.7.0.
-
-- All 140 `DeseqBuilder::fit*` methods (for example `fit_with_results`,
-  `fit_lrt_with_results`, `fit_wald_glm_mu_contrast_spec`,
-  `fit_fixed_dispersion_wald_with_cooks_replacement`,
-  `fit_map_dispersions_glm_mu`): use `DeseqBuilder::run` with an `Analysis`.
-  Each deprecation note gives the exact replacement request. The methods are
-  one-line wrappers with unchanged output and will be removed in 0.7.0. The
-  fast-VST trend helpers are not affected.
 
 - `rsdeseq2::math::qr`, renamed to `rsdeseq2::math::rank`: the module computes
   matrix ranks and contains no QR factorization. The old path re-exports the

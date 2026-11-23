@@ -1,5 +1,7 @@
 use super::numerical_assertions::*;
 use super::*;
+use crate::support::run::run_results;
+use rsdeseq2::prelude::{Analysis, ResultColumn};
 
 struct ContrastFixture {
     counts: CountMatrix,
@@ -98,13 +100,19 @@ fn contrast_fixture(dir: &Path, effect_name: &str) -> ContrastFixture {
 
 fn contrast_result(command: &str, fixture: &ContrastFixture, contrast: &[f64]) -> DeseqResults {
     if command == "wald" {
-        test_builder().fit_with_results_contrast(&fixture.counts, &fixture.design, contrast)
+        run_results(
+            test_builder().run(
+                &Analysis::new(&fixture.counts, &fixture.design)
+                    .result(ResultColumn::Numeric(contrast)),
+            ),
+        )
     } else {
-        test_builder().fit_lrt_with_results_contrast(
-            &fixture.counts,
-            &fixture.design,
-            &fixture.reduced,
-            contrast,
+        run_results(
+            test_builder().run(
+                &Analysis::new(&fixture.counts, &fixture.design)
+                    .lrt(&fixture.reduced)
+                    .result(ResultColumn::Numeric(contrast)),
+            ),
         )
     }
     .unwrap()

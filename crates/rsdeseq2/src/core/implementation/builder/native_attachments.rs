@@ -1,7 +1,6 @@
 use super::*;
 use crate::errors::{ErrorKind, missing_prerequisite};
 impl DeseqBuilder {
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_glm_mu_parametric(
         &self,
         counts: &CountMatrix,
@@ -15,7 +14,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_contrast_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_glm_mu_contrast_parametric(
         &self,
         counts: &CountMatrix,
@@ -28,7 +26,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_contrast_spec_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_glm_mu_contrast_spec_parametric(
         &self,
         counts: &CountMatrix,
@@ -48,7 +45,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_factor_level_contrast_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_glm_mu_factor_level_contrast_parametric(
         &self,
         counts: &CountMatrix,

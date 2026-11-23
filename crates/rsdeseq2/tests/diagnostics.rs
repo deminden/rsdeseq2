@@ -1,3 +1,4 @@
+use crate::support::run::{run_fit, run_results};
 use approx::assert_relative_eq;
 use rsdeseq2::prelude::*;
 
@@ -44,9 +45,7 @@ fn assert_diagnostics_frame_excludes_matrix_state(frame: &Deseq2McolsDiagnostics
 fn deseq2_mcols_diagnostics_are_empty_before_glm_stages() {
     let counts = CountMatrix::from_row_major_u32(2, 3, vec![10, 12, 14, 20, 22, 24]).unwrap();
 
-    let fit = DeseqBuilder::new()
-        .fit_size_factors_and_base_means(&counts)
-        .unwrap();
+    let fit = run_fit(DeseqBuilder::new().run(&Analysis::without_design(&counts))).unwrap();
     let diagnostics = fit.deseq2_mcols_diagnostics();
 
     assert_eq!(diagnostics, Deseq2McolsDiagnostics::default());
@@ -58,9 +57,7 @@ fn covariance_diagnostic_counts_only_rows_that_were_fitted() {
     let counts =
         CountMatrix::from_row_major_u32(4, 3, vec![10, 12, 14, 20, 22, 24, 0, 0, 0, 30, 32, 34])
             .unwrap();
-    let mut fit = DeseqBuilder::new()
-        .fit_size_factors_and_base_means(&counts)
-        .unwrap();
+    let mut fit = run_fit(DeseqBuilder::new().run(&Analysis::without_design(&counts))).unwrap();
     assert_eq!(fit.nonfinite_covariance_rows(), None);
     fit.weights_fail = Some(vec![false, false, false, true]);
     fit.beta_covariance = Some(
@@ -82,15 +79,21 @@ fn deseq2_mcols_diagnostics_include_gene_wise_dispersion_iterations() {
         DesignMatrix::from_row_major(4, 2, vec![1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0], None)
             .unwrap();
 
-    let fit = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0, 1.0])
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            fit_method: GeneWiseDispersionFitMethod::Grid,
-            use_cox_reid: false,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .fit_gene_wise_dispersions_linear_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0, 1.0])
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                fit_method: GeneWiseDispersionFitMethod::Grid,
+                use_cox_reid: false,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::LinearMu)
+                    .stop_after(Stage::GeneWise),
+            ),
+    )
+    .unwrap();
 
     let diagnostics = fit.deseq2_mcols_diagnostics();
     assert_eq!(
@@ -159,17 +162,23 @@ fn deseq2_mcols_diagnostics_include_dispersion_fit_type() {
     )
     .unwrap();
 
-    let fit = DeseqBuilder::new()
-        .size_factors(vec![1.0; 8])
-        .fit_type(FitType::Mean)
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            use_cox_reid: false,
-            fit_method: GeneWiseDispersionFitMethod::Grid,
-            niter: 2,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .fit_dispersion_trend_glm_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 8])
+            .fit_type(FitType::Mean)
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                use_cox_reid: false,
+                fit_method: GeneWiseDispersionFitMethod::Grid,
+                niter: 2,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::GlmMu)
+                    .stop_after(Stage::Trend),
+            ),
+    )
+    .unwrap();
 
     let diagnostics = fit.deseq2_mcols_diagnostics();
     assert_eq!(diagnostics.dispersion_fit_type, Some("mean"));
@@ -218,17 +227,23 @@ fn deseq2_mcols_diagnostics_include_map_dispersion_columns() {
     )
     .unwrap();
 
-    let fit = DeseqBuilder::new()
-        .size_factors(vec![1.0; 8])
-        .fit_type(FitType::Mean)
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            use_cox_reid: false,
-            fit_method: GeneWiseDispersionFitMethod::Grid,
-            niter: 2,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .fit_map_dispersions_glm_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 8])
+            .fit_type(FitType::Mean)
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                use_cox_reid: false,
+                fit_method: GeneWiseDispersionFitMethod::Grid,
+                niter: 2,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::GlmMu)
+                    .stop_after(Stage::Map),
+            ),
+    )
+    .unwrap();
 
     let diagnostics = fit.deseq2_mcols_diagnostics();
     assert_optional_float_vec_eq_with_nan(
@@ -286,16 +301,22 @@ fn deseq2_mcols_diagnostics_use_wald_beta_conv_shape() {
         DesignMatrix::from_row_major(4, 2, vec![1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0], None)
             .unwrap();
 
-    let (fit, _results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0, 1.0])
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .irls_options(IrlsOptions {
-            ridge_lambda: 0.0,
-            ..IrlsOptions::default()
-        })
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.05], 1)
-        .unwrap();
+    let (fit, _results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0, 1.0])
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .irls_options(IrlsOptions {
+                ridge_lambda: 0.0,
+                ..IrlsOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.05])
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     let diagnostics = fit.deseq2_mcols_diagnostics();
     assert_eq!(diagnostics.beta_conv.as_ref(), fit.beta_converged.as_ref());
@@ -375,16 +396,23 @@ fn deseq2_mcols_diagnostics_use_lrt_full_and_reduced_shapes() {
             .unwrap();
     let reduced = DesignMatrix::from_row_major(4, 1, vec![1.0, 1.0, 1.0, 1.0], None).unwrap();
 
-    let (fit, _results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0, 1.0])
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .irls_options(IrlsOptions {
-            ridge_lambda: 0.0,
-            ..IrlsOptions::default()
-        })
-        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &[0.1, 0.05], 1)
-        .unwrap();
+    let (fit, _results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0, 1.0])
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .irls_options(IrlsOptions {
+                ridge_lambda: 0.0,
+                ..IrlsOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &full)
+                    .lrt(&reduced)
+                    .fixed_dispersion(&[0.1, 0.05])
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     let diagnostics = fit.deseq2_mcols_diagnostics();
     assert_eq!(diagnostics.beta_conv, None);

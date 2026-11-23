@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::run_wald_replacement;
+use rsdeseq2::prelude::{Analysis, ResultColumn};
 
 #[test]
 fn fixed_dispersion_wald_cooks_replacement_refits_marked_rows() {
@@ -34,17 +36,18 @@ fn fixed_dispersion_wald_cooks_replacement_refits_marked_rows() {
         which_samples: Some(vec![true, false, false, false, false, false, false, false]),
     };
 
-    let output = DeseqBuilder::new()
-        .size_factors(vec![1.0; 8])
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            1,
-            &options,
-        )
-        .unwrap();
+    let output = run_wald_replacement(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 8])
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1, 0.1])
+                    .result(ResultColumn::Coefficient(1))
+                    .cooks_replacement(&options),
+            ),
+    )
+    .unwrap();
 
     assert!(output.refit_plan.n_refit > 0);
     assert!(output.refit_plan.should_refit);
@@ -111,17 +114,18 @@ fn fixed_dispersion_wald_contrast_cooks_replacement_refits_marked_rows() {
         which_samples: Some(vec![true, false, false, false, false, false, false, false]),
     };
 
-    let output = DeseqBuilder::new()
-        .size_factors(vec![1.0; 8])
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &[0.0, 1.0],
-            &options,
-        )
-        .unwrap();
+    let output = run_wald_replacement(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 8])
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1, 0.1])
+                    .result(ResultColumn::Numeric(&[0.0, 1.0]))
+                    .cooks_replacement(&options),
+            ),
+    )
+    .unwrap();
 
     assert!(output.refit_plan.n_refit > 0);
     assert!(output.refit_plan.should_refit);
@@ -179,17 +183,20 @@ fn fixed_dispersion_wald_contrast_spec_cooks_replacement_preserves_metadata() {
         which_samples: Some(vec![true, false, false, false, false, false, false, false]),
     };
 
-    let output = DeseqBuilder::new()
-        .size_factors(vec![1.0; 8])
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ContrastSpec::coefficient_name("condition_B_vs_A"),
-            &options,
-        )
-        .unwrap();
+    let output = run_wald_replacement(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 8])
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1, 0.1])
+                    .result(ResultColumn::Spec(&ContrastSpec::coefficient_name(
+                        "condition_B_vs_A",
+                    )))
+                    .cooks_replacement(&options),
+            ),
+    )
+    .unwrap();
 
     assert!(output.refit_plan.n_refit > 0);
     assert_eq!(
@@ -258,29 +265,39 @@ fn fixed_dispersion_wald_factor_level_cooks_replacement_preserves_metadata() {
         which_samples: Some(vec![true, false, false, false, false, false, false, false]),
     };
 
-    let output = DeseqBuilder::new()
-        .size_factors(vec![1.0; 8])
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-            &options,
-        )
-        .unwrap();
-    let request = DeseqBuilder::new()
-        .size_factors(vec![1.0; 8])
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald_results_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ResultsContrast::character("condition", "B", "A"),
-            Some(&levels),
-            &options,
-        )
-        .unwrap();
+    let output = run_wald_replacement(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 8])
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1, 0.1])
+                    .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                        "condition",
+                        "B",
+                        "A",
+                        &levels,
+                    )))
+                    .cooks_replacement(&options),
+            ),
+    )
+    .unwrap();
+    let request = run_wald_replacement(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 8])
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1, 0.1])
+                    .result(ResultColumn::Results {
+                        contrast: &ResultsContrast::character("condition", "B", "A"),
+                        sample_levels: Some(&levels),
+                        model_frame: None,
+                    })
+                    .cooks_replacement(&options),
+            ),
+    )
+    .unwrap();
 
     assert!(output.refit_plan.n_refit > 0);
     assert_eq!(request.results, output.results);
@@ -320,18 +337,22 @@ fn fixed_dispersion_wald_factor_level_cooks_replacement_preserves_metadata() {
         }],
         numeric_covariates: Vec::new(),
     };
-    let model_frame_request = DeseqBuilder::new()
-        .size_factors(vec![1.0; 8])
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald_results_contrast_from_model_frame_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ResultsContrast::character("condition", "B", "A"),
-            &model_frame,
-            &options,
-        )
-        .unwrap();
+    let model_frame_request = run_wald_replacement(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 8])
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1, 0.1])
+                    .result(ResultColumn::Results {
+                        contrast: &ResultsContrast::character("condition", "B", "A"),
+                        sample_levels: None,
+                        model_frame: Some(&model_frame),
+                    })
+                    .cooks_replacement(&options),
+            ),
+    )
+    .unwrap();
     assert_eq!(model_frame_request.results, output.results);
     assert_eq!(
         model_frame_request.original_fit.current_model_frame(),
@@ -367,17 +388,18 @@ fn fixed_dispersion_wald_replacement_skips_when_no_rows_are_marked() {
     )
     .unwrap();
 
-    let output = DeseqBuilder::new()
-        .size_factors(vec![1.0; 8])
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            1,
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap();
+    let output = run_wald_replacement(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 8])
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1, 0.1])
+                    .result(ResultColumn::Coefficient(1))
+                    .cooks_replacement(&CooksReplacementOptions::new(f64::MAX)),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(output.refit_plan.n_refit, 0);
     assert!(!output.refit_plan.should_refit);

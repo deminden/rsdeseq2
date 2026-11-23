@@ -1,5 +1,6 @@
 //! Compare builder presentation with shared stored-query policy on the same fit.
 //! The independent original-DESeq2 origin/row oracle lives in cooks_policy_reference.
+use crate::support::run::run_results;
 use rsdeseq2::errors::NameScope;
 use rsdeseq2::prelude::*;
 
@@ -194,62 +195,33 @@ fn evaluate(
     let reduced = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
     let d = [0.2; 3];
     let options = CooksReplacementOptions::new(f64::MAX);
-    macro_rules! run {
-        ($plain:ident,$replace:ident,$($argument:expr),*) => {
-            if replacement {
-                let out=b.$replace(counts,design,$($argument,)*&options).unwrap();
-                assert_eq!(out.refit_plan.n_refit,0);
-                (out.original_fit,out.results)
-            } else { b.$plain(counts,design,$($argument),*).unwrap() }
+    let column = match query {
+        Query::Coefficient(index) => ResultColumn::Coefficient(*index),
+        Query::Numeric(contrast) => ResultColumn::Numeric(contrast),
+    };
+    let request = Analysis::new(counts, design).result(column);
+    let request = match engine {
+        Engine::FixedWald => request.fixed_dispersion(&d),
+        Engine::FixedLrt => request.lrt(&reduced).fixed_dispersion(&d),
+        Engine::NativeWald => request.means(MeanModel::GlmMu),
+        Engine::NativeLrt => request.lrt(&reduced).means(MeanModel::GlmMu),
+    };
+    let request = if replacement {
+        request.cooks_replacement(&options)
+    } else {
+        request
+    };
+    match b.run(&request).unwrap() {
+        RunOutput::Results { fit, results } => (fit, results),
+        RunOutput::Replacement(CooksReplacementTestOutput::Wald(out)) => {
+            assert_eq!(out.refit_plan.n_refit, 0);
+            (out.original_fit, out.results)
         }
-    }
-    match (engine, query) {
-        (Engine::FixedWald, Query::Coefficient(i)) => run!(
-            fit_fixed_dispersion_wald,
-            fit_fixed_dispersion_wald_with_cooks_replacement,
-            &d,
-            *i
-        ),
-        (Engine::FixedWald, Query::Numeric(v)) => run!(
-            fit_fixed_dispersion_wald_contrast,
-            fit_fixed_dispersion_wald_contrast_with_cooks_replacement,
-            &d,
-            v
-        ),
-        (Engine::FixedLrt, Query::Coefficient(i)) => run!(
-            fit_fixed_dispersion_lrt,
-            fit_fixed_dispersion_lrt_with_cooks_replacement,
-            &reduced,
-            &d,
-            *i
-        ),
-        (Engine::FixedLrt, Query::Numeric(v)) => run!(
-            fit_fixed_dispersion_lrt_contrast,
-            fit_fixed_dispersion_lrt_contrast_with_cooks_replacement,
-            &reduced,
-            &d,
-            v
-        ),
-        (Engine::NativeWald, Query::Coefficient(i)) => {
-            run!(fit_wald_glm_mu, fit_wald_glm_mu_with_cooks_replacement, *i)
+        RunOutput::Replacement(CooksReplacementTestOutput::Lrt(out)) => {
+            assert_eq!(out.refit_plan.n_refit, 0);
+            (out.original_fit, out.results)
         }
-        (Engine::NativeWald, Query::Numeric(v)) => run!(
-            fit_wald_glm_mu_contrast,
-            fit_wald_glm_mu_contrast_with_cooks_replacement,
-            v
-        ),
-        (Engine::NativeLrt, Query::Coefficient(i)) => run!(
-            fit_lrt_glm_mu,
-            fit_lrt_glm_mu_with_cooks_replacement,
-            &reduced,
-            *i
-        ),
-        (Engine::NativeLrt, Query::Numeric(v)) => run!(
-            fit_lrt_glm_mu_contrast,
-            fit_lrt_glm_mu_contrast_with_cooks_replacement,
-            &reduced,
-            v
-        ),
+        _ => panic!("expected fitted results"),
     }
 }
 // Derive-based PartialEq deliberately follows IEEE NaN != NaN. Compare the
@@ -348,11 +320,17 @@ fn invalid_frame_is_rejected_before_normalization_even_when_filtering_is_disable
     wrong_samples.factors[0].sample_levels.pop();
     // Invalid size factors would fail first if frame preflight were lost.
     let reject = |bad| {
-        builder(bad)
-            .size_factors(vec![0.; 6])
-            .disable_cooks_cutoff()
-            .fit_fixed_dispersion_wald(&counts, &design, &[0.2; 3], 0)
-            .unwrap_err()
+        run_results(
+            builder(bad)
+                .size_factors(vec![0.; 6])
+                .disable_cooks_cutoff()
+                .run(
+                    &Analysis::new(&counts, &design)
+                        .fixed_dispersion(&[0.2; 3])
+                        .result(ResultColumn::Coefficient(0)),
+                ),
+        )
+        .unwrap_err()
     };
     crate::support::assert_ambiguous_name(
         reject(ambiguous),
@@ -386,17 +364,20 @@ fn explicit_factor_alias_without_a_frame_preserves_original_formula_scope() {
     .with_origin(DesignOrigin::formula(vec!["cell type".into()]).unwrap());
     let levels = frame().factors.remove(0).sample_levels;
     for factor in ["cell type", "cell.type"] {
-        let (_, result) = DeseqBuilder::new()
-            .size_factors(vec![1.; 6])
-            .cooks_cutoff_threshold(0.)
-            .disable_independent_filtering()
-            .fit_fixed_dispersion_wald_factor_level_contrast(
-                &counts,
-                &design,
-                &[0.2; 3],
-                FactorLevelContrast::new(factor, "B", "A", &levels),
-            )
-            .unwrap();
+        let (_, result) = run_results(
+            DeseqBuilder::new()
+                .size_factors(vec![1.; 6])
+                .cooks_cutoff_threshold(0.)
+                .disable_independent_filtering()
+                .run(
+                    &Analysis::new(&counts, &design)
+                        .fixed_dispersion(&[0.2; 3])
+                        .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                            factor, "B", "A", &levels,
+                        ))),
+                ),
+        )
+        .unwrap();
         assert_eq!(result.rows[0].cooks_outlier, Some(false), "{factor}");
         assert!(result.rows[0].pvalue.is_some());
     }

@@ -1,5 +1,6 @@
 //! Execution policy from original DESeq2, shared across fitting/selection routes.
 use crate::support::json_prefixed_bits as numbers;
+use crate::support::run::run_replacement;
 use rsdeseq2::prelude::*;
 use serde_json::Value;
 
@@ -49,9 +50,13 @@ fn ineligible_samples_do_not_refit_or_change_original_fits_and_results() {
             .size_factors(numbers(&r["size_factors"]))
             .disable_cooks_cutoff()
             .disable_independent_filtering();
-        if lrt {
-            builder = builder.test(TestType::Lrt).reduced_design(reduced.clone());
-        }
+        let test_request = if lrt {
+            TestRequest::Lrt {
+                reduced: DesignInput::Matrix(&reduced),
+            }
+        } else {
+            TestRequest::Wald
+        };
         if c["normalization_factors"].as_bool().unwrap() {
             builder = builder.normalization_factors(
                 RowMajorMatrix::from_row_major(
@@ -69,53 +74,19 @@ fn ineligible_samples_do_not_refit_or_change_original_fits_and_results() {
         }
         for fixed in [false, true] {
             for use_contrast in [false, true] {
-                let output = match (fixed, lrt, use_contrast) {
-                    (false, _, false) => builder
-                        .fit_with_test_results_with_cooks_replacement(&counts, &design, &options),
-                    (false, _, true) => builder
-                        .fit_with_test_results_contrast_with_cooks_replacement(
-                            &counts, &design, &contrast, &options,
-                        ),
-                    (true, false, false) => builder
-                        .fit_fixed_dispersion_wald_with_cooks_replacement(
-                            &counts,
-                            &design,
-                            &dispersions,
-                            1,
-                            &options,
-                        )
-                        .map(CooksReplacementTestOutput::Wald),
-                    (true, false, true) => builder
-                        .fit_fixed_dispersion_wald_contrast_with_cooks_replacement(
-                            &counts,
-                            &design,
-                            &dispersions,
-                            &contrast,
-                            &options,
-                        )
-                        .map(CooksReplacementTestOutput::Wald),
-                    (true, true, false) => builder
-                        .fit_fixed_dispersion_lrt_with_cooks_replacement(
-                            &counts,
-                            &design,
-                            &reduced,
-                            &dispersions,
-                            1,
-                            &options,
-                        )
-                        .map(CooksReplacementTestOutput::Lrt),
-                    (true, true, true) => builder
-                        .fit_fixed_dispersion_lrt_contrast_with_cooks_replacement(
-                            &counts,
-                            &design,
-                            &reduced,
-                            &dispersions,
-                            &contrast,
-                            &options,
-                        )
-                        .map(CooksReplacementTestOutput::Lrt),
+                let column = if use_contrast {
+                    ResultColumn::Numeric(&contrast)
+                } else {
+                    ResultColumn::Default
+                };
+                let mut request = Analysis::new(&counts, &design)
+                    .test(test_request)
+                    .result(column)
+                    .cooks_replacement(&options);
+                if fixed {
+                    request = request.fixed_dispersion(&dispersions);
                 }
-                .unwrap();
+                let output = run_replacement(builder.run(&request)).unwrap();
                 let (original, refit, raw_results, final_results, plan) = match &output {
                     CooksReplacementTestOutput::Wald(o) => (
                         &o.original_fit,

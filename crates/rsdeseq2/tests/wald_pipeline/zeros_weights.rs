@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::run_results;
+use rsdeseq2::prelude::{Analysis, ResultColumn};
 
 #[test]
 fn original_zero_zero_list_contrast_zeroes_lfc_like_numeric_contrast() {
@@ -37,21 +39,25 @@ fn original_zero_zero_list_contrast_zeroes_lfc_like_numeric_contrast() {
         .disable_cooks_cutoff()
         .disable_independent_filtering();
 
-    let (list_fit, list_results) = builder
-        .clone()
-        .fit_fixed_dispersion_wald_contrast_spec(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ContrastSpec::list(
-                vec!["condition_D_vs_A".into()],
-                vec!["condition_B_vs_A".into()],
-            ),
-        )
-        .unwrap();
-    let (_numeric_fit, numeric_results) = builder
-        .fit_fixed_dispersion_wald_contrast(&counts, &design, &[0.1, 0.1], &[0.0, -1.0, 0.0, 1.0])
-        .unwrap();
+    let (list_fit, list_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Spec(&ContrastSpec::list(
+                    vec!["condition_D_vs_A".into()],
+                    vec!["condition_B_vs_A".into()],
+                ))),
+        ),
+    )
+    .unwrap();
+    let (_numeric_fit, numeric_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Numeric(&[0.0, -1.0, 0.0, 1.0])),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(list_results.rows[0].log2_fold_change, Some(0.0));
     assert_eq!(numeric_results.rows[0].log2_fold_change, Some(0.0));
@@ -116,32 +122,42 @@ fn original_zero_intercept_factor_level_contrasts_return_signed_lfcs() {
             ..IrlsOptions::default()
         });
 
-    let (_fit_21, result_21) = builder
-        .clone()
-        .fit_fixed_dispersion_wald_contrast_spec(
-            &counts,
-            &design,
-            &[0.05],
-            &ContrastSpec::factor_level("condition", "2", "1"),
-        )
-        .unwrap();
-    let (_fit_32, result_32) = builder
-        .clone()
-        .fit_fixed_dispersion_wald_contrast_spec(
-            &counts,
-            &design,
-            &[0.05],
-            &ContrastSpec::factor_level("condition", "3", "2"),
-        )
-        .unwrap();
-    let (_fit_13, result_13) = builder
-        .fit_fixed_dispersion_wald_contrast_spec(
-            &counts,
-            &design,
-            &[0.05],
-            &ContrastSpec::factor_level("condition", "1", "3"),
-        )
-        .unwrap();
+    let (_fit_21, result_21) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.05])
+                .result(ResultColumn::Spec(&ContrastSpec::factor_level(
+                    "condition",
+                    "2",
+                    "1",
+                ))),
+        ),
+    )
+    .unwrap();
+    let (_fit_32, result_32) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.05])
+                .result(ResultColumn::Spec(&ContrastSpec::factor_level(
+                    "condition",
+                    "3",
+                    "2",
+                ))),
+        ),
+    )
+    .unwrap();
+    let (_fit_13, result_13) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.05])
+                .result(ResultColumn::Spec(&ContrastSpec::factor_level(
+                    "condition",
+                    "1",
+                    "3",
+                ))),
+        ),
+    )
+    .unwrap();
 
     assert_relative_eq!(
         result_21.rows[0].log2_fold_change.unwrap(),
@@ -194,12 +210,18 @@ fn fixed_dispersion_wald_contrast_applies_contrast_all_zero_numeric() {
     )
     .unwrap();
 
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0; 6])
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald_contrast(&counts, &design, &[0.1, 0.1], &[-1.0, 1.0, 0.0])
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 6])
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1, 0.1])
+                    .result(ResultColumn::Numeric(&[-1.0, 1.0, 0.0])),
+            ),
+    )
+    .unwrap();
 
     let wald = fit.wald.as_ref().unwrap();
     assert_eq!(results.rows[0].log2_fold_change, Some(0.0));
@@ -251,18 +273,27 @@ fn fixed_dispersion_wald_factor_level_contrast_applies_character_contrast_all_ze
         .disable_cooks_cutoff()
         .disable_independent_filtering();
 
-    let (fit, results) = builder
-        .clone()
-        .fit_fixed_dispersion_wald_factor_level_contrast(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-        )
-        .unwrap();
-    let (primitive_fit, _primitive_results) = builder
-        .fit_fixed_dispersion_wald_contrast(&counts, &design, &[0.1, 0.1], &[0.0, 1.0, 0.0])
-        .unwrap();
+    let (fit, results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                    "condition",
+                    "B",
+                    "A",
+                    &levels,
+                ))),
+        ),
+    )
+    .unwrap();
+    let (primitive_fit, _primitive_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Numeric(&[0.0, 1.0, 0.0])),
+        ),
+    )
+    .unwrap();
 
     assert_wald_fit_intermediates_match(&fit, &primitive_fit, "factor-level contrast helper");
     assert_eq!(fit.wald.as_ref().unwrap().stat[0], Some(0.0));
@@ -325,18 +356,27 @@ fn original_weighted_contrast_lfc_se_does_not_depend_on_contrast_type() {
         .disable_cooks_cutoff()
         .disable_independent_filtering();
 
-    let (_factor_fit, factor_results) = builder
-        .clone()
-        .fit_fixed_dispersion_wald_factor_level_contrast(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-        )
-        .unwrap();
-    let (_numeric_fit, numeric_results) = builder
-        .fit_fixed_dispersion_wald_contrast(&counts, &design, &[0.1, 0.1], &[0.0, 1.0])
-        .unwrap();
+    let (_factor_fit, factor_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                    "condition",
+                    "B",
+                    "A",
+                    &levels,
+                ))),
+        ),
+    )
+    .unwrap();
+    let (_numeric_fit, numeric_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
 
     for (factor, numeric) in factor_results.rows.iter().zip(numeric_results.rows.iter()) {
         assert_eq!(factor.log2_fold_change, numeric.log2_fold_change);
@@ -374,13 +414,19 @@ fn fixed_dispersion_wald_contrast_marks_weight_failed_rows_as_skipped() {
     )
     .unwrap();
 
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0, 1.0])
-        .observation_weights(weights)
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald_contrast(&counts, &design, &[0.1, 0.1], &[0.0, 1.0])
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0, 1.0])
+            .observation_weights(weights)
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1, 0.1])
+                    .result(ResultColumn::Numeric(&[0.0, 1.0])),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(fit.weights_fail, Some(vec![false, true]));
     assert_eq!(fit.all_zero, vec![false, true]);
@@ -397,30 +443,42 @@ fn original_zero_weighted_sample_matches_removed_sample_fit() {
         DesignMatrix::from_row_major(4, 1, vec![1.0, 1.0, 1.0, 1.0], None).unwrap();
     let weights = RowMajorMatrix::from_row_major(1, 4, vec![1.0, 1.0, 0.0, 1.0]).unwrap();
 
-    let (weighted_fit, weighted_results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0, 1.0])
-        .observation_weights(weights)
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .irls_options(IrlsOptions {
-            ridge_lambda: 0.0,
-            ..IrlsOptions::default()
-        })
-        .fit_fixed_dispersion_wald(&weighted_counts, &weighted_design, &[0.05], 0)
-        .unwrap();
+    let (weighted_fit, weighted_results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0, 1.0])
+            .observation_weights(weights)
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .irls_options(IrlsOptions {
+                ridge_lambda: 0.0,
+                ..IrlsOptions::default()
+            })
+            .run(
+                &Analysis::new(&weighted_counts, &weighted_design)
+                    .fixed_dispersion(&[0.05])
+                    .result(ResultColumn::Coefficient(0)),
+            ),
+    )
+    .unwrap();
 
     let subset_counts = CountMatrix::from_row_major_u32(1, 3, vec![10, 12, 120]).unwrap();
     let subset_design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
-    let (subset_fit, subset_results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0])
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .irls_options(IrlsOptions {
-            ridge_lambda: 0.0,
-            ..IrlsOptions::default()
-        })
-        .fit_fixed_dispersion_wald(&subset_counts, &subset_design, &[0.05], 0)
-        .unwrap();
+    let (subset_fit, subset_results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0])
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .irls_options(IrlsOptions {
+                ridge_lambda: 0.0,
+                ..IrlsOptions::default()
+            })
+            .run(
+                &Analysis::new(&subset_counts, &subset_design)
+                    .fixed_dispersion(&[0.05])
+                    .result(ResultColumn::Coefficient(0)),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(weighted_fit.weights_fail, Some(vec![false]));
     assert_relative_eq!(
@@ -456,11 +514,17 @@ fn fixed_dispersion_wald_pipeline_expands_all_zero_rows() {
     .unwrap();
     let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
 
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0])
-        .wald_t_residual_degrees_of_freedom()
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.1, 0.2], 0)
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0])
+            .wald_t_residual_degrees_of_freedom()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1, 0.2])
+                    .result(ResultColumn::Coefficient(0)),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(fit.all_zero, vec![true, false]);
     assert!(fit.dispersion.as_ref().unwrap()[0].is_nan());
@@ -523,10 +587,14 @@ fn fixed_dispersion_wald_pipeline_handles_all_zero_only_with_supplied_size_facto
     let counts = CountMatrix::from_row_major_u32(1, 3, vec![0, 0, 0]).unwrap();
     let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
 
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0])
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.1], 0)
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new().size_factors(vec![1.0, 1.0, 1.0]).run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Coefficient(0)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(fit.base_mean, vec![0.0]);
     assert!(fit.beta.as_ref().unwrap().row(0).unwrap()[0].is_nan());

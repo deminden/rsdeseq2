@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::{run_fit, run_results, run_wald_replacement};
+use rsdeseq2::prelude::{Analysis, MeanModel, ResultColumn};
 
 #[test]
 fn top_level_fit_with_results_cooks_replacement_runs_default_automatic_wald() {
@@ -30,26 +32,31 @@ fn top_level_fit_with_results_cooks_replacement_runs_default_automatic_wald() {
         which_samples: Some(vec![true, false, false, false, false, false, false, false]),
     };
 
-    let top_level_output = builder
-        .fit_with_results_with_cooks_replacement(&counts, &design, &replacement_options)
+    let top_level_output = run_wald_replacement(
+        builder.run(&Analysis::new(&counts, &design).cooks_replacement(&replacement_options)),
+    )
+    .unwrap();
+    let wald_output = run_wald_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let formula_output =
+        run_wald_replacement(builder.run(
+            &Analysis::formula(&counts, "~ condition").cooks_replacement(&replacement_options),
+        ))
         .unwrap();
-    let wald_output = builder
-        .fit_wald_glm_mu_with_cooks_replacement(&counts, &design, 1, &replacement_options)
-        .unwrap();
-    let formula_output = builder
-        .fit_formula_with_results_with_cooks_replacement(
-            &counts,
-            "~ condition",
-            &replacement_options,
-        )
-        .unwrap();
-    let transformed_formula_output = builder
-        .fit_formula_with_results_with_cooks_replacement(
-            &counts,
-            "~ factor(condition, levels=c('A','B'))",
-            &replacement_options,
-        )
-        .unwrap();
+    let transformed_formula_output = run_wald_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ factor(condition, levels=c('A','B'))")
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
     let offset_values = builder.current_model_frame().unwrap().numeric_covariates[0]
         .values
         .to_vec();
@@ -62,22 +69,22 @@ fn top_level_fit_with_results_cooks_replacement_runs_default_automatic_wald() {
     let normalization_factors =
         RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), normalization_values)
             .unwrap();
-    let explicit_offset_output = builder
-        .clone()
-        .normalization_factors(normalization_factors.clone())
-        .fit_formula_with_results_with_cooks_replacement(
-            &counts,
-            "~ condition",
-            &replacement_options,
-        )
-        .unwrap();
-    let formula_offset_output = builder
-        .fit_formula_with_results_with_cooks_replacement(
-            &counts,
-            "~ condition + offset(exposure)",
-            &replacement_options,
-        )
-        .unwrap();
+    let explicit_offset_output = run_wald_replacement(
+        builder
+            .clone()
+            .normalization_factors(normalization_factors.clone())
+            .run(
+                &Analysis::formula(&counts, "~ condition").cooks_replacement(&replacement_options),
+            ),
+    )
+    .unwrap();
+    let formula_offset_output = run_wald_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ condition + offset(exposure)")
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(top_level_output.refit_plan, wald_output.refit_plan);
     assert_eq!(formula_output.refit_plan, wald_output.refit_plan);
@@ -204,25 +211,31 @@ fn top_level_fit_with_results_cooks_replacement_accepts_coefficient_name() {
         which_samples: Some(vec![true, false, false, false, false, false, false, false]),
     };
 
-    let named_output = builder
-        .fit_with_results_name_with_cooks_replacement(
-            &counts,
-            &design,
-            "condition_B_vs_A",
-            &replacement_options,
-        )
-        .unwrap();
-    let indexed_output = builder
-        .fit_wald_glm_mu_with_cooks_replacement(&counts, &design, 1, &replacement_options)
-        .unwrap();
-    let formula_named_output = builder
-        .fit_formula_with_results_name_with_cooks_replacement(
-            &counts,
-            "~ condition",
-            "condition_B_vs_A",
-            &replacement_options,
-        )
-        .unwrap();
+    let named_output = run_wald_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .result(ResultColumn::Name("condition_B_vs_A"))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let indexed_output = run_wald_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let formula_named_output = run_wald_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ condition")
+                .result(ResultColumn::Name("condition_B_vs_A"))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(named_output.refit_plan, indexed_output.refit_plan);
     assert_eq!(formula_named_output.refit_plan, indexed_output.refit_plan);
@@ -247,12 +260,18 @@ fn top_level_fit_with_results_contrast_runs_default_automatic_wald_contrast() {
     let builder = glm_mu_native_wald_builder().automatic_dispersion_means();
     let contrast = [0.0, 1.0];
 
-    let (top_level_fit, top_level_results) = builder
-        .fit_with_results_contrast(&counts, &design, &contrast)
-        .unwrap();
-    let (contrast_fit, contrast_results) = builder
-        .fit_wald_glm_mu_contrast(&counts, &design, &contrast)
-        .unwrap();
+    let (top_level_fit, top_level_results) = run_results(
+        builder.run(&Analysis::new(&counts, &design).result(ResultColumn::Numeric(&contrast))),
+    )
+    .unwrap();
+    let (contrast_fit, contrast_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(&contrast)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(top_level_fit.wald, contrast_fit.wald);
     assert_wald_fit_state_matches(
@@ -275,10 +294,18 @@ fn top_level_fit_contrast_returns_default_automatic_wald_contrast_fit() {
     let builder = glm_mu_native_wald_builder().automatic_dispersion_means();
     let contrast = [0.0, 1.0];
 
-    let top_level_fit = builder.fit_contrast(&counts, &design, &contrast).unwrap();
-    let (contrast_fit, _contrast_results) = builder
-        .fit_wald_glm_mu_contrast(&counts, &design, &contrast)
-        .unwrap();
+    let top_level_fit = run_fit(
+        builder.run(&Analysis::new(&counts, &design).result(ResultColumn::Numeric(&contrast))),
+    )
+    .unwrap();
+    let (contrast_fit, _contrast_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(&contrast)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(top_level_fit.counts_summary, contrast_fit.counts_summary);
     assert_eq!(top_level_fit.design, contrast_fit.design);
@@ -304,22 +331,23 @@ fn top_level_fit_with_results_contrast_cooks_replacement_runs_default_automatic_
         which_samples: Some(vec![true, false, false, false, false, false, false, false]),
     };
 
-    let top_level_output = builder
-        .fit_with_results_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &contrast,
-            &replacement_options,
-        )
-        .unwrap();
-    let contrast_output = builder
-        .fit_wald_glm_mu_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &contrast,
-            &replacement_options,
-        )
-        .unwrap();
+    let top_level_output = run_wald_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .result(ResultColumn::Numeric(&contrast))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let contrast_output = run_wald_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(&contrast))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(top_level_output.refit_plan, contrast_output.refit_plan);
     assert_eq!(
@@ -358,24 +386,21 @@ fn top_level_fit_with_results_contrast_specs_set_metadata() {
         .map(String::from)
         .collect::<Vec<_>>();
 
-    let (primitive_fit, _primitive_results) = builder
-        .clone()
-        .fit_with_results_contrast(&counts, &design, &[0.0, 1.0])
+    let (primitive_fit, _primitive_results) = run_results(
+        builder
+            .clone()
+            .run(&Analysis::new(&counts, &design).result(ResultColumn::Numeric(&[0.0, 1.0]))),
+    )
+    .unwrap();
+    let (named_fit, named_results) =
+        run_results(builder.clone().run(&Analysis::new(&counts, &design).result(
+            ResultColumn::Spec(&ContrastSpec::coefficient_name("condition_B_vs_A")),
+        )))
         .unwrap();
-    let (named_fit, named_results) = builder
-        .clone()
-        .fit_with_results_contrast_spec(
-            &counts,
-            &design,
-            &ContrastSpec::coefficient_name("condition_B_vs_A"),
-        )
-        .unwrap();
-    let (factor_fit, factor_results) = builder
-        .fit_with_results_factor_level_contrast(
-            &counts,
-            &design,
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-        )
+    let (factor_fit, factor_results) =
+        run_results(builder.run(&Analysis::new(&counts, &design).result(
+            ResultColumn::FactorLevel(FactorLevelContrast::new("condition", "B", "A", &levels)),
+        )))
         .unwrap();
 
     assert_wald_fit_state_matches(

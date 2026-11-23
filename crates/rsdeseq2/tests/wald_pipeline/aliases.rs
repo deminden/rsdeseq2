@@ -1,6 +1,8 @@
 use super::*;
 use crate::support::assert_ambiguous_name;
+use crate::support::run::run_results;
 use rsdeseq2::errors::{FactorLevelRole, NameScope};
+use rsdeseq2::prelude::{Analysis, ResultColumn};
 
 #[test]
 fn fixed_dispersion_wald_results_contrast_canonicalizes_cleaned_sample_level_aliases() {
@@ -44,25 +46,36 @@ fn fixed_dispersion_wald_results_contrast_canonicalizes_cleaned_sample_level_ali
         .disable_cooks_cutoff()
         .disable_independent_filtering();
 
-    let (_expected_fit, expected_results) = builder
-        .clone()
-        .fit_fixed_dispersion_wald_factor_level_contrast(
-            &counts,
-            &design,
-            &dispersions,
-            FactorLevelContrast::new("cell.type", "B cell", "A cell", &levels),
-        )
-        .unwrap();
-    let (_actual_fit, actual_results) = builder
-        .clone()
-        .fit_fixed_dispersion_wald_results_contrast(
-            &counts,
-            &design,
-            &dispersions,
-            &ResultsContrast::character_with_reference("cell.type", "B.cell", "A.cell", "A.cell"),
-            Some(&levels),
-        )
-        .unwrap();
+    let (_expected_fit, expected_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                    "cell.type",
+                    "B cell",
+                    "A cell",
+                    &levels,
+                ))),
+        ),
+    )
+    .unwrap();
+    let (_actual_fit, actual_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character_with_reference(
+                        "cell.type",
+                        "B.cell",
+                        "A.cell",
+                        "A.cell",
+                    ),
+                    sample_levels: Some(&levels),
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(actual_results.rows, expected_results.rows);
     assert_eq!(
@@ -77,15 +90,23 @@ fn fixed_dispersion_wald_results_contrast_canonicalizes_cleaned_sample_level_ali
     let ambiguous_levels = [
         "A cell", "A-cell", "A cell", "A-cell", "B cell", "B cell", "B cell", "B cell",
     ];
-    let err = builder
-        .fit_fixed_dispersion_wald_results_contrast(
-            &counts,
-            &design,
-            &dispersions,
-            &ResultsContrast::character_with_reference("cell.type", "B.cell", "A.cell", "A.cell"),
-            Some(&ambiguous_levels),
-        )
-        .unwrap_err();
+    let err = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character_with_reference(
+                        "cell.type",
+                        "B.cell",
+                        "A.cell",
+                        "A.cell",
+                    ),
+                    sample_levels: Some(&ambiguous_levels.map(String::from)),
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap_err();
     assert_ambiguous_name(
         err,
         ErrorKind::Options,
@@ -134,31 +155,36 @@ fn fixed_dispersion_wald_list_contrast_accepts_cleaned_positive_and_negative_ali
         .disable_cooks_cutoff()
         .disable_independent_filtering();
 
-    let (_cleaned_fit, cleaned_results) = builder
-        .clone()
-        .fit_fixed_dispersion_wald_results_contrast(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ResultsContrast::list(
-                vec!["cell.type_NK.cell_vs_T.cell".into()],
-                vec!["cell.type_B.cell_vs_T.cell".into()],
-            ),
-            None::<&[String]>,
-        )
-        .unwrap();
-    let (_raw_fit, raw_results) = builder
-        .fit_fixed_dispersion_wald_results_contrast(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ResultsContrast::list(
-                vec!["cell type_NK cell_vs_T cell".into()],
-                vec!["cell type_B cell_vs_T cell".into()],
-            ),
-            None::<&[String]>,
-        )
-        .unwrap();
+    let (_cleaned_fit, cleaned_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell.type_NK.cell_vs_T.cell".into()],
+                        vec!["cell.type_B.cell_vs_T.cell".into()],
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
+    let (_raw_fit, raw_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell type_NK cell_vs_T cell".into()],
+                        vec!["cell type_B cell_vs_T cell".into()],
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(cleaned_results.rows, raw_results.rows);
     assert_eq!(

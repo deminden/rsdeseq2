@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::{run_fit, run_results};
+use rsdeseq2::prelude::{Analysis, MeanModel, ResultColumn, Stage};
 
 #[test]
 fn native_wald_parametric_contrast_helpers_ignore_builder_fit_type() {
@@ -15,12 +17,23 @@ fn native_wald_parametric_contrast_helpers_ignore_builder_fit_type() {
         .collect::<Vec<_>>();
     let factor_contrast = FactorLevelContrast::new("condition", "B", "A", &levels);
 
-    let (linear_parametric_fit, linear_parametric_results) = mean_linear_builder
-        .fit_wald_linear_mu_contrast_parametric(&counts, &design, &[0.0, 1.0])
-        .unwrap();
-    let (linear_expected_fit, linear_expected_results) = parametric_linear_builder
-        .fit_wald_linear_mu_contrast(&counts, &design, &[0.0, 1.0])
-        .unwrap();
+    let (linear_parametric_fit, linear_parametric_results) = run_results(
+        mean_linear_builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
+    let (linear_expected_fit, linear_expected_results) = run_results(
+        parametric_linear_builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
     assert_wald_fit_state_matches(
         &linear_parametric_fit,
         &linear_expected_fit,
@@ -28,9 +41,15 @@ fn native_wald_parametric_contrast_helpers_ignore_builder_fit_type() {
     );
     assert_eq!(linear_parametric_results, linear_expected_results);
 
-    let (linear_named_fit, linear_named_results) = mean_linear_builder
-        .fit_wald_linear_mu_contrast_spec_parametric(&counts, &design, &spec)
-        .unwrap();
+    let (linear_named_fit, linear_named_results) = run_results(
+        mean_linear_builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Spec(&spec)),
+        ),
+    )
+    .unwrap();
     assert_wald_fit_state_matches(
         &linear_named_fit,
         &linear_expected_fit,
@@ -42,9 +61,15 @@ fn native_wald_parametric_contrast_helpers_ignore_builder_fit_type() {
         Some("condition_B_vs_A")
     );
 
-    let (linear_factor_fit, linear_factor_results) = mean_linear_builder
-        .fit_wald_linear_mu_factor_level_contrast_parametric(&counts, &design, factor_contrast)
-        .unwrap();
+    let (linear_factor_fit, linear_factor_results) = run_results(
+        mean_linear_builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::FactorLevel(factor_contrast)),
+        ),
+    )
+    .unwrap();
     assert_wald_fit_state_matches(
         &linear_factor_fit,
         &linear_expected_fit,
@@ -56,12 +81,23 @@ fn native_wald_parametric_contrast_helpers_ignore_builder_fit_type() {
         Some("factor-level contrast: condition B vs A")
     );
 
-    let (glm_parametric_fit, glm_parametric_results) = mean_glm_builder
-        .fit_wald_glm_mu_contrast_parametric(&counts, &design, &[0.0, 1.0])
-        .unwrap();
-    let (glm_expected_fit, glm_expected_results) = parametric_glm_builder
-        .fit_wald_glm_mu_contrast(&counts, &design, &[0.0, 1.0])
-        .unwrap();
+    let (glm_parametric_fit, glm_parametric_results) = run_results(
+        mean_glm_builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
+    let (glm_expected_fit, glm_expected_results) = run_results(
+        parametric_glm_builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
     assert_wald_fit_state_matches(
         &glm_parametric_fit,
         &glm_expected_fit,
@@ -69,9 +105,15 @@ fn native_wald_parametric_contrast_helpers_ignore_builder_fit_type() {
     );
     assert_eq!(glm_parametric_results, glm_expected_results);
 
-    let (glm_named_fit, glm_named_results) = mean_glm_builder
-        .fit_wald_glm_mu_contrast_spec_parametric(&counts, &design, &spec)
-        .unwrap();
+    let (glm_named_fit, glm_named_results) = run_results(
+        mean_glm_builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Spec(&spec)),
+        ),
+    )
+    .unwrap();
     assert_wald_fit_state_matches(
         &glm_named_fit,
         &glm_expected_fit,
@@ -83,9 +125,15 @@ fn native_wald_parametric_contrast_helpers_ignore_builder_fit_type() {
         Some("condition_B_vs_A")
     );
 
-    let (glm_factor_fit, glm_factor_results) = mean_glm_builder
-        .fit_wald_glm_mu_factor_level_contrast_parametric(&counts, &design, factor_contrast)
-        .unwrap();
+    let (glm_factor_fit, glm_factor_results) = run_results(
+        mean_glm_builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::FactorLevel(factor_contrast)),
+        ),
+    )
+    .unwrap();
     assert_wald_fit_state_matches(
         &glm_factor_fit,
         &glm_expected_fit,
@@ -104,7 +152,14 @@ fn native_linear_mu_generic_mean_wald_runs_through_map_and_glm() {
     let design = two_group_design();
     let builder = native_wald_builder().fit_type(FitType::Mean);
 
-    let (fit, results) = builder.fit_wald_linear_mu(&counts, &design, 1).unwrap();
+    let (fit, results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(results.rows.len(), counts.n_genes());
     assert_eq!(
@@ -150,15 +205,22 @@ fn native_glm_mu_parametric_map_preserves_dispersion_intermediates() {
     let counts = native_wald_counts_with_zero_row();
     let design = two_group_design();
 
-    let fit = native_wald_builder()
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            use_cox_reid: false,
-            fit_method: GeneWiseDispersionFitMethod::Grid,
-            niter: 2,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .fit_map_dispersions_glm_mu_parametric(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        native_wald_builder()
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                use_cox_reid: false,
+                fit_method: GeneWiseDispersionFitMethod::Grid,
+                niter: 2,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::GlmMu)
+                    .fit_type(FitType::Parametric)
+                    .stop_after(Stage::Map),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(fit.design.as_ref().unwrap(), &design);
     assert_eq!(
@@ -205,16 +267,22 @@ fn native_glm_mu_generic_mean_map_runs_through_selected_trend() {
     let counts = native_wald_counts_with_zero_row();
     let design = two_group_design();
 
-    let fit = native_wald_builder()
-        .fit_type(FitType::Mean)
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            use_cox_reid: false,
-            fit_method: GeneWiseDispersionFitMethod::Grid,
-            niter: 2,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .fit_map_dispersions_glm_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        native_wald_builder()
+            .fit_type(FitType::Mean)
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                use_cox_reid: false,
+                fit_method: GeneWiseDispersionFitMethod::Grid,
+                niter: 2,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::GlmMu)
+                    .stop_after(Stage::Map),
+            ),
+    )
+    .unwrap();
 
     let disp_fit = fit.disp_fit.as_ref().unwrap();
     assert!(disp_fit[0].is_nan());
@@ -238,13 +306,24 @@ fn native_glm_mu_parametric_wald_matches_fixed_pipeline_when_reusing_final_dispe
     let design = two_group_design();
     let builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
 
-    let (native_fit, native_results) = builder
-        .fit_wald_glm_mu_parametric(&counts, &design, 1)
-        .unwrap();
+    let (native_fit, native_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
     let final_dispersions = native_fit.dispersion.as_ref().unwrap().clone();
-    let (fixed_fit, fixed_results) = builder
-        .fit_fixed_dispersion_wald(&counts, &design, &final_dispersions, 1)
-        .unwrap();
+    let (fixed_fit, fixed_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&final_dispersions)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert!(native_fit.disp_prior_var.unwrap().is_finite());
     assert!(native_fit.beta.as_ref().unwrap().n_cols() == design.n_coefficients());
@@ -282,13 +361,23 @@ fn native_glm_mu_wald_contrast_matches_fixed_pipeline_when_reusing_final_dispers
     let builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
     let contrast = [0.0, 1.0];
 
-    let (native_fit, native_results) = builder
-        .fit_wald_glm_mu_contrast(&counts, &design, &contrast)
-        .unwrap();
+    let (native_fit, native_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(&contrast)),
+        ),
+    )
+    .unwrap();
     let final_dispersions = native_fit.dispersion.as_ref().unwrap().clone();
-    let (fixed_fit, fixed_results) = builder
-        .fit_fixed_dispersion_wald_contrast(&counts, &design, &final_dispersions, &contrast)
-        .unwrap();
+    let (fixed_fit, fixed_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&final_dispersions)
+                .result(ResultColumn::Numeric(&contrast)),
+        ),
+    )
+    .unwrap();
 
     assert!(native_fit.disp_prior_var.unwrap().is_finite());
     assert_eq!(
@@ -334,25 +423,37 @@ fn native_glm_mu_wald_contrast_specs_set_metadata_and_factor_levels() {
         .map(String::from)
         .collect::<Vec<_>>();
 
-    let (primitive_fit, _primitive_results) = builder
-        .clone()
-        .fit_wald_glm_mu_contrast(&counts, &design, &[0.0, 1.0])
-        .unwrap();
-    let (named_fit, named_results) = builder
-        .clone()
-        .fit_wald_glm_mu_contrast_spec(
-            &counts,
-            &design,
-            &ContrastSpec::coefficient_name("condition_B_vs_A"),
-        )
-        .unwrap();
-    let (factor_fit, factor_results) = builder
-        .fit_wald_glm_mu_factor_level_contrast(
-            &counts,
-            &design,
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-        )
-        .unwrap();
+    let (primitive_fit, _primitive_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
+    let (named_fit, named_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Spec(&ContrastSpec::coefficient_name(
+                    "condition_B_vs_A",
+                ))),
+        ),
+    )
+    .unwrap();
+    let (factor_fit, factor_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                    "condition",
+                    "B",
+                    "A",
+                    &levels,
+                ))),
+        ),
+    )
+    .unwrap();
 
     assert_wald_fit_state_matches(
         &named_fit,

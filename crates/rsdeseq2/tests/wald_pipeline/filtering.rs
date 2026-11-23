@@ -1,15 +1,23 @@
 use super::*;
+use crate::support::run::run_results;
+use rsdeseq2::prelude::{Analysis, ResultColumn};
 
 #[test]
 fn fixed_dispersion_wald_contrast_applies_explicit_cooks_cutoff() {
     let counts = CountMatrix::from_row_major_u32(1, 3, vec![2, 4, 6]).unwrap();
     let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
 
-    let (_fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0])
-        .cooks_cutoff_threshold(0.1)
-        .fit_fixed_dispersion_wald_contrast(&counts, &design, &[0.2], &[1.0])
-        .unwrap();
+    let (_fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0])
+            .cooks_cutoff_threshold(0.1)
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.2])
+                    .result(ResultColumn::Numeric(&[1.0])),
+            ),
+    )
+    .unwrap();
 
     assert_relative_eq!(
         results.rows[0].max_cooks.unwrap(),
@@ -45,17 +53,23 @@ fn fixed_dispersion_wald_factor_level_contrast_applies_low_count_cooks_gate() {
         .map(String::from)
         .collect::<Vec<_>>();
 
-    let (_fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0; 6])
-        .cooks_cutoff_threshold(0.0)
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald_factor_level_contrast(
-            &counts,
-            &design,
-            &[0.1],
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-        )
-        .unwrap();
+    let (_fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 6])
+            .cooks_cutoff_threshold(0.0)
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1])
+                    .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                        "condition",
+                        "B",
+                        "A",
+                        &levels,
+                    ))),
+            ),
+    )
+    .unwrap();
 
     assert!(results.rows[0].max_cooks.unwrap() > 0.0);
     assert_eq!(results.rows[0].cooks_outlier, Some(false));
@@ -100,14 +114,22 @@ fn fixed_dispersion_wald_coefficient_uses_stored_formula_low_count_cooks_gate() 
         .cooks_cutoff_threshold(0.0)
         .disable_independent_filtering();
 
-    let (_generic_fit, generic_results) = builder
-        .clone()
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.1], 1)
-        .unwrap();
-    let (_formula_fit, formula_results) = builder
-        .model_frame(model_frame)
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.1], 1)
-        .unwrap();
+    let (_generic_fit, generic_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let (_formula_fit, formula_results) = run_results(
+        builder.model_frame(model_frame).run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert!(formula_results.rows[0].max_cooks.unwrap() > 0.0);
     assert_eq!(generic_results.rows[0].cooks_outlier, Some(true));
@@ -157,14 +179,22 @@ fn fixed_dispersion_wald_coefficient_uses_cleaned_stored_reference_for_cooks_gat
         .cooks_cutoff_threshold(0.0)
         .disable_independent_filtering();
 
-    let (_generic_fit, generic_results) = builder
-        .clone()
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.1], 1)
-        .unwrap();
-    let (_formula_fit, formula_results) = builder
-        .model_frame(model_frame)
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.1], 1)
-        .unwrap();
+    let (_generic_fit, generic_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let (_formula_fit, formula_results) = run_results(
+        builder.model_frame(model_frame).run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(generic_results.rows[0].cooks_outlier, Some(true));
     assert_eq!(generic_results.rows[0].pvalue, None);
@@ -177,11 +207,17 @@ fn fixed_dispersion_wald_pipeline_applies_explicit_cooks_cutoff() {
     let counts = CountMatrix::from_row_major_u32(1, 3, vec![2, 4, 6]).unwrap();
     let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
 
-    let (_fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0])
-        .cooks_cutoff_threshold(0.1)
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.2], 0)
-        .unwrap();
+    let (_fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0])
+            .cooks_cutoff_threshold(0.1)
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.2])
+                    .result(ResultColumn::Coefficient(0)),
+            ),
+    )
+    .unwrap();
 
     assert_relative_eq!(
         results.rows[0].max_cooks.unwrap(),
@@ -198,12 +234,18 @@ fn fixed_dispersion_wald_pipeline_can_disable_cooks_cutoff() {
     let counts = CountMatrix::from_row_major_u32(1, 3, vec![2, 4, 6]).unwrap();
     let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
 
-    let (_fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0])
-        .cooks_cutoff_threshold(0.1)
-        .disable_cooks_cutoff()
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.2], 0)
-        .unwrap();
+    let (_fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0])
+            .cooks_cutoff_threshold(0.1)
+            .disable_cooks_cutoff()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.2])
+                    .result(ResultColumn::Coefficient(0)),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(results.rows[0].cooks_outlier, None);
     assert!(results.rows[0].pvalue.is_some());
@@ -215,12 +257,18 @@ fn fixed_dispersion_wald_pipeline_applies_independent_filtering() {
     let counts = CountMatrix::from_row_major_u32(2, 3, vec![1, 1, 1, 100, 100, 100]).unwrap();
     let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
 
-    let (_fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0])
-        .disable_cooks_cutoff()
-        .independent_filtering_theta(vec![1.0, 1.0])
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.2, 0.2], 0)
-        .unwrap();
+    let (_fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0])
+            .disable_cooks_cutoff()
+            .independent_filtering_theta(vec![1.0, 1.0])
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.2, 0.2])
+                    .result(ResultColumn::Coefficient(0)),
+            ),
+    )
+    .unwrap();
 
     let filtering = results.independent_filtering.as_ref().unwrap();
     assert!(filtering.enabled);
@@ -236,12 +284,18 @@ fn fixed_dispersion_wald_pipeline_can_disable_independent_filtering() {
     let counts = CountMatrix::from_row_major_u32(2, 3, vec![1, 1, 1, 100, 100, 100]).unwrap();
     let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
 
-    let (_fit, results) = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0])
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.2, 0.2], 0)
-        .unwrap();
+    let (_fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0])
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.2, 0.2])
+                    .result(ResultColumn::Coefficient(0)),
+            ),
+    )
+    .unwrap();
 
     let filtering = results.independent_filtering.as_ref().unwrap();
     assert!(!filtering.enabled);

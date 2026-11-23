@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::run_results;
+use rsdeseq2::prelude::{Analysis, MeanModel, ResultColumn};
 
 #[test]
 fn native_weighted_glm_mu_wald_matches_deseq2_reference() {
@@ -10,19 +12,25 @@ fn native_weighted_glm_mu_wald_matches_deseq2_reference() {
 
     let counts = reference_counts();
     let design = reference_full_design();
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(size_factors)
-        .observation_weights(observation_weights)
-        .fit_type(FitType::Mean)
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            use_cox_reid: false,
-            niter: 2,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_wald_glm_mu(&counts, &design, 1)
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(size_factors)
+            .observation_weights(observation_weights)
+            .fit_type(FitType::Mean)
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                use_cox_reid: false,
+                niter: 2,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::GlmMu)
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     let beta = fit.beta.as_ref().unwrap();
     let beta_se = fit.beta_se.as_ref().unwrap();
@@ -164,19 +172,25 @@ fn native_weighted_glm_mu_local_wald_matches_deseq2_reference() {
 
     let counts = reference_counts();
     let design = reference_full_design();
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(size_factors)
-        .observation_weights(observation_weights)
-        .fit_type(FitType::Local)
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            use_cox_reid: false,
-            niter: 2,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_wald_glm_mu(&counts, &design, 1)
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(size_factors)
+            .observation_weights(observation_weights)
+            .fit_type(FitType::Local)
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                use_cox_reid: false,
+                niter: 2,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::GlmMu)
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     let beta = fit.beta.as_ref().unwrap();
     let beta_se = fit.beta_se.as_ref().unwrap();
@@ -318,18 +332,24 @@ fn native_weighted_glm_mu_mean_cox_reid_wald_matches_deseq2_reference() {
 
     let counts = reference_counts();
     let design = reference_full_design();
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(size_factors)
-        .observation_weights(observation_weights)
-        .fit_type(FitType::Mean)
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            niter: 2,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_wald_glm_mu(&counts, &design, 1)
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(size_factors)
+            .observation_weights(observation_weights)
+            .fit_type(FitType::Mean)
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                niter: 2,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::GlmMu)
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     let beta = fit.beta.as_ref().unwrap();
     let beta_se = fit.beta_se.as_ref().unwrap();
@@ -468,18 +488,24 @@ fn native_weighted_glm_mu_local_cox_reid_wald_matches_deseq2_reference() {
 
     let counts = reference_counts();
     let design = reference_full_design();
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(size_factors)
-        .observation_weights(observation_weights)
-        .fit_type(FitType::Local)
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            niter: 2,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_wald_glm_mu(&counts, &design, 1)
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(size_factors)
+            .observation_weights(observation_weights)
+            .fit_type(FitType::Local)
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                niter: 2,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::GlmMu)
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     let beta = fit.beta.as_ref().unwrap();
     let beta_se = fit.beta_se.as_ref().unwrap();

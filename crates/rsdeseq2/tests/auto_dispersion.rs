@@ -1,3 +1,4 @@
+use crate::support::run::{run_fit, run_results};
 use approx::assert_relative_eq;
 use rsdeseq2::prelude::*;
 use std::path::PathBuf;
@@ -66,14 +67,22 @@ fn check_reference(fit: &DeseqFit, mode: &str, check_mu: bool) {
 fn automatic_gene_estimates_match_deseq2_and_preserve_explicit_glm_mode() {
     let (counts, design, factors) = data();
     let builder = DeseqBuilder::new().size_factors(factors);
-    let automatic = builder
-        .clone()
-        .automatic_dispersion_means()
-        .fit_gene_wise_dispersions_glm_mu(&counts, &design)
-        .unwrap();
-    let explicit = builder
-        .fit_gene_wise_dispersions_glm_mu(&counts, &design)
-        .unwrap();
+    let automatic = run_fit(
+        builder.clone().automatic_dispersion_means().run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::GeneWise),
+        ),
+    )
+    .unwrap();
+    let explicit = run_fit(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::GeneWise),
+        ),
+    )
+    .unwrap();
     check_reference(&automatic, "auto", true);
     check_reference(&explicit, "glm", true);
     let difference = automatic
@@ -99,12 +108,18 @@ fn supplied_weights_disable_automatic_linear_means() {
         vec![1.0; counts.n_genes() * counts.n_samples()],
     )
     .unwrap();
-    let fit = DeseqBuilder::new()
-        .automatic_dispersion_means()
-        .size_factors(factors)
-        .observation_weights(weights)
-        .fit_gene_wise_dispersions_glm_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .automatic_dispersion_means()
+            .size_factors(factors)
+            .observation_weights(weights)
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::GlmMu)
+                    .stop_after(Stage::GeneWise),
+            ),
+    )
+    .unwrap();
     check_reference(&fit, "weighted", true);
 }
 
@@ -117,11 +132,17 @@ fn automatic_linear_means_use_gene_sample_normalization_factors() {
         factors.repeat(counts.n_genes()),
     )
     .unwrap();
-    let fit = DeseqBuilder::new()
-        .automatic_dispersion_means()
-        .normalization_factors(normalization)
-        .fit_gene_wise_dispersions_glm_mu(&counts, &design)
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .automatic_dispersion_means()
+            .normalization_factors(normalization)
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::GlmMu)
+                    .stop_after(Stage::GeneWise),
+            ),
+    )
+    .unwrap();
     check_reference(&fit, "auto", true);
 }
 
@@ -133,15 +154,17 @@ fn top_level_workflows_select_deseq2_automatic_means() {
         .fit_type(FitType::Mean)
         .disable_cooks_cutoff()
         .disable_independent_filtering();
-    let (fit, _) = builder.fit_with_results(&counts, &design).unwrap();
+    let (fit, _) = run_results(builder.run(&Analysis::new(&counts, &design))).unwrap();
     check_reference(&fit, "auto", false);
-    let (named, _) = builder
-        .fit_with_results_name(&counts, &design, "sexmale")
-        .unwrap();
+    let (named, _) = run_results(
+        builder.run(&Analysis::new(&counts, &design).result(ResultColumn::Name("sexmale"))),
+    )
+    .unwrap();
     check_reference(&named, "auto", false);
-    let (contrast, _) = builder
-        .fit_with_results_contrast(&counts, &design, &[0.0, 1.0])
-        .unwrap();
+    let (contrast, _) = run_results(
+        builder.run(&Analysis::new(&counts, &design).result(ResultColumn::Numeric(&[0.0, 1.0]))),
+    )
+    .unwrap();
     check_reference(&contrast, "auto", false);
 }
 

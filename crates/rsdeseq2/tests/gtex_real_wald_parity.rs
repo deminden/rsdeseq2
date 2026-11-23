@@ -1,3 +1,4 @@
+use crate::support::run::{run_fit, run_results};
 use crate::support::{self as common, TsvTable};
 
 use rsdeseq2::prelude::*;
@@ -153,11 +154,17 @@ fn check_wald(compact: bool) {
     } else {
         DeseqBuilder::new()
     };
-    let (fit, results) = builder
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald(&counts, &design, &dispersions, result_coefficient)
-        .unwrap();
+    let (fit, results) = run_results(
+        builder
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&dispersions)
+                    .result(ResultColumn::Coefficient(result_coefficient)),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(results.rows.len(), n_genes, "Rust result gene count");
     let mut max_size_factor_relative_error: f64 = 0.0;
@@ -311,9 +318,7 @@ fn reference_padj(reference: &TsvTable) -> Vec<Option<f64>> {
 fn full_gtex_normalization_matches_deseq2_without_fitting_glms() {
     let counts = rsdeseq2::io::read_count_matrix_tsv(fixture_dir().join("counts.tsv")).unwrap();
     assert_eq!((counts.n_genes(), counts.n_samples()), (56200, 61));
-    let fit = DeseqBuilder::new()
-        .fit_size_factors_and_base_means(&counts)
-        .unwrap();
+    let fit = run_fit(DeseqBuilder::new().run(&Analysis::without_design(&counts))).unwrap();
     let expected = TsvTable::read(&fixture_dir().join("reference_size_factors.tsv"));
     assert_eq!(fit.size_factors.len(), expected.rows.len());
     for (a, r) in fit.size_factors.iter().zip(&expected.rows) {

@@ -49,7 +49,6 @@ offline).
 - No `unsafe` outside the x87 kernels and the R bridge; every unsafe block has
   a `SAFETY:` comment.
 - New dependencies need a stated reason in the pull request.
-- Record public API changes in [CHANGELOG.md](CHANGELOG.md); removals need a
-  deprecation release first.
+- Record public API changes and replacement calls in [CHANGELOG.md](CHANGELOG.md).
 - Performance claims need a paired eleven-contrast run and peak RSS
   (`scripts/benchmarks/paired_gtex_rust_timing.py`).

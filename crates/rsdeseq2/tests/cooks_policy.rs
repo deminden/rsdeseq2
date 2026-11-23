@@ -1,3 +1,4 @@
+use crate::support::run::run_results;
 use rsdeseq2::prelude::*;
 
 fn matrix<T>(rows: usize, columns: usize, values: &[T], order: MatrixOrder) -> MatrixView<'_, T> {
@@ -201,12 +202,18 @@ fn stored_requests_infer_matching_formula_context_and_preserve_explicit_override
         DesignMatrix::from_row_major(4, 2, vec![1., 0., 1., 0., 1., 1., 1., 1.], None).unwrap();
     let matrix_origin = design.clone();
     let design = design.with_origin(DesignOrigin::formula(vec!["condition".into()]).unwrap());
-    let (mut fit, raw) = DeseqBuilder::new()
-        .size_factors(vec![1.; 4])
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.1], 1)
-        .unwrap();
+    let (mut fit, raw) = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.; 4])
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1])
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
     assert!(raw.rows[0].pvalue.is_some());
     fit.max_cooks = Some(vec![Some(10.)]);
     fit.cooks = Some(RowMajorMatrix::from_row_major(1, 4, vec![10., 0.1, 0.2, 0.3]).unwrap());

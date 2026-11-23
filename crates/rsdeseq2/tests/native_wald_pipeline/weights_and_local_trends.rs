@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::{run_fit, run_results, run_wald_replacement};
+use rsdeseq2::prelude::{Analysis, MeanModel, ResultColumn, Stage};
 
 #[test]
 fn native_glm_mu_unit_weights_match_unweighted_wald() {
@@ -7,14 +9,24 @@ fn native_glm_mu_unit_weights_match_unweighted_wald() {
     let builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
     let unit_weights = unit_weights_for(&counts);
 
-    let (unweighted_fit, unweighted_results) = builder
-        .clone()
-        .fit_wald_glm_mu_parametric(&counts, &design, 1)
-        .unwrap();
-    let (weighted_fit, weighted_results) = builder
-        .observation_weights(unit_weights.clone())
-        .fit_wald_glm_mu_parametric(&counts, &design, 1)
-        .unwrap();
+    let (unweighted_fit, unweighted_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let (weighted_fit, weighted_results) = run_results(
+        builder.observation_weights(unit_weights.clone()).run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     let expected_weights_fail = vec![false; counts.n_genes()];
     assert_eq!(
@@ -113,14 +125,24 @@ fn native_glm_mu_observation_weights_run_through_wald() {
     let builder = glm_mu_native_wald_builder();
     let weights = nonunit_weights_for(&counts);
 
-    let (unweighted_fit, _) = builder
-        .clone()
-        .fit_wald_glm_mu_parametric(&counts, &design, 1)
-        .unwrap();
-    let (fit, results) = builder
-        .observation_weights(weights)
-        .fit_wald_glm_mu_parametric(&counts, &design, 1)
-        .unwrap();
+    let (unweighted_fit, _) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let (fit, results) = run_results(
+        builder.observation_weights(weights).run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     let expected_weights_fail = vec![false; counts.n_genes()];
     assert_eq!(fit.weights_fail.as_ref(), Some(&expected_weights_fail));
@@ -173,7 +195,14 @@ fn native_glm_mu_generic_mean_wald_runs_through_map_and_glm() {
             ..GeneWiseDispersionOptions::default()
         });
 
-    let (fit, results) = builder.fit_wald_glm_mu(&counts, &design, 1).unwrap();
+    let (fit, results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(results.rows.len(), counts.n_genes());
     assert!(fit.disp_prior_var.unwrap().is_finite());
@@ -203,19 +232,22 @@ fn native_glm_mu_cooks_replacement_refit_merges_refit_rows() {
     let design = two_group_design();
     let builder = glm_mu_native_wald_builder();
 
-    let output = builder
-        .fit_wald_glm_mu_with_cooks_replacement(
-            &counts,
-            &design,
-            1,
-            &CooksReplacementOptions {
-                trim: 0.2,
-                cooks_cutoff: 0.0,
-                min_replicates: 3,
-                which_samples: Some(vec![true, false, false, false, false, false, false, false]),
-            },
-        )
-        .unwrap();
+    let output = run_wald_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1))
+                .cooks_replacement(&CooksReplacementOptions {
+                    trim: 0.2,
+                    cooks_cutoff: 0.0,
+                    min_replicates: 3,
+                    which_samples: Some(vec![
+                        true, false, false, false, false, false, false, false,
+                    ]),
+                }),
+        ),
+    )
+    .unwrap();
 
     assert!(output.refit_plan.n_refit > 0);
     assert!(output.refit_plan.should_refit);
@@ -267,19 +299,22 @@ fn native_glm_mu_contrast_cooks_replacement_refit_merges_refit_rows() {
     let builder = glm_mu_native_wald_builder();
     let contrast = [0.0, 1.0];
 
-    let output = builder
-        .fit_wald_glm_mu_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &contrast,
-            &CooksReplacementOptions {
-                trim: 0.2,
-                cooks_cutoff: 0.0,
-                min_replicates: 3,
-                which_samples: Some(vec![true, false, false, false, false, false, false, false]),
-            },
-        )
-        .unwrap();
+    let output = run_wald_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(&contrast))
+                .cooks_replacement(&CooksReplacementOptions {
+                    trim: 0.2,
+                    cooks_cutoff: 0.0,
+                    min_replicates: 3,
+                    which_samples: Some(vec![
+                        true, false, false, false, false, false, false, false,
+                    ]),
+                }),
+        ),
+    )
+    .unwrap();
 
     assert!(output.refit_plan.n_refit > 0);
     assert!(output.refit_plan.should_refit);
@@ -331,23 +366,30 @@ fn native_glm_mu_contrast_spec_cooks_replacement_preserves_metadata() {
     let design = two_group_design();
     let builder = glm_mu_native_wald_builder();
 
-    let (expected_fit, expected_results) = builder
-        .clone()
-        .fit_wald_glm_mu_contrast(&counts, &design, &[0.0, 1.0])
-        .unwrap();
-    let output = builder
-        .fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
-            &counts,
-            &design,
-            &ContrastSpec::coefficient_name("condition_B_vs_A"),
-            &CooksReplacementOptions {
-                trim: 0.2,
-                cooks_cutoff: f64::MAX,
-                min_replicates: 3,
-                which_samples: None,
-            },
-        )
-        .unwrap();
+    let (expected_fit, expected_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
+    let output = run_wald_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Spec(&ContrastSpec::coefficient_name(
+                    "condition_B_vs_A",
+                )))
+                .cooks_replacement(&CooksReplacementOptions {
+                    trim: 0.2,
+                    cooks_cutoff: f64::MAX,
+                    min_replicates: 3,
+                    which_samples: None,
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(output.refit_plan.n_refit, 0);
     assert!(output.refit_fit.is_none());
@@ -387,23 +429,33 @@ fn native_glm_mu_factor_level_contrast_cooks_replacement_preserves_metadata() {
         .map(String::from)
         .collect::<Vec<_>>();
 
-    let (expected_fit, expected_results) = builder
-        .clone()
-        .fit_wald_glm_mu_contrast(&counts, &design, &[0.0, 1.0])
-        .unwrap();
-    let output = builder
-        .fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-            &CooksReplacementOptions {
-                trim: 0.2,
-                cooks_cutoff: f64::MAX,
-                min_replicates: 3,
-                which_samples: None,
-            },
-        )
-        .unwrap();
+    let (expected_fit, expected_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
+    let output = run_wald_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                    "condition",
+                    "B",
+                    "A",
+                    &levels,
+                )))
+                .cooks_replacement(&CooksReplacementOptions {
+                    trim: 0.2,
+                    cooks_cutoff: f64::MAX,
+                    min_replicates: 3,
+                    which_samples: None,
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(output.refit_plan.n_refit, 0);
     assert!(output.refit_fit.is_none());
@@ -435,19 +487,20 @@ fn native_glm_mu_cooks_replacement_refit_skips_when_no_rows_are_marked() {
     let design = two_group_design();
     let builder = glm_mu_native_wald_builder();
 
-    let output = builder
-        .fit_wald_glm_mu_with_cooks_replacement(
-            &counts,
-            &design,
-            1,
-            &CooksReplacementOptions {
-                trim: 0.2,
-                cooks_cutoff: f64::MAX,
-                min_replicates: 3,
-                which_samples: None,
-            },
-        )
-        .unwrap();
+    let output = run_wald_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1))
+                .cooks_replacement(&CooksReplacementOptions {
+                    trim: 0.2,
+                    cooks_cutoff: f64::MAX,
+                    min_replicates: 3,
+                    which_samples: None,
+                }),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(output.refit_plan.n_refit, 0);
     assert!(!output.refit_plan.should_refit);
@@ -466,11 +519,23 @@ fn native_linear_mu_generic_mean_wald_matches_fixed_pipeline_when_reusing_final_
     let design = two_group_design();
     let builder = native_wald_builder().fit_type(FitType::Mean);
 
-    let (native_fit, native_results) = builder.fit_wald_linear_mu(&counts, &design, 1).unwrap();
+    let (native_fit, native_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
     let final_dispersions = native_fit.dispersion.as_ref().unwrap().clone();
-    let (fixed_fit, fixed_results) = builder
-        .fit_fixed_dispersion_wald(&counts, &design, &final_dispersions, 1)
-        .unwrap();
+    let (fixed_fit, fixed_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&final_dispersions)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     for gene in 0..counts.n_genes() {
         let native_disp = native_fit.dispersion.as_ref().unwrap()[gene];
@@ -501,11 +566,23 @@ fn native_linear_mu_local_wald_matches_fixed_pipeline_when_reusing_final_dispers
     let design = two_group_design();
     let builder = native_wald_builder().fit_type(FitType::Local);
 
-    let (native_fit, native_results) = builder.fit_wald_linear_mu(&counts, &design, 1).unwrap();
+    let (native_fit, native_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
     let final_dispersions = native_fit.dispersion.as_ref().unwrap().clone();
-    let (fixed_fit, fixed_results) = builder
-        .fit_fixed_dispersion_wald(&counts, &design, &final_dispersions, 1)
-        .unwrap();
+    let (fixed_fit, fixed_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&final_dispersions)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert!(native_fit.disp_prior_var.unwrap().is_finite());
     assert_eq!(
@@ -542,11 +619,23 @@ fn native_glm_mu_local_wald_matches_fixed_pipeline_when_reusing_final_dispersion
     let design = two_group_design();
     let builder = glm_mu_native_wald_builder().fit_type(FitType::Local);
 
-    let (native_fit, native_results) = builder.fit_wald_glm_mu(&counts, &design, 1).unwrap();
+    let (native_fit, native_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
     let final_dispersions = native_fit.dispersion.as_ref().unwrap().clone();
-    let (fixed_fit, fixed_results) = builder
-        .fit_fixed_dispersion_wald(&counts, &design, &final_dispersions, 1)
-        .unwrap();
+    let (fixed_fit, fixed_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&final_dispersions)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     assert!(native_fit.disp_prior_var.unwrap().is_finite());
     assert_eq!(
@@ -582,10 +671,14 @@ fn native_linear_mu_generic_pipeline_accepts_local_and_rejects_glm_gam_poi() {
     let counts = native_wald_counts_with_zero_row();
     let design = two_group_design();
 
-    let local_fit = native_wald_builder()
-        .fit_type(FitType::Local)
-        .fit_map_dispersions_linear_mu(&counts, &design)
-        .unwrap();
+    let local_fit = run_fit(
+        native_wald_builder().fit_type(FitType::Local).run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::LinearMu)
+                .stop_after(Stage::Map),
+        ),
+    )
+    .unwrap();
     assert_eq!(
         local_fit.dispersion.as_ref().unwrap().len(),
         counts.n_genes()

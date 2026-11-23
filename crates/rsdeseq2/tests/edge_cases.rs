@@ -1,6 +1,7 @@
 //! Degenerate inputs must return a typed error or a well-formed result, never
 //! panic. The validation cases check the error fields exposed to callers.
 
+use crate::support::run::run_results;
 use rsdeseq2::prelude::*;
 
 const GROUPS: [usize; 6] = [0, 0, 0, 1, 1, 1];
@@ -34,7 +35,7 @@ fn fit(
     counts: &CountMatrix,
     design: &DesignMatrix,
 ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-    DeseqBuilder::new().fit_with_results(counts, design)
+    run_results(DeseqBuilder::new().run(&Analysis::new(counts, design)))
 }
 
 #[test]
@@ -119,7 +120,7 @@ fn flat_dispersions_stop_before_any_trend() {
             std::assert_matches!(
                 DeseqBuilder::new()
                     .fit_type(fit_type)
-                    .fit_with_results(counts, &design).unwrap_err(),
+                    .run(&Analysis::new(counts, &design)).unwrap_err(),
                 DeseqError::NoUsableDispersionTrendRows { min_disp: 1e-8, genes_checked }
                     if genes_checked == counts.n_genes(),
                 "{fit_type:?}"
@@ -164,19 +165,29 @@ fn invalid_user_supplied_factors_and_dispersions_are_rejected() {
         vec![1.0, f64::NAN, 1.0, 1.0, 1.0, 1.0],
         vec![1.0, 0.0, 1.0, 1.0, 1.0, 1.0],
     ] {
-        let result = DeseqBuilder::new()
-            .size_factors(factors)
-            .fit_with_results(&counts, &design);
+        let result = run_results(
+            DeseqBuilder::new()
+                .size_factors(factors)
+                .run(&Analysis::new(&counts, &design)),
+        );
         assert_eq!(kind(result), ErrorKind::Normalization);
     }
-    let short = DeseqBuilder::new()
-        .size_factors(vec![1.0; 5])
-        .fit_with_results(&counts, &design);
+    let short = run_results(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 5])
+            .run(&Analysis::new(&counts, &design)),
+    );
     assert_eq!(kind(short), ErrorKind::Shape);
 
     let small = varied(5, 6);
     let wald = |dispersions: &[f64], coefficient| {
-        DeseqBuilder::new().fit_fixed_dispersion_wald(&small, &design, dispersions, coefficient)
+        run_results(
+            DeseqBuilder::new().run(
+                &Analysis::new(&small, &design)
+                    .fixed_dispersion(dispersions)
+                    .result(ResultColumn::Coefficient(coefficient)),
+            ),
+        )
     };
     for rejected in [-0.1, f64::NAN] {
         std::assert_matches!(
@@ -194,13 +205,21 @@ fn invalid_contrasts_and_threads_are_rejected() {
     let small = varied(5, 6);
     let design = design(&GROUPS);
     let contrast = |weights: &[f64]| {
-        DeseqBuilder::new().fit_fixed_dispersion_wald_contrast(&small, &design, &[0.1; 5], weights)
+        run_results(
+            DeseqBuilder::new().run(
+                &Analysis::new(&small, &design)
+                    .fixed_dispersion(&[0.1; 5])
+                    .result(ResultColumn::Numeric(weights)),
+            ),
+        )
     };
     assert_eq!(kind(contrast(&[0.0, 1.0, 0.0])), ErrorKind::Shape);
     assert_eq!(kind(contrast(&[0.0, 0.0])), ErrorKind::Options);
-    let threads = DeseqBuilder::new()
-        .threads(0)
-        .fit_with_results(&varied(50, 6), &design);
+    let threads = run_results(
+        DeseqBuilder::new()
+            .threads(0)
+            .run(&Analysis::new(&varied(50, 6), &design)),
+    );
     assert_eq!(kind(threads), ErrorKind::Options);
 }
 

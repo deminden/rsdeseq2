@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::{run_replacement, run_results, run_wald_replacement};
+use rsdeseq2::prelude::{Analysis, MeanModel, ResultColumn};
 
 #[test]
 fn native_glm_mu_factor_level_contrast_applies_low_count_cooks_gate() {
@@ -46,17 +48,16 @@ fn native_glm_mu_factor_level_contrast_applies_low_count_cooks_gate() {
         })
         .cooks_cutoff_threshold(0.0)
         .disable_independent_filtering();
-    let (_numeric_fit, numeric_results) = builder
-        .clone()
-        .fit_with_results_contrast(&counts, &design, &[0.0, 1.0])
-        .unwrap();
-    let (_fit, results) = builder
-        .fit_with_results_factor_level_contrast(
-            &counts,
-            &design,
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-        )
-        .unwrap();
+    let (_numeric_fit, numeric_results) = run_results(
+        builder
+            .clone()
+            .run(&Analysis::new(&counts, &design).result(ResultColumn::Numeric(&[0.0, 1.0]))),
+    )
+    .unwrap();
+    let (_fit, results) = run_results(builder.run(&Analysis::new(&counts, &design).result(
+        ResultColumn::FactorLevel(FactorLevelContrast::new("condition", "B", "A", &levels)),
+    )))
+    .unwrap();
 
     assert_eq!(results.rows[0].gene.as_deref(), Some("low_count"));
     assert!(results.rows[0].max_cooks.unwrap() > 0.0);
@@ -119,14 +120,20 @@ fn native_formula_wald_default_uses_stored_formula_low_count_cooks_gate() {
         .cooks_cutoff_threshold(0.0)
         .disable_independent_filtering();
 
-    let (_generic_fit, generic_results) = builder
-        .clone()
-        .fit_wald_glm_mu(&counts, &design, 1)
-        .unwrap();
-    let (_formula_fit, formula_results) = builder
-        .model_frame(model_frame.clone())
-        .fit_formula_with_results(&counts, "~ condition")
-        .unwrap();
+    let (_generic_fit, generic_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let (_formula_fit, formula_results) = run_results(
+        builder
+            .model_frame(model_frame.clone())
+            .run(&Analysis::formula(&counts, "~ condition")),
+    )
+    .unwrap();
 
     assert_eq!(formula_results.rows[0].gene.as_deref(), Some("low_count"));
     assert!(formula_results.rows[0].max_cooks.unwrap() > 0.0);
@@ -194,31 +201,32 @@ fn native_formula_wald_default_uses_cleaned_stored_reference_for_cooks_gate() {
         .cooks_cutoff_threshold(0.0)
         .disable_independent_filtering();
 
-    let (_generic_fit, generic_results) = builder
-        .clone()
-        .fit_wald_glm_mu(&counts, &design, 1)
-        .unwrap();
-    let generic_replacement = builder
-        .clone()
-        .fit_with_results_with_cooks_replacement(
-            &counts,
-            &design,
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap();
-    let (_formula_fit, formula_results) = builder
-        .clone()
-        .model_frame(model_frame.clone())
-        .fit_formula_with_results(&counts, "~ `cell type`")
-        .unwrap();
-    let formula_replacement = builder
-        .model_frame(model_frame)
-        .fit_formula_with_results_with_cooks_replacement(
-            &counts,
-            "~ `cell type`",
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap();
+    let (_generic_fit, generic_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let generic_replacement = run_wald_replacement(builder.clone().run(
+        &Analysis::new(&counts, &design).cooks_replacement(&CooksReplacementOptions::new(f64::MAX)),
+    ))
+    .unwrap();
+    let (_formula_fit, formula_results) = run_results(
+        builder
+            .clone()
+            .model_frame(model_frame.clone())
+            .run(&Analysis::formula(&counts, "~ `cell type`")),
+    )
+    .unwrap();
+    let formula_replacement = run_wald_replacement(
+        builder.model_frame(model_frame).run(
+            &Analysis::formula(&counts, "~ `cell type`")
+                .cooks_replacement(&CooksReplacementOptions::new(f64::MAX)),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(formula_results.rows[0].gene.as_deref(), Some("low_count"));
     assert!(formula_results.rows[0].max_cooks.unwrap() > 0.0);
@@ -296,25 +304,22 @@ fn native_replacement_named_contrasts_use_stored_formula_low_count_cooks_gate() 
         .disable_independent_filtering();
     let contrast = ContrastSpec::coefficient_name("condition_B_vs_A");
 
-    let generic_wald = builder
-        .clone()
-        .fit_with_results_contrast_spec_with_cooks_replacement(
-            &counts,
-            &design,
-            &contrast,
-            &replacement_options,
-        )
-        .unwrap();
-    let formula_wald = builder
-        .clone()
-        .model_frame(model_frame.clone())
-        .fit_with_results_contrast_spec_with_cooks_replacement(
-            &counts,
-            &design,
-            &contrast,
-            &replacement_options,
-        )
-        .unwrap();
+    let generic_wald = run_wald_replacement(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .result(ResultColumn::Spec(&contrast))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let formula_wald = run_wald_replacement(
+        builder.clone().model_frame(model_frame.clone()).run(
+            &Analysis::new(&counts, &design)
+                .result(ResultColumn::Spec(&contrast))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(
         generic_wald.results.rows[0].gene.as_deref(),
@@ -324,25 +329,22 @@ fn native_replacement_named_contrasts_use_stored_formula_low_count_cooks_gate() 
     assert_eq!(formula_wald.results.rows[0].cooks_outlier, Some(false));
     assert!(formula_wald.results.rows[0].pvalue.is_some());
 
-    let generic_reverse_wald = builder
-        .clone()
-        .fit_with_results_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.0, -1.0],
-            &replacement_options,
-        )
-        .unwrap();
-    let formula_reverse_wald = builder
-        .clone()
-        .model_frame(model_frame.clone())
-        .fit_with_results_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.0, -1.0],
-            &replacement_options,
-        )
-        .unwrap();
+    let generic_reverse_wald = run_wald_replacement(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .result(ResultColumn::Numeric(&[0.0, -1.0]))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let formula_reverse_wald = run_wald_replacement(
+        builder.clone().model_frame(model_frame.clone()).run(
+            &Analysis::new(&counts, &design)
+                .result(ResultColumn::Numeric(&[0.0, -1.0]))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(
         generic_reverse_wald.results.rows[0].gene.as_deref(),
@@ -358,29 +360,24 @@ fn native_replacement_named_contrasts_use_stored_formula_low_count_cooks_gate() 
     );
     assert!(formula_reverse_wald.results.rows[0].pvalue.is_some());
 
-    let generic_lrt = builder
-        .clone()
-        .test(TestType::Lrt)
-        .reduced_design(reduced_design.clone())
-        .fit_with_test_results_contrast_spec_with_cooks_replacement(
-            &counts,
-            &design,
-            &contrast,
-            &replacement_options,
-        )
-        .unwrap();
-    let formula_lrt = builder
-        .clone()
-        .model_frame(model_frame.clone())
-        .test(TestType::Lrt)
-        .reduced_design(reduced_design.clone())
-        .fit_with_test_results_contrast_spec_with_cooks_replacement(
-            &counts,
-            &design,
-            &contrast,
-            &replacement_options,
-        )
-        .unwrap();
+    let generic_lrt = run_replacement(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .lrt(&reduced_design)
+                .result(ResultColumn::Spec(&contrast))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let formula_lrt = run_replacement(
+        builder.clone().model_frame(model_frame.clone()).run(
+            &Analysis::new(&counts, &design)
+                .lrt(&reduced_design)
+                .result(ResultColumn::Spec(&contrast))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
     let CooksReplacementTestOutput::Lrt(generic_lrt) = generic_lrt else {
         panic!("named contrast should route to LRT");
     };
@@ -396,28 +393,24 @@ fn native_replacement_named_contrasts_use_stored_formula_low_count_cooks_gate() 
     assert_eq!(formula_lrt.results.rows[0].cooks_outlier, Some(false));
     assert!(formula_lrt.results.rows[0].pvalue.is_some());
 
-    let generic_reverse_lrt = builder
-        .clone()
-        .test(TestType::Lrt)
-        .reduced_design(reduced_design.clone())
-        .fit_with_test_results_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.0, -1.0],
-            &replacement_options,
-        )
-        .unwrap();
-    let formula_reverse_lrt = builder
-        .model_frame(model_frame)
-        .test(TestType::Lrt)
-        .reduced_design(reduced_design)
-        .fit_with_test_results_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.0, -1.0],
-            &replacement_options,
-        )
-        .unwrap();
+    let generic_reverse_lrt = run_replacement(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .lrt(&reduced_design)
+                .result(ResultColumn::Numeric(&[0.0, -1.0]))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let formula_reverse_lrt = run_replacement(
+        builder.model_frame(model_frame).run(
+            &Analysis::new(&counts, &design)
+                .lrt(&reduced_design)
+                .result(ResultColumn::Numeric(&[0.0, -1.0]))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
     let CooksReplacementTestOutput::Lrt(generic_reverse_lrt) = generic_reverse_lrt else {
         panic!("reverse numeric contrast should route to LRT");
     };
@@ -508,24 +501,22 @@ fn native_replacement_numeric_contrasts_do_not_infer_low_count_gate_from_multifa
         .cooks_cutoff_threshold(0.0)
         .disable_independent_filtering();
 
-    let generic = builder
-        .clone()
-        .fit_with_results_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.0, 1.0, 0.0],
-            &replacement_options,
-        )
-        .unwrap();
-    let formula = builder
-        .model_frame(model_frame)
-        .fit_with_results_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.0, 1.0, 0.0],
-            &replacement_options,
-        )
-        .unwrap();
+    let generic = run_wald_replacement(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .result(ResultColumn::Numeric(&[0.0, 1.0, 0.0]))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
+    let formula = run_wald_replacement(
+        builder.model_frame(model_frame).run(
+            &Analysis::new(&counts, &design)
+                .result(ResultColumn::Numeric(&[0.0, 1.0, 0.0]))
+                .cooks_replacement(&replacement_options),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(generic.results.rows[0].gene.as_deref(), Some("low_count"));
     assert_eq!(formula.results.rows, generic.results.rows);

@@ -1,5 +1,7 @@
 use super::numerical_assertions::*;
 use super::*;
+use crate::support::run::run_results;
+use rsdeseq2::prelude::Analysis;
 
 fn filter_fixture(dir: &Path) -> (CountMatrix, DesignMatrix, DesignMatrix) {
     // Four replicates per group make Cook's masking eligible. The outlier and
@@ -119,9 +121,9 @@ fn wald_and_lrt_filter_controls_match_library_results_and_metadata() {
     for command in ["wald", "lrt"] {
         let result = |builder: &DeseqBuilder| {
             if command == "wald" {
-                builder.fit_with_results(&counts, &design)
+                run_results(builder.run(&Analysis::new(&counts, &design)))
             } else {
-                builder.fit_lrt_with_results(&counts, &design, &reduced)
+                run_results(builder.run(&Analysis::new(&counts, &design).lrt(&reduced)))
             }
             .unwrap()
             .1

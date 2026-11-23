@@ -1,5 +1,6 @@
 //! Independently frozen R arithmetic plus shared raw/fitted exclusion policy.
 use crate::support::json_fixture;
+use crate::support::run::run_results;
 use rsdeseq2::matrix::{CountRows, CountView, MatrixOrder, MatrixView};
 use rsdeseq2::prelude::*;
 use serde::Deserialize;
@@ -210,10 +211,15 @@ fn formula_offsets_use_effective_factors_without_dividing_by_tiny_base_factors()
     // Shape errors precede size-factor estimation, even when the counts would
     // make ratio estimation fail. Keep the earlier native preflight contract.
     let wrong_counts = CountMatrix::from_row_major_u32(3, 2, vec![0; 6]).unwrap();
-    let error = DeseqBuilder::new()
-        .model_frame(builder.current_model_frame().unwrap().clone())
-        .fit_formula_with_results(&wrong_counts, "~condition+offset(exposure)")
-        .unwrap_err();
+    let error = run_results(
+        DeseqBuilder::new()
+            .model_frame(builder.current_model_frame().unwrap().clone())
+            .run(&Analysis::formula(
+                &wrong_counts,
+                "~condition+offset(exposure)",
+            )),
+    )
+    .unwrap_err();
     std::assert_matches!(
         error,
         DeseqError::InvalidDimensions { context, expected: 2, actual: 6 }
@@ -222,16 +228,20 @@ fn formula_offsets_use_effective_factors_without_dividing_by_tiny_base_factors()
     let formula = builder
         .expanded_formula_design_with_offsets("~condition+offset(exposure)")
         .unwrap();
-    let (fit, actual) = builder
-        .clone()
-        .fit_formula_with_results(&counts, "~condition+offset(exposure)")
-        .unwrap();
+    let (fit, actual) = run_results(
+        builder
+            .clone()
+            .run(&Analysis::formula(&counts, "~condition+offset(exposure)")),
+    )
+    .unwrap();
     let factors =
         normalization_factors_with_offsets(3, 6, Some(&[1e-310; 6]), None, &[700.; 6]).unwrap();
-    let (matrix_fit, expected) = builder
-        .normalization_factors(factors.clone())
-        .fit_with_results(&counts, &formula.design.standard_design)
-        .unwrap();
+    let (matrix_fit, expected) = run_results(
+        builder
+            .normalization_factors(factors.clone())
+            .run(&Analysis::new(&counts, &formula.design.standard_design)),
+    )
+    .unwrap();
     assert_eq!(actual.rows, expected.rows);
     assert_eq!(fit.normalization_factors.as_ref(), Some(&factors));
     // Complete formula workflows consume sample scales into the effective

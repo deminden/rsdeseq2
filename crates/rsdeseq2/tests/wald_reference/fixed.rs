@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::run_results;
+use rsdeseq2::prelude::{Analysis, ResultColumn};
 
 #[test]
 fn fixed_dispersion_wald_matches_deseq2_internal_reference() {
@@ -9,17 +11,18 @@ fn fixed_dispersion_wald_matches_deseq2_internal_reference() {
         .iter()
         .map(|row| parse_required_f64(row, "dispersion"))
         .collect::<Vec<_>>();
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(size_factors)
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald(
-            &reference_counts(),
-            &reference_full_design(),
-            &dispersions,
-            1,
-        )
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(size_factors)
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&reference_counts(), &reference_full_design())
+                    .fixed_dispersion(&dispersions)
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     let beta = fit.beta.as_ref().unwrap();
     let beta_se = fit.beta_se.as_ref().unwrap();
@@ -110,18 +113,19 @@ fn fixed_dispersion_wald_t_matches_deseq2_internal_reference() {
         .iter()
         .map(|row| parse_required_f64(row, "dispersion"))
         .collect::<Vec<_>>();
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(size_factors)
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .wald_t_residual_degrees_of_freedom()
-        .fit_fixed_dispersion_wald(
-            &reference_counts(),
-            &reference_full_design(),
-            &dispersions,
-            1,
-        )
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(size_factors)
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .wald_t_residual_degrees_of_freedom()
+            .run(
+                &Analysis::new(&reference_counts(), &reference_full_design())
+                    .fixed_dispersion(&dispersions)
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     let request = ResultRequest::new(
         ResultsContrast::Numeric(vec![0.0, 1.0]),
@@ -221,22 +225,23 @@ fn fixed_dispersion_force_optim_wald_matches_deseq2_internal_reference() {
         .iter()
         .map(|row| parse_required_f64(row, "dispersion"))
         .collect::<Vec<_>>();
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(size_factors)
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .irls_options(IrlsOptions {
-            use_optim: true,
-            force_optim: true,
-            ..IrlsOptions::default()
-        })
-        .fit_fixed_dispersion_wald(
-            &reference_counts(),
-            &reference_full_design(),
-            &dispersions,
-            1,
-        )
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(size_factors)
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .irls_options(IrlsOptions {
+                use_optim: true,
+                force_optim: true,
+                ..IrlsOptions::default()
+            })
+            .run(
+                &Analysis::new(&reference_counts(), &reference_full_design())
+                    .fixed_dispersion(&dispersions)
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     let beta = fit.beta.as_ref().unwrap();
     let beta_se = fit.beta_se.as_ref().unwrap();
@@ -339,17 +344,18 @@ fn fixed_dispersion_cooks_match_deseq2_internal_reference() {
     let size_factors = read_size_factors("size_factors_ratio.tsv");
     let dispersions = read_fixed_dispersions();
 
-    let (fit, _results) = DeseqBuilder::new()
-        .size_factors(size_factors)
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald(
-            &reference_counts(),
-            &reference_full_design(),
-            &dispersions,
-            1,
-        )
-        .unwrap();
+    let (fit, _results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(size_factors)
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&reference_counts(), &reference_full_design())
+                    .fixed_dispersion(&dispersions)
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
     let cooks = fit.cooks.as_ref().unwrap();
     let samples = reference_sample_names();
 
@@ -377,18 +383,19 @@ fn fixed_dispersion_weighted_wald_matches_deseq2_internal_reference() {
         .iter()
         .map(|row| parse_required_f64(row, "dispersion"))
         .collect::<Vec<_>>();
-    let (fit, results) = DeseqBuilder::new()
-        .size_factors(size_factors)
-        .observation_weights(observation_weights)
-        .disable_cooks_cutoff()
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald(
-            &reference_counts(),
-            &reference_full_design(),
-            &dispersions,
-            1,
-        )
-        .unwrap();
+    let (fit, results) = run_results(
+        DeseqBuilder::new()
+            .size_factors(size_factors)
+            .observation_weights(observation_weights)
+            .disable_cooks_cutoff()
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&reference_counts(), &reference_full_design())
+                    .fixed_dispersion(&dispersions)
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     let beta = fit.beta.as_ref().unwrap();
     let beta_se = fit.beta_se.as_ref().unwrap();

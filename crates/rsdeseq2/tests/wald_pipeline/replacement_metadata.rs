@@ -1,6 +1,8 @@
 use super::*;
 use crate::support::assert_ambiguous_name;
+use crate::support::run::run_wald_replacement;
 use rsdeseq2::errors::NameScope;
+use rsdeseq2::prelude::{Analysis, MeanModel, ResultColumn};
 
 #[test]
 fn fixed_dispersion_wald_list_contrast_replacement_accepts_cleaned_positive_and_negative_aliases() {
@@ -39,33 +41,38 @@ fn fixed_dispersion_wald_list_contrast_replacement_accepts_cleaned_positive_and_
         .disable_independent_filtering();
     let options = CooksReplacementOptions::new(f64::MAX);
 
-    let cleaned = builder
-        .clone()
-        .fit_fixed_dispersion_wald_results_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ResultsContrast::list(
-                vec!["cell.type_NK.cell_vs_T.cell".into()],
-                vec!["cell.type_B.cell_vs_T.cell".into()],
-            ),
-            None::<&[String]>,
-            &options,
-        )
-        .unwrap();
-    let raw = builder
-        .fit_fixed_dispersion_wald_results_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ResultsContrast::list(
-                vec!["cell type_NK cell_vs_T cell".into()],
-                vec!["cell type_B cell_vs_T cell".into()],
-            ),
-            None::<&[String]>,
-            &options,
-        )
-        .unwrap();
+    let cleaned = run_wald_replacement(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell.type_NK.cell_vs_T.cell".into()],
+                        vec!["cell.type_B.cell_vs_T.cell".into()],
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let raw = run_wald_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1, 0.1])
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(
+                        vec!["cell type_NK cell_vs_T cell".into()],
+                        vec!["cell type_B cell_vs_T cell".into()],
+                    ),
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(cleaned.refit_plan, raw.refit_plan);
     assert_eq!(cleaned.results.rows, raw.results.rows);
@@ -118,19 +125,23 @@ fn wald_replacement_numeric_contrast_validates_stored_model_frame_metadata() {
     };
     let options = CooksReplacementOptions::new(f64::MAX);
 
-    let error = DeseqBuilder::new()
-        .size_factors(vec![1.0; 2])
-        .model_frame(ambiguous)
-        .disable_independent_filtering()
-        .fit_fixed_dispersion_wald_results_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.1, 0.1],
-            &ResultsContrast::numeric(vec![0.0, 1.0]),
-            None::<&[String]>,
-            &options,
-        )
-        .unwrap_err();
+    let error = run_wald_replacement(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 2])
+            .model_frame(ambiguous)
+            .disable_independent_filtering()
+            .run(
+                &Analysis::new(&counts, &design)
+                    .fixed_dispersion(&[0.1, 0.1])
+                    .result(ResultColumn::Results {
+                        contrast: &ResultsContrast::numeric(vec![0.0, 1.0]),
+                        sample_levels: None,
+                        model_frame: None,
+                    })
+                    .cooks_replacement(&options),
+            ),
+    )
+    .unwrap_err();
 
     assert_ambiguous_name(
         error,
@@ -179,24 +190,24 @@ fn fixed_dispersion_wald_replacement_uses_stored_formula_low_count_cooks_gate() 
         .cooks_cutoff_threshold(0.0)
         .disable_independent_filtering();
 
-    let generic = builder
-        .clone()
-        .fit_wald_glm_mu_with_cooks_replacement(
-            &counts,
-            &design,
-            1,
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap();
-    let formula = builder
-        .model_frame(model_frame)
-        .fit_wald_glm_mu_with_cooks_replacement(
-            &counts,
-            &design,
-            1,
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap();
+    let generic = run_wald_replacement(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1))
+                .cooks_replacement(&CooksReplacementOptions::new(f64::MAX)),
+        ),
+    )
+    .unwrap();
+    let formula = run_wald_replacement(
+        builder.model_frame(model_frame).run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1))
+                .cooks_replacement(&CooksReplacementOptions::new(f64::MAX)),
+        ),
+    )
+    .unwrap();
 
     assert!(formula.results.rows[0].max_cooks.unwrap() > 0.0);
     assert_eq!(generic.results.rows[0].cooks_outlier, Some(true));
@@ -244,26 +255,24 @@ fn fixed_dispersion_wald_named_replacement_uses_stored_formula_low_count_cooks_g
     let contrast = ContrastSpec::coefficient_name("condition_B_vs_A");
     let options = CooksReplacementOptions::new(f64::MAX);
 
-    let generic = builder
-        .clone()
-        .fit_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.1],
-            &contrast,
-            &options,
-        )
-        .unwrap();
-    let formula = builder
-        .model_frame(model_frame)
-        .fit_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.1],
-            &contrast,
-            &options,
-        )
-        .unwrap();
+    let generic = run_wald_replacement(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Spec(&contrast))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let formula = run_wald_replacement(
+        builder.model_frame(model_frame).run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Spec(&contrast))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     assert!(formula.results.rows[0].max_cooks.unwrap() > 0.0);
     assert_eq!(generic.results.rows[0].cooks_outlier, Some(true));
@@ -314,26 +323,24 @@ fn fixed_dispersion_wald_reverse_numeric_replacement_uses_stored_formula_low_cou
         .disable_independent_filtering();
     let options = CooksReplacementOptions::new(f64::MAX);
 
-    let generic = builder
-        .clone()
-        .fit_fixed_dispersion_wald_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.1],
-            &[0.0, -1.0],
-            &options,
-        )
-        .unwrap();
-    let formula = builder
-        .model_frame(model_frame)
-        .fit_fixed_dispersion_wald_contrast_with_cooks_replacement(
-            &counts,
-            &design,
-            &[0.1],
-            &[0.0, -1.0],
-            &options,
-        )
-        .unwrap();
+    let generic = run_wald_replacement(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Numeric(&[0.0, -1.0]))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let formula = run_wald_replacement(
+        builder.model_frame(model_frame).run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&[0.1])
+                .result(ResultColumn::Numeric(&[0.0, -1.0]))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     assert!(formula.results.rows[0].max_cooks.unwrap() > 0.0);
     assert_eq!(generic.results.rows[0].cooks_outlier, Some(true));

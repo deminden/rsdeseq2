@@ -5,9 +5,6 @@
 //! tests with `cargo test --test integration <file>::`.
 //!
 //! Fixture readers and comparisons are shared through `support`.
-//!
-//! The deprecated `DeseqBuilder::fit*` methods stay covered here until they
-//! are removed in 0.7.0; `run_equivalence` checks each against `run`.
 #![allow(clippy::duplicate_mod, clippy::module_inception)]
 #![allow(deprecated)]
 
@@ -17,6 +14,8 @@ mod support;
 mod adaptive_result;
 #[path = "advanced_ashr_optimizers.rs"]
 mod advanced_ashr_optimizers;
+#[path = "analysis_requests.rs"]
+mod analysis_requests;
 #[path = "ashr_mode.rs"]
 mod ashr_mode;
 #[path = "ashr_optimizers.rs"]
@@ -169,8 +168,6 @@ mod results;
 mod results_reference;
 #[path = "row_preparation.rs"]
 mod row_preparation;
-#[path = "run_equivalence.rs"]
-mod run_equivalence;
 #[path = "se_covariance_reference.rs"]
 mod se_covariance_reference;
 #[path = "size_factors.rs"]

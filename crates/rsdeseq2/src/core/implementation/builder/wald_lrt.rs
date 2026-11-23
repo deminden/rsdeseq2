@@ -1,7 +1,6 @@
 use super::*;
 use crate::errors::{ErrorKind, missing_prerequisite};
 impl DeseqBuilder {
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_linear_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -15,7 +14,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_linear_mu_contrast`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_linear_mu_contrast(
         &self,
         counts: &CountMatrix,
@@ -28,7 +26,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_linear_mu_contrast_spec`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_linear_mu_contrast_spec(
         &self,
         counts: &CountMatrix,
@@ -48,7 +45,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_linear_mu_factor_level_contrast`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_linear_mu_factor_level_contrast(
         &self,
         counts: &CountMatrix,
@@ -90,7 +86,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_linear_mu_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_linear_mu_parametric(
         &self,
         counts: &CountMatrix,
@@ -104,7 +99,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_linear_mu_contrast_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_linear_mu_contrast_parametric(
         &self,
         counts: &CountMatrix,
@@ -117,7 +111,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_linear_mu_contrast_spec_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_linear_mu_contrast_spec_parametric(
         &self,
         counts: &CountMatrix,
@@ -137,7 +130,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_linear_mu_factor_level_contrast_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_linear_mu_factor_level_contrast_parametric(
         &self,
         counts: &CountMatrix,
@@ -179,7 +171,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -193,7 +184,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_contrast`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_glm_mu_contrast(
         &self,
         counts: &CountMatrix,
@@ -206,7 +196,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_contrast_spec`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_glm_mu_contrast_spec(
         &self,
         counts: &CountMatrix,
@@ -226,7 +215,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_factor_level_contrast`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_glm_mu_factor_level_contrast(
         &self,
         counts: &CountMatrix,
@@ -294,7 +282,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_linear_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -309,7 +296,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_linear_mu_contrast`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_linear_mu_contrast(
         &self,
         counts: &CountMatrix,
@@ -331,7 +317,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_linear_mu_contrast_spec`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_linear_mu_contrast_spec(
         &self,
         counts: &CountMatrix,
@@ -356,7 +341,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_linear_mu_factor_level_contrast`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_linear_mu_factor_level_contrast(
         &self,
         counts: &CountMatrix,
@@ -401,7 +385,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_linear_mu_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_linear_mu_parametric(
         &self,
         counts: &CountMatrix,
@@ -416,7 +399,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_linear_mu_contrast_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_linear_mu_contrast_parametric(
         &self,
         counts: &CountMatrix,
@@ -438,7 +420,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_linear_mu_contrast_spec_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_linear_mu_contrast_spec_parametric(
         &self,
         counts: &CountMatrix,
@@ -463,7 +444,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_linear_mu_factor_level_contrast_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_linear_mu_factor_level_contrast_parametric(
         &self,
         counts: &CountMatrix,
@@ -508,7 +488,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_glm_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -523,7 +502,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_glm_mu_contrast`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_glm_mu_contrast(
         &self,
         counts: &CountMatrix,
@@ -545,7 +523,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_glm_mu_contrast_spec`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_glm_mu_contrast_spec(
         &self,
         counts: &CountMatrix,
@@ -570,7 +547,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_glm_mu_factor_level_contrast`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_glm_mu_factor_level_contrast(
         &self,
         counts: &CountMatrix,
@@ -641,7 +617,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_glm_mu_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_glm_mu_parametric(
         &self,
         counts: &CountMatrix,
@@ -656,7 +631,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_glm_mu_contrast_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_glm_mu_contrast_parametric(
         &self,
         counts: &CountMatrix,
@@ -678,7 +652,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_glm_mu_contrast_spec_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_glm_mu_contrast_spec_parametric(
         &self,
         counts: &CountMatrix,
@@ -703,7 +676,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_glm_mu_factor_level_contrast_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_lrt_glm_mu_factor_level_contrast_parametric(
         &self,
         counts: &CountMatrix,

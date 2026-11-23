@@ -1,5 +1,7 @@
 use super::numerical_assertions::*;
 use super::*;
+use crate::support::run::{run_fit, run_results};
+use rsdeseq2::prelude::{Analysis, MeanModel, Stage};
 
 fn distinct_matrix(a: &RowMajorMatrix<f64>, b: &RowMajorMatrix<f64>) -> bool {
     numerically_distinct(
@@ -24,9 +26,14 @@ fn frozen_rlog_options_match_library_and_change_transformed_values() {
         } else {
             common::reference_full_design()
         };
-        let fit = builder
-            .fit_map_dispersions_glm_mu(&counts, &design)
-            .unwrap();
+        let fit = run_fit(
+            builder.run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::GlmMu)
+                    .stop_after(Stage::Map),
+            ),
+        )
+        .unwrap();
         let expected = fit
             .frozen_rlog(&counts, &intercept, 2.5)
             .unwrap()
@@ -90,7 +97,11 @@ fn wald_threshold_and_t_tail_options_match_library_numerically() {
     .unwrap();
     let counts = common::reference_counts();
     let design = common::reference_full_design();
-    let result = |builder: &DeseqBuilder| builder.fit_with_results(&counts, &design).unwrap().1;
+    let result = |builder: &DeseqBuilder| {
+        run_results(builder.run(&Analysis::new(&counts, &design)))
+            .unwrap()
+            .1
+    };
     let normal = result(&test_builder());
     let scalar = result(&test_builder().wald_t_degrees_of_freedom(4.0));
     let cases = [

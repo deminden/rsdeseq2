@@ -1,3 +1,4 @@
+use crate::support::run::run_fit;
 use approx::assert_relative_eq;
 use rsdeseq2::prelude::*;
 use std::f64::consts::{FRAC_1_SQRT_2, SQRT_2};
@@ -206,20 +207,24 @@ fn control_gene_indices_are_validated() {
 fn builder_accepts_control_gene_mask() {
     let counts =
         CountMatrix::from_row_major_u32(3, 3, vec![2, 4, 8, 100, 100, 100, 4, 8, 16]).unwrap();
-    let fit = DeseqBuilder::new()
-        .control_gene_mask(vec![false, true, false])
-        .fit_size_factors_and_base_means(&counts)
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .control_gene_mask(vec![false, true, false])
+            .run(&Analysis::without_design(&counts)),
+    )
+    .unwrap();
     assert_eq!(fit.size_factors, vec![1.0, 1.0, 1.0]);
 }
 
 #[test]
 fn builder_validates_control_gene_mask_length() {
     let counts = CountMatrix::from_row_major_u32(2, 3, vec![2, 4, 8, 4, 8, 16]).unwrap();
-    let err = DeseqBuilder::new()
-        .control_gene_mask(vec![true])
-        .fit_size_factors_and_base_means(&counts)
-        .unwrap_err();
+    let err = run_fit(
+        DeseqBuilder::new()
+            .control_gene_mask(vec![true])
+            .run(&Analysis::without_design(&counts)),
+    )
+    .unwrap_err();
     assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Shape);
     std::assert_matches!(
         err,
@@ -231,10 +236,12 @@ fn builder_validates_control_gene_mask_length() {
 #[test]
 fn builder_uses_supplied_geometric_means() {
     let counts = CountMatrix::from_row_major_u32(2, 3, vec![2, 4, 8, 4, 8, 16]).unwrap();
-    let fit = DeseqBuilder::new()
-        .geometric_means(vec![4.0, 8.0])
-        .fit_size_factors_and_base_means(&counts)
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .geometric_means(vec![4.0, 8.0])
+            .run(&Analysis::without_design(&counts)),
+    )
+    .unwrap();
     let geometric_mean = (fit.size_factors.iter().map(|value| value.ln()).sum::<f64>()
         / fit.size_factors.len() as f64)
         .exp();

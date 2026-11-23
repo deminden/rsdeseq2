@@ -77,10 +77,6 @@ mod normalization_components;
 #[path = "implementation/builder/beta_prior.rs"]
 mod beta_prior;
 
-// Explicit-path `fit*` methods, each a `run` request.
-#[path = "implementation/builder/leaf_forwarders.rs"]
-mod leaf_forwarders;
-
 // Public top-level builder workflows.
 #[path = "implementation/builder/workflows/mod.rs"]
 mod workflows;

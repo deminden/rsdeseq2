@@ -1,3 +1,4 @@
+use crate::support::run::run_fit;
 use crate::support::two_group_design;
 use approx::assert_relative_eq;
 use rsdeseq2::prelude::*;
@@ -177,7 +178,11 @@ fn builder_rejects_rank_deficient_linear_mu_design() {
     assert!(
         DeseqBuilder::new()
             .size_factors(vec![1.0; 4])
-            .fit_gene_wise_dispersions_linear_mu(&counts, &rank_deficient)
+            .run(
+                &Analysis::new(&counts, &rank_deficient)
+                    .means(MeanModel::LinearMu)
+                    .stop_after(Stage::GeneWise)
+            )
             .is_err()
     );
 }
@@ -844,15 +849,21 @@ fn linear_mu_gene_wise_dispersion_estimator_uses_normalization_factor_offsets() 
     let normalization_factors =
         RowMajorMatrix::from_row_major(1, 4, vec![1.0, 2.0, 1.0, 2.0]).unwrap();
 
-    let fit = DeseqBuilder::new()
-        .normalization_factors(normalization_factors.clone())
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            fit_method: GeneWiseDispersionFitMethod::Grid,
-            use_cox_reid: false,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .fit_gene_wise_dispersions_linear_mu(&counts, &two_group_design(4, Some("conditionB")))
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .normalization_factors(normalization_factors.clone())
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                fit_method: GeneWiseDispersionFitMethod::Grid,
+                use_cox_reid: false,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &two_group_design(4, Some("conditionB")))
+                    .means(MeanModel::LinearMu)
+                    .stop_after(Stage::GeneWise),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(fit.size_factors, vec![1.0, 1.0, 1.0, 1.0]);
     assert_eq!(fit.normalization_factors, Some(normalization_factors));
@@ -934,15 +945,21 @@ fn builder_attaches_linear_mu_gene_wise_dispersion_state() {
     let counts =
         CountMatrix::from_row_major_u32(2, 4, vec![10, 10, 20, 20, 10, 30, 10, 30]).unwrap();
 
-    let fit = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0, 1.0])
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            fit_method: GeneWiseDispersionFitMethod::Grid,
-            use_cox_reid: false,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .fit_gene_wise_dispersions_linear_mu(&counts, &two_group_design(4, Some("conditionB")))
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0, 1.0])
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                fit_method: GeneWiseDispersionFitMethod::Grid,
+                use_cox_reid: false,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &two_group_design(4, Some("conditionB")))
+                    .means(MeanModel::LinearMu)
+                    .stop_after(Stage::GeneWise),
+            ),
+    )
+    .unwrap();
 
     let dispersions = fit.disp_gene_est.as_ref().unwrap();
     let gene_iterations = fit.disp_gene_iter.as_ref().unwrap();
@@ -965,16 +982,22 @@ fn builder_attaches_glm_mu_gene_wise_dispersion_state() {
     let counts =
         CountMatrix::from_row_major_u32(2, 4, vec![10, 10, 20, 20, 10, 30, 10, 30]).unwrap();
 
-    let fit = DeseqBuilder::new()
-        .size_factors(vec![1.0, 1.0, 1.0, 1.0])
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            fit_method: GeneWiseDispersionFitMethod::Grid,
-            use_cox_reid: false,
-            niter: 2,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .fit_gene_wise_dispersions_glm_mu(&counts, &two_group_design(4, Some("conditionB")))
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0, 1.0, 1.0, 1.0])
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                fit_method: GeneWiseDispersionFitMethod::Grid,
+                use_cox_reid: false,
+                niter: 2,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &two_group_design(4, Some("conditionB")))
+                    .means(MeanModel::GlmMu)
+                    .stop_after(Stage::GeneWise),
+            ),
+    )
+    .unwrap();
 
     let dispersions = fit.disp_gene_est.as_ref().unwrap();
     let gene_iterations = fit.disp_gene_iter.as_ref().unwrap();
@@ -1018,21 +1041,27 @@ fn weighted_glm_mu_gene_wise_dispersion_matches_deseq2_fitidx_weight_rows() {
     )
     .unwrap();
 
-    let fit = DeseqBuilder::new()
-        .size_factors(vec![
-            0.645497224367903,
-            0.829777303051304,
-            1.29099444873581,
-            1.54919333848297,
-        ])
-        .observation_weights(observation_weights)
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            use_cox_reid: false,
-            niter: 2,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .fit_gene_wise_dispersions_glm_mu(&counts, &two_group_design(4, Some("conditionB")))
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .size_factors(vec![
+                0.645497224367903,
+                0.829777303051304,
+                1.29099444873581,
+                1.54919333848297,
+            ])
+            .observation_weights(observation_weights)
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                use_cox_reid: false,
+                niter: 2,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &two_group_design(4, Some("conditionB")))
+                    .means(MeanModel::GlmMu)
+                    .stop_after(Stage::GeneWise),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(
         fit.weights_fail.as_ref().unwrap(),
@@ -1071,20 +1100,26 @@ fn weighted_glm_mu_gene_wise_dispersion_matches_deseq2_weighted_cox_reid() {
     )
     .unwrap();
 
-    let fit = DeseqBuilder::new()
-        .size_factors(vec![
-            0.645497224367903,
-            0.829777303051304,
-            1.29099444873581,
-            1.54919333848297,
-        ])
-        .observation_weights(observation_weights)
-        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
-            niter: 2,
-            ..GeneWiseDispersionOptions::default()
-        })
-        .fit_gene_wise_dispersions_glm_mu(&counts, &two_group_design(4, Some("conditionB")))
-        .unwrap();
+    let fit = run_fit(
+        DeseqBuilder::new()
+            .size_factors(vec![
+                0.645497224367903,
+                0.829777303051304,
+                1.29099444873581,
+                1.54919333848297,
+            ])
+            .observation_weights(observation_weights)
+            .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+                niter: 2,
+                ..GeneWiseDispersionOptions::default()
+            })
+            .run(
+                &Analysis::new(&counts, &two_group_design(4, Some("conditionB")))
+                    .means(MeanModel::GlmMu)
+                    .stop_after(Stage::GeneWise),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(
         fit.weights_fail.as_ref().unwrap(),

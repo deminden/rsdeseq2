@@ -2,7 +2,6 @@
 use super::*;
 
 impl DeseqBuilder {
-    /// Leaf workflow behind [`DeseqBuilder::fit_size_factors_and_base_means`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_size_factors_and_base_means(
         &self,
         counts: &CountMatrix,
@@ -13,7 +12,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_size_factors_and_base_means_with_design`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_size_factors_and_base_means_with_design(
         &self,
         counts: &CountMatrix,

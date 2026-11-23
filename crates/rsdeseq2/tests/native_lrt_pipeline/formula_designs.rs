@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::{run_fit, run_lrt_replacement, run_results};
+use rsdeseq2::prelude::{Analysis, MeanModel, ResultColumn};
 
 #[test]
 fn top_level_lrt_formula_helpers_build_full_and_reduced_designs() {
@@ -23,15 +25,19 @@ fn top_level_lrt_formula_helpers_build_full_and_reduced_designs() {
     };
     let builder = native_lrt_builder().model_frame(model_frame);
 
-    let (explicit_fit, explicit_results) = builder
-        .fit_lrt_with_results(&counts, &full, &reduced)
-        .unwrap();
-    let (formula_fit, formula_results) = builder
-        .fit_lrt_formula_with_results(&counts, "~ condition", "~ 1")
-        .unwrap();
-    let (formula_named_fit, formula_named_results) = builder
-        .fit_lrt_formula_with_results_name(&counts, "~ condition", "~ 1", "condition_B_vs_A")
-        .unwrap();
+    let (explicit_fit, explicit_results) =
+        run_results(builder.run(&Analysis::new(&counts, &full).lrt(&reduced))).unwrap();
+    let (formula_fit, formula_results) =
+        run_results(builder.run(&Analysis::formula(&counts, "~ condition").lrt_formula("~ 1")))
+            .unwrap();
+    let (formula_named_fit, formula_named_results) = run_results(
+        builder.run(
+            &Analysis::formula(&counts, "~ condition")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Name("condition_B_vs_A")),
+        ),
+    )
+    .unwrap();
     let offset_values = builder.current_model_frame().unwrap().numeric_covariates[0]
         .values
         .to_vec();
@@ -48,12 +54,15 @@ fn top_level_lrt_formula_helpers_build_full_and_reduced_designs() {
         .clone()
         .normalization_factors(normalization_factors.clone());
     let formula_offset_builder = builder.clone();
-    let (explicit_offset_fit, explicit_offset_results) = explicit_offset_builder
-        .fit_lrt_formula_with_results(&counts, "~ condition", "~ 1")
-        .unwrap();
-    let (formula_offset_fit, formula_offset_results) = formula_offset_builder
-        .fit_lrt_formula_with_results(&counts, "~ condition + offset(exposure)", "~ 1")
-        .unwrap();
+    let (explicit_offset_fit, explicit_offset_results) = run_results(
+        explicit_offset_builder.run(&Analysis::formula(&counts, "~ condition").lrt_formula("~ 1")),
+    )
+    .unwrap();
+    let (formula_offset_fit, formula_offset_results) = run_results(
+        formula_offset_builder
+            .run(&Analysis::formula(&counts, "~ condition + offset(exposure)").lrt_formula("~ 1")),
+    )
+    .unwrap();
     assert_eq!(
         formula_offset_fit.normalization_factors,
         Some(normalization_factors.clone())
@@ -65,9 +74,10 @@ fn top_level_lrt_formula_helpers_build_full_and_reduced_designs() {
     );
     assert_eq!(formula_offset_results.rows, explicit_offset_results.rows);
 
-    let offset_err = builder
-        .fit_lrt_formula_with_results(&counts, "~ condition", "~ offset(exposure)")
-        .unwrap_err();
+    let offset_err = run_results(
+        builder.run(&Analysis::formula(&counts, "~ condition").lrt_formula("~ offset(exposure)")),
+    )
+    .unwrap_err();
     std::assert_matches!(
         offset_err,
         DeseqError::LrtOffsetsMismatch {
@@ -78,10 +88,9 @@ fn top_level_lrt_formula_helpers_build_full_and_reduced_designs() {
     );
     std::assert_matches!(
         builder
-            .fit_lrt_formula_with_results(
-                &counts,
-                "~ condition + offset(exposure)",
-                "~ offset(I(exposure + 1))",
+            .run(
+                &Analysis::formula(&counts, "~ condition + offset(exposure)")
+                    .lrt_formula("~ offset(I(exposure + 1))")
             )
             .unwrap_err(),
         DeseqError::LrtOffsetsMismatch {
@@ -90,13 +99,13 @@ fn top_level_lrt_formula_helpers_build_full_and_reduced_designs() {
             reduced: Some(1.0)
         }
     );
-    let (matching_fit, matching_results) = builder
-        .fit_lrt_formula_with_results(
-            &counts,
-            "~ condition + offset(exposure)",
-            "~ offset(exposure)",
-        )
-        .unwrap();
+    let (matching_fit, matching_results) = run_results(
+        builder.run(
+            &Analysis::formula(&counts, "~ condition + offset(exposure)")
+                .lrt_formula("~ offset(exposure)"),
+        ),
+    )
+    .unwrap();
     assert_lrt_fit_state_matches(
         &matching_fit,
         &explicit_offset_fit,
@@ -163,25 +172,24 @@ fn fixed_lrt_supports_stored_model_frame_dot_power_design() {
     )
     .unwrap();
     let dispersions = vec![0.2; counts.n_genes()];
-    let (dot_fit, dot_results) = builder
-        .clone()
-        .fit_fixed_dispersion_lrt(
-            &counts,
-            &dot_full.standard_design,
-            &reduced.standard_design,
-            &dispersions,
-            coefficient,
-        )
-        .unwrap();
-    let (explicit_fit, explicit_results) = builder
-        .fit_fixed_dispersion_lrt(
-            &counts,
-            &explicit_full.standard_design,
-            &reduced.standard_design,
-            &dispersions,
-            coefficient,
-        )
-        .unwrap();
+    let (dot_fit, dot_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &dot_full.standard_design)
+                .lrt(&reduced.standard_design)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Coefficient(coefficient)),
+        ),
+    )
+    .unwrap();
+    let (explicit_fit, explicit_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &explicit_full.standard_design)
+                .lrt(&reduced.standard_design)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Coefficient(coefficient)),
+        ),
+    )
+    .unwrap();
 
     assert_lrt_fit_state_matches(
         &dot_fit,
@@ -216,56 +224,75 @@ fn top_level_lrt_formula_contrast_helpers_use_model_frame_metadata() {
     let builder = native_lrt_builder().model_frame(model_frame);
     let options = CooksReplacementOptions::new(f64::MAX);
 
-    let (_factor_fit, factor_results) = builder
-        .fit_lrt_with_results_factor_level_contrast(
-            &counts,
-            &full,
-            &reduced,
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-        )
-        .unwrap();
-    let (_formula_character_fit, formula_character_results) = builder
-        .fit_lrt_formula_with_results_contrast_request(
-            &counts,
-            "~ condition",
-            "~ 1",
-            &ResultsContrast::character("condition", "B", "A"),
-        )
-        .unwrap();
-    let (_formula_list_fit, formula_list_results) = builder
-        .fit_lrt_formula_with_results_contrast_request(
-            &counts,
-            "~ condition",
-            "~ 1",
-            &ResultsContrast::list(vec!["condition_B_vs_A".into()], Vec::new()),
-        )
-        .unwrap();
-    let (_formula_numeric_fit, formula_numeric_results) = builder
-        .fit_lrt_formula_with_results_contrast_request(
-            &counts,
-            "~ condition",
-            "~ 1",
-            &ResultsContrast::numeric(vec![0.0, 1.0]),
-        )
-        .unwrap();
-    let formula_replacement = builder
-        .fit_lrt_formula_with_results_contrast_request_with_cooks_replacement(
-            &counts,
-            "~ condition",
-            "~ 1",
-            &ResultsContrast::character("condition", "B", "A"),
-            &options,
-        )
-        .unwrap();
-    let explicit_replacement = builder
-        .fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
-            &counts,
-            &full,
-            &reduced,
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-            &options,
-        )
-        .unwrap();
+    let (_factor_fit, factor_results) = run_results(
+        builder.run(&Analysis::new(&counts, &full).lrt(&reduced).result(
+            ResultColumn::FactorLevel(FactorLevelContrast::new("condition", "B", "A", &levels)),
+        )),
+    )
+    .unwrap();
+    let (_formula_character_fit, formula_character_results) = run_results(
+        builder.run(
+            &Analysis::formula(&counts, "~ condition")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "B", "A"),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
+    let (_formula_list_fit, formula_list_results) = run_results(
+        builder.run(
+            &Analysis::formula(&counts, "~ condition")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::list(vec!["condition_B_vs_A".into()], Vec::new()),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
+    let (_formula_numeric_fit, formula_numeric_results) = run_results(
+        builder.run(
+            &Analysis::formula(&counts, "~ condition")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::numeric(vec![0.0, 1.0]),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
+    let formula_replacement = run_lrt_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ condition")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "B", "A"),
+                    sample_levels: None,
+                    model_frame: None,
+                })
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let explicit_replacement = run_lrt_replacement(
+        builder.run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                    "condition",
+                    "B",
+                    "A",
+                    &levels,
+                )))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(formula_character_results, factor_results);
     assert_eq!(formula_list_results.rows, factor_results.rows);
@@ -345,17 +372,23 @@ fn native_formula_lrt_default_uses_stored_formula_low_count_cooks_gate() {
             ..GeneWiseDispersionOptions::default()
         })
         .cooks_cutoff_threshold(0.0)
-        .disable_independent_filtering()
-        .reduced_design(reduced.clone());
+        .disable_independent_filtering();
 
-    let (_generic_fit, generic_results) = builder
-        .clone()
-        .fit_lrt_glm_mu(&counts, &full, &reduced, 1)
-        .unwrap();
-    let (_formula_fit, formula_results) = builder
-        .model_frame(model_frame)
-        .fit_lrt_formula_with_results(&counts, "~ condition", "~ 1")
-        .unwrap();
+    let (_generic_fit, generic_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &full)
+                .lrt(&reduced)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
+    let (_formula_fit, formula_results) = run_results(
+        builder
+            .model_frame(model_frame)
+            .run(&Analysis::formula(&counts, "~ condition").lrt_formula("~ 1")),
+    )
+    .unwrap();
 
     assert_eq!(formula_results.rows[0].gene.as_deref(), Some("low_count"));
     assert!(formula_results.rows[0].max_cooks.unwrap() > 0.0);
@@ -390,50 +423,57 @@ fn top_level_lrt_formula_fit_state_retains_model_frame_metadata() {
     let options = CooksReplacementOptions::new(f64::MAX);
     let transformed_formula = "~ relevel(`cell type`, ref='B cell')";
 
-    let (fit, _results) = builder
-        .clone()
-        .fit_lrt_formula_with_results(&counts, transformed_formula, "~ 1")
-        .unwrap();
-    let (named_fit, _named_results) = builder
-        .clone()
-        .fit_lrt_formula_with_results_name(
-            &counts,
-            transformed_formula,
-            "~ 1",
-            "relevel.cell.type..ref....B.cell.._T.cell_vs_B.cell",
-        )
-        .unwrap();
-    let fit_only = builder
-        .clone()
-        .fit_lrt_formula(&counts, transformed_formula, "~ 1")
-        .unwrap();
-    let named_fit_only = builder
-        .clone()
-        .fit_lrt_formula_name(
-            &counts,
-            transformed_formula,
-            "~ 1",
-            "relevel.cell.type..ref....B.cell.._T.cell_vs_B.cell",
-        )
-        .unwrap();
-    let replacement = builder
-        .clone()
-        .fit_lrt_formula_with_results_with_cooks_replacement(
-            &counts,
-            transformed_formula,
-            "~ 1",
-            &options,
-        )
-        .unwrap();
-    let named_replacement = builder
-        .fit_lrt_formula_with_results_name_with_cooks_replacement(
-            &counts,
-            transformed_formula,
-            "~ 1",
-            "relevel.cell.type..ref....B.cell.._T.cell_vs_B.cell",
-            &options,
-        )
-        .unwrap();
+    let (fit, _results) = run_results(
+        builder
+            .clone()
+            .run(&Analysis::formula(&counts, transformed_formula).lrt_formula("~ 1")),
+    )
+    .unwrap();
+    let (named_fit, _named_results) = run_results(
+        builder.clone().run(
+            &Analysis::formula(&counts, transformed_formula)
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Name(
+                    "relevel.cell.type..ref....B.cell.._T.cell_vs_B.cell",
+                )),
+        ),
+    )
+    .unwrap();
+    let fit_only = run_fit(
+        builder
+            .clone()
+            .run(&Analysis::formula(&counts, transformed_formula).lrt_formula("~ 1")),
+    )
+    .unwrap();
+    let named_fit_only = run_fit(
+        builder.clone().run(
+            &Analysis::formula(&counts, transformed_formula)
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Name(
+                    "relevel.cell.type..ref....B.cell.._T.cell_vs_B.cell",
+                )),
+        ),
+    )
+    .unwrap();
+    let replacement = run_lrt_replacement(
+        builder.clone().run(
+            &Analysis::formula(&counts, transformed_formula)
+                .lrt_formula("~ 1")
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let named_replacement = run_lrt_replacement(
+        builder.run(
+            &Analysis::formula(&counts, transformed_formula)
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Name(
+                    "relevel.cell.type..ref....B.cell.._T.cell_vs_B.cell",
+                ))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     let transformed_model_frame = fit.current_model_frame().unwrap();
     assert_eq!(
@@ -483,9 +523,10 @@ fn top_level_lrt_formula_fit_state_retains_model_frame_metadata() {
     );
 
     let numeric_formula = "~ `cell type` + as.numeric(`dose value`)";
-    let numeric_fit = builder
-        .fit_lrt_formula(&counts, numeric_formula, "~ `cell type`")
-        .expect("LRT formula with derived numeric metadata should fit");
+    let numeric_fit = run_fit(
+        builder.run(&Analysis::formula(&counts, numeric_formula).lrt_formula("~ `cell type`")),
+    )
+    .expect("LRT formula with derived numeric metadata should fit");
     let numeric_frame = numeric_fit.current_model_frame().unwrap();
     assert_eq!(
         numeric_frame
@@ -507,19 +548,21 @@ fn top_level_lrt_formula_fit_state_retains_model_frame_metadata() {
     );
 
     let factor_code_formula = "~ as.double(`cell type`)";
-    let factor_code_fit = builder
-        .clone()
-        .fit_lrt_formula(&counts, factor_code_formula, "~ 1")
-        .expect("LRT formula with factor-code numeric metadata should fit");
-    let factor_code_replacement = builder
-        .fit_lrt_formula_with_results_name_with_cooks_replacement(
-            &counts,
-            factor_code_formula,
-            "~ 1",
-            "cell.type_as.double",
-            &options,
-        )
-        .expect("LRT factor-code formula replacement should resolve cleaned coefficient alias");
+    let factor_code_fit = run_fit(
+        builder
+            .clone()
+            .run(&Analysis::formula(&counts, factor_code_formula).lrt_formula("~ 1")),
+    )
+    .expect("LRT formula with factor-code numeric metadata should fit");
+    let factor_code_replacement = run_lrt_replacement(
+        builder.run(
+            &Analysis::formula(&counts, factor_code_formula)
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Name("cell.type_as.double"))
+                .cooks_replacement(&options),
+        ),
+    )
+    .expect("LRT factor-code formula replacement should resolve cleaned coefficient alias");
     let factor_code_frame = factor_code_fit.current_model_frame().unwrap();
     assert_eq!(
         factor_code_frame

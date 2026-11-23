@@ -3,6 +3,7 @@ pub(crate) mod builtin_checks;
 mod formula_reference;
 pub(crate) mod posterior;
 pub(crate) mod regression_checks;
+pub(crate) mod run;
 
 pub(crate) use formula_reference::formula_reference;
 

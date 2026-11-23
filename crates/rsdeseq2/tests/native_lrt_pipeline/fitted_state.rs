@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::run_results;
+use rsdeseq2::prelude::{Analysis, ResultColumn};
 
 #[test]
 fn fitted_lrt_object_uses_stored_model_frame_for_character_contrast_results() {
@@ -20,14 +22,18 @@ fn fitted_lrt_object_uses_stored_model_frame_for_character_contrast_results() {
     };
     let builder = native_lrt_builder().model_frame(model_frame);
 
-    let (fit, mut expected_results) = builder
-        .fit_lrt_formula_with_results_contrast_request(
-            &counts,
-            "~ `cell type`",
-            "~ 1",
-            &ResultsContrast::character("cell.type", "B cell", "T cell"),
-        )
-        .unwrap();
+    let (fit, mut expected_results) = run_results(
+        builder.run(
+            &Analysis::formula(&counts, "~ `cell type`")
+                .lrt_formula("~ 1")
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("cell.type", "B cell", "T cell"),
+                    sample_levels: None,
+                    model_frame: None,
+                }),
+        ),
+    )
+    .unwrap();
     expected_results.independent_filtering = None;
     let object_results = fit
         .lrt_results_contrast_request(
@@ -130,16 +136,19 @@ fn fitted_lrt_object_applies_numeric_contrast_all_zero_from_stored_design() {
     )
     .unwrap();
     let dispersions = vec![0.2; counts.n_genes()];
-    let (fit, character_results) = builder
-        .fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
-            &counts,
-            &full_design,
-            &reduced_design,
-            &dispersions,
-            &ResultsContrast::character("condition", "B", "A"),
-            builder.current_model_frame().unwrap(),
-        )
-        .unwrap();
+    let (fit, character_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &full_design)
+                .lrt(&reduced_design)
+                .fixed_dispersion(&dispersions)
+                .result(ResultColumn::Results {
+                    contrast: &ResultsContrast::character("condition", "B", "A"),
+                    sample_levels: None,
+                    model_frame: Some(builder.current_model_frame().unwrap()),
+                }),
+        ),
+    )
+    .unwrap();
     let list_results = fit
         .results_contrast_request(
             &counts,
@@ -169,15 +178,15 @@ fn fitted_lrt_object_applies_numeric_contrast_all_zero_from_stored_design() {
 #[test]
 fn lrt_effect_projection_does_not_require_a_valid_wald_test() {
     let counts = counts_with_zero_row();
-    let (mut fit, _) = native_lrt_builder()
-        .fit_fixed_dispersion_lrt(
-            &counts,
-            &full_design(),
-            &reduced_design(),
-            &vec![0.2; counts.n_genes()],
-            1,
-        )
-        .unwrap();
+    let (mut fit, _) = run_results(
+        native_lrt_builder().run(
+            &Analysis::new(&counts, &full_design())
+                .lrt(&reduced_design())
+                .fixed_dispersion(&vec![0.2; counts.n_genes()])
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
     let beta = fit.beta.as_ref().unwrap().row(1).unwrap().to_vec();
     let lrt = fit.lrt.as_ref().unwrap().clone();
     let se = fit.beta_se.as_ref().unwrap();

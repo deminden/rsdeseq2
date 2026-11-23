@@ -134,7 +134,6 @@ pub struct DeseqFit {
 #[must_use]
 pub struct DeseqBuilder {
     pub(super) fit_type: FitType,
-    pub(super) test: TestType,
     pub(super) size_factor_options: SizeFactorOptions,
     pub(super) normalization_factors: Option<Arc<RowMajorMatrix<f64>>>,
     // Formula sample offsets use normalization-factor column means for dispersion starts.
@@ -145,7 +144,6 @@ pub struct DeseqBuilder {
     pub(super) execution_context: ExecutionContext,
     #[cfg(test)]
     pub(super) execution_observer: Option<std::sync::Arc<std::sync::Mutex<Vec<usize>>>>,
-    pub(super) reduced_design: Option<DesignMatrix>,
     pub(super) model_frame: Option<FormulaModelFrame>,
     pub(super) irls_options: IrlsOptions,
     pub(super) gene_wise_dispersion_options: GeneWiseDispersionOptions,

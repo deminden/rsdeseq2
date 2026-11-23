@@ -6,7 +6,6 @@ use crate::dispersion::gene_est::{
 };
 
 impl DeseqBuilder {
-    /// Leaf workflow behind [`DeseqBuilder::fit_gene_wise_dispersions_linear_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_gene_wise_dispersions_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -40,7 +39,6 @@ impl DeseqBuilder {
         })
     }
 
-    /// Leaf workflow behind [`DeseqBuilder::fit_gene_wise_dispersions_glm_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_gene_wise_dispersions_glm_mu(
         &self,
         counts: &CountMatrix,

@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::run::{run_replacement, run_results, run_wald_replacement};
+use rsdeseq2::prelude::{Analysis, MeanModel, ResultColumn};
 
 #[test]
 fn top_level_test_output_routes_wald_cooks_replacement() {
@@ -18,37 +20,36 @@ fn top_level_test_output_routes_wald_cooks_replacement() {
         }],
         numeric_covariates: Vec::new(),
     };
-    let builder = glm_mu_native_wald_builder()
-        .test(TestType::Wald)
-        .model_frame(model_frame);
+    let builder = glm_mu_native_wald_builder().model_frame(model_frame);
 
-    let top_level = builder
-        .fit_with_test_results_name_with_cooks_replacement(
-            &counts,
-            &design,
-            "condition_B_vs_A",
-            &options,
-        )
-        .unwrap();
-    let formula_top_level = builder
-        .fit_formula_with_test_results_with_cooks_replacement(&counts, "~ condition", &options)
-        .unwrap();
-    let formula_named_top_level = builder
-        .fit_formula_with_test_results_name_with_cooks_replacement(
-            &counts,
-            "~ condition",
-            "condition_B_vs_A",
-            &options,
-        )
-        .unwrap();
-    let expected = builder
-        .fit_with_results_name_with_cooks_replacement(
-            &counts,
-            &design,
-            "condition_B_vs_A",
-            &options,
-        )
-        .unwrap();
+    let top_level = run_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .result(ResultColumn::Name("condition_B_vs_A"))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let formula_top_level = run_replacement(
+        builder.run(&Analysis::formula(&counts, "~ condition").cooks_replacement(&options)),
+    )
+    .unwrap();
+    let formula_named_top_level = run_replacement(
+        builder.run(
+            &Analysis::formula(&counts, "~ condition")
+                .result(ResultColumn::Name("condition_B_vs_A"))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
+    let expected = run_wald_replacement(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .result(ResultColumn::Name("condition_B_vs_A"))
+                .cooks_replacement(&options),
+        ),
+    )
+    .unwrap();
 
     assert_eq!(top_level.test_type(), TestType::Wald);
     assert_eq!(top_level.results(), &expected.results);
@@ -96,9 +97,15 @@ fn native_linear_mu_parametric_wald_validates_coefficient_index() {
     let counts = native_wald_counts_with_zero_row();
     let design = two_group_design();
 
-    let err = native_wald_builder()
-        .fit_wald_linear_mu_parametric(&counts, &design, 2)
-        .unwrap_err();
+    let err = run_results(
+        native_wald_builder().run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Coefficient(2)),
+        ),
+    )
+    .unwrap_err();
     std::assert_matches!(
         err,
         DeseqError::InvalidDimensions { context, expected: 1, actual: 2 }
@@ -117,10 +124,17 @@ fn native_linear_mu_parametric_wald_accepts_normalization_factors() {
     )
     .unwrap();
 
-    let (fit, results) = native_wald_builder()
-        .normalization_factors(normalization_factors.clone())
-        .fit_wald_linear_mu_parametric(&counts, &design, 1)
-        .unwrap();
+    let (fit, results) = run_results(
+        native_wald_builder()
+            .normalization_factors(normalization_factors.clone())
+            .run(
+                &Analysis::new(&counts, &design)
+                    .means(MeanModel::LinearMu)
+                    .fit_type(FitType::Parametric)
+                    .result(ResultColumn::Coefficient(1)),
+            ),
+    )
+    .unwrap();
 
     assert_eq!(fit.normalization_factors, Some(normalization_factors));
     assert_eq!(results.rows.len(), counts.n_genes());
@@ -134,13 +148,24 @@ fn native_linear_mu_parametric_wald_matches_fixed_pipeline_when_reusing_final_di
     let design = two_group_design();
     let builder = native_wald_builder();
 
-    let (native_fit, native_results) = builder
-        .fit_wald_linear_mu_parametric(&counts, &design, 1)
-        .unwrap();
+    let (native_fit, native_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
     let final_dispersions = native_fit.dispersion.as_ref().unwrap().clone();
-    let (fixed_fit, fixed_results) = builder
-        .fit_fixed_dispersion_wald(&counts, &design, &final_dispersions, 1)
-        .unwrap();
+    let (fixed_fit, fixed_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&final_dispersions)
+                .result(ResultColumn::Coefficient(1)),
+        ),
+    )
+    .unwrap();
 
     for gene in 0..counts.n_genes() {
         let native_disp = native_fit.dispersion.as_ref().unwrap()[gene];
@@ -172,13 +197,23 @@ fn native_linear_mu_wald_contrast_matches_fixed_pipeline_when_reusing_final_disp
     let builder = native_wald_builder().fit_type(FitType::Mean);
     let contrast = [0.0, 1.0];
 
-    let (native_fit, native_results) = builder
-        .fit_wald_linear_mu_contrast(&counts, &design, &contrast)
-        .unwrap();
+    let (native_fit, native_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Numeric(&contrast)),
+        ),
+    )
+    .unwrap();
     let final_dispersions = native_fit.dispersion.as_ref().unwrap().clone();
-    let (fixed_fit, fixed_results) = builder
-        .fit_fixed_dispersion_wald_contrast(&counts, &design, &final_dispersions, &contrast)
-        .unwrap();
+    let (fixed_fit, fixed_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .fixed_dispersion(&final_dispersions)
+                .result(ResultColumn::Numeric(&contrast)),
+        ),
+    )
+    .unwrap();
 
     assert!(native_fit.disp_prior_var.unwrap().is_finite());
     assert_eq!(
@@ -224,25 +259,37 @@ fn native_linear_mu_wald_contrast_specs_set_metadata_and_factor_levels() {
         .map(String::from)
         .collect::<Vec<_>>();
 
-    let (primitive_fit, _primitive_results) = builder
-        .clone()
-        .fit_wald_linear_mu_contrast(&counts, &design, &[0.0, 1.0])
-        .unwrap();
-    let (named_fit, named_results) = builder
-        .clone()
-        .fit_wald_linear_mu_contrast_spec(
-            &counts,
-            &design,
-            &ContrastSpec::coefficient_name("condition_B_vs_A"),
-        )
-        .unwrap();
-    let (factor_fit, factor_results) = builder
-        .fit_wald_linear_mu_factor_level_contrast(
-            &counts,
-            &design,
-            FactorLevelContrast::new("condition", "B", "A", &levels),
-        )
-        .unwrap();
+    let (primitive_fit, _primitive_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Numeric(&[0.0, 1.0])),
+        ),
+    )
+    .unwrap();
+    let (named_fit, named_results) = run_results(
+        builder.clone().run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Spec(&ContrastSpec::coefficient_name(
+                    "condition_B_vs_A",
+                ))),
+        ),
+    )
+    .unwrap();
+    let (factor_fit, factor_results) = run_results(
+        builder.run(
+            &Analysis::new(&counts, &design)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::FactorLevel(FactorLevelContrast::new(
+                    "condition",
+                    "B",
+                    "A",
+                    &levels,
+                ))),
+        ),
+    )
+    .unwrap();
 
     assert_wald_fit_state_matches(
         &named_fit,
