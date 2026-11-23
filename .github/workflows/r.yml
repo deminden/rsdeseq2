@@ -9,7 +9,7 @@ on:
 
 jobs:
   r:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     continue-on-error: ${{ matrix.lane != 'reference' }}
     strategy:
       fail-fast: false
@@ -51,7 +51,7 @@ jobs:
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ${{ env.R_LIBS_USER }}
-          key: r-reference-ubuntu-24.04-${{ runner.arch }}-4.6.2-${{ hashFiles('config/r-reference/r-reference-sources-2026-10-29.tsv', 'config/r-reference/r-reference-environment-2026-10-29.json', 'scripts/environment/install_locked_r_packages.R', 'scripts/environment/install_r_reference.py') }}
+          key: r-reference-ubuntu-26.04-${{ runner.arch }}-4.6.2-${{ hashFiles('config/r-reference/r-reference-sources-2026-10-29.tsv', 'config/r-reference/r-reference-environment-2026-10-29.json', 'scripts/environment/install_locked_r_packages.R', 'scripts/environment/install_r_reference.py') }}
       - name: Restore verified numerical reference environment
         if: matrix.lane == 'reference'
         run: python scripts/environment/install_r_reference.py --library "$R_LIBS_USER" ${{ steps.reference-cache.outputs.cache-hit == 'true' && '--check-installed' || '' }}
@@ -60,7 +60,7 @@ jobs:
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ${{ env.R_LIBS_USER }}
-          key: r-reference-ubuntu-24.04-${{ runner.arch }}-4.6.2-${{ hashFiles('config/r-reference/r-reference-sources-2026-10-29.tsv', 'config/r-reference/r-reference-environment-2026-10-29.json', 'scripts/environment/install_locked_r_packages.R', 'scripts/environment/install_r_reference.py') }}
+          key: r-reference-ubuntu-26.04-${{ runner.arch }}-4.6.2-${{ hashFiles('config/r-reference/r-reference-sources-2026-10-29.tsv', 'config/r-reference/r-reference-environment-2026-10-29.json', 'scripts/environment/install_locked_r_packages.R', 'scripts/environment/install_r_reference.py') }}
       - name: Install compatibility dependencies
         if: matrix.lane != 'reference'
         env:

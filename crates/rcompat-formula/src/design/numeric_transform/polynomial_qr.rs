@@ -63,15 +63,7 @@ pub(in crate::design) fn visit_basis(
             let weight = -inner / columns[step][step];
             if weight != 0.0 {
                 let (previous, remaining) = columns.split_at_mut(other);
-                if crate::numeric::profile::r_linux_x86() {
-                    axpy(weight, &previous[step][step..], &mut remaining[0][step..]);
-                } else {
-                    for (value, &reflector) in
-                        remaining[0][step..].iter_mut().zip(&previous[step][step..])
-                    {
-                        *value = weight.mul_add(reflector, *value);
-                    }
-                }
+                axpy(weight, &previous[step][step..], &mut remaining[0][step..]);
             }
             if tails[other] != 0.0 {
                 let fraction = columns[other][step].abs() / tails[other];
@@ -105,13 +97,7 @@ pub(in crate::design) fn visit_basis(
             let inner = dot(&columns[step][step..], &q[step..]);
             let weight = -inner / reflectors[step];
             if weight != 0.0 {
-                if crate::numeric::profile::r_linux_x86() {
-                    axpy(weight, &columns[step][step..], &mut q[step..]);
-                } else {
-                    for r in step..n {
-                        q[r] = weight.mul_add(columns[step][r], q[r]);
-                    }
-                }
+                axpy(weight, &columns[step][step..], &mut q[step..]);
             }
             columns[step][step] = diagonal;
         }

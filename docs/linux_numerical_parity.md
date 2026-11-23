@@ -10,8 +10,8 @@ See the [validation record](testing-parity.md#ci-status) for checked revisions.
 
 ## Linux formulas
 
-Linux CI and release builds that run exact numerical checks use Ubuntu 24.04.
-The Linux references use R 4.6.2 and one OpenBLAS 0.3.26 thread. Linux
+Linux CI and release builds that run exact numerical checks use Ubuntu 26.04.
+The Linux references use R 4.6.2 and one OpenBLAS 0.3.32 thread. Linux
 x86_64 pins `OPENBLAS_CORETYPE=Haswell` and uses 80-bit x87 scalar reductions.
 Linux arm64 pins `OPENBLAS_CORETYPE=ARMV8` and uses 128-bit scalar reductions
 with a 113-bit significand. These settings keep the original R reference
@@ -19,8 +19,14 @@ independent of the machine's automatic kernel selection.
 
 The Rust kernels follow the reference reduction order through the binary64
 conversion. Polynomial QR follows the target dot product, norm and fused
-operation schedules. The Rust Haswell implementation also runs on x86_64
-CPUs without AVX.
+operation schedules, including the fused scalar tail of the Ubuntu 26.04
+Haswell axpy kernel. The Rust Haswell implementation also runs on x86_64
+CPUs without AVX. Snapshots were regenerated with original base R for both
+architectures. [Reference capture](https://github.com/deminden/rsdeseq2/actions/runs/45277310935)
+
+Linux R-host golden manifests use glibc 2.43. The portable profile uses a
+single manifest across platforms.
+[Golden capture](https://github.com/deminden/rsdeseq2/actions/runs/45276866316)
 
 Run the regeneration check on a matching Linux R installation. For arm64:
 

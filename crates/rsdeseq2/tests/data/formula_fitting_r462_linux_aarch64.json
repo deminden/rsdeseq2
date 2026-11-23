@@ -3,7 +3,7 @@
     "R": "4.6.2",
     "platform": "aarch64-unknown-linux-gnu",
     "BLAS": "/usr/lib/aarch64-linux-gnu/openblas-pthread/libblas.so.3",
-    "LAPACK": "/usr/lib/aarch64-linux-gnu/openblas-pthread/libopenblasp-r0.3.26.so"
+    "LAPACK": "/usr/lib/aarch64-linux-gnu/openblas-pthread/libopenblasp-r0.3.32.so"
   },
   "samples": 12,
   "factors": [

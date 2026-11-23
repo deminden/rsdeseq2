@@ -101,15 +101,9 @@ fn dot_reference_haswell(x: &[f64], y: &[f64]) -> f64 {
     }
     total
 }
-/// OpenBLAS Haswell daxpy: fused multiply-add in 16-wide blocks, then plain
-/// multiply-add for the tail.
+/// Fused axpy, including the scalar tail in Ubuntu 26.04's Haswell kernel.
 pub(super) fn axpy(weight: f64, x: &[f64], y: &mut [f64]) {
-    let end = x.len() / 16 * 16;
-    for (i, (v, &x)) in y.iter_mut().zip(x).enumerate() {
-        *v = if i >= end {
-            *v + weight * x
-        } else {
-            weight.mul_add(x, *v)
-        };
+    for (v, &x) in y.iter_mut().zip(x) {
+        *v = weight.mul_add(x, *v);
     }
 }
