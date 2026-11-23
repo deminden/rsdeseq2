@@ -10,24 +10,18 @@ individual analysis stages. An optional R package wraps the same numerical core.
 
 ## Install
 
-Requires **Rust 1.96.0 or newer**.
-
-```sh
-# Embed the library.
-cargo add rsdeseq2@0.6.0
-
-# Install the CLI.
-cargo install rsdeseq2 --version 0.6.0 --locked
-```
-
-For source installation from a repository checkout:
+Requires **Rust 1.96.0 or newer**. From the root of the 0.6.0 checkout,
+install the CLI with:
 
 ```sh
 cargo install --path crates/rsdeseq2 --locked
 ```
 
-[Release procedure][release] describes checked artifacts, version tags and
-publication verification.
+To use the checkout as a library, run
+`cargo add rsdeseq2 --path /absolute/path/to/rsdeseq2/crates/rsdeseq2`
+from your application. [crates.io](https://crates.io/crates/rsdeseq2)
+lists published versions. See the [release procedure][release] for how
+archives are checked and published.
 
 ## Workflows
 
@@ -49,15 +43,12 @@ is pre-1.0 and may change between minor releases.
 
 ## Validation and Performance
 
-The [main comparison][comparison] reports precision, elapsed-time ratios and
-peak memory against DESeq2 for eleven full GTEx v8 Kidney Cortex contrasts.
-The [measurement report][gtex-benchmark] provides per-contrast values, executable
-and environment identities, and reproduction instructions. These are measured
-results for the documented workload, not a guarantee for every design.
-
-Independent reference tests cover numerical stages and complete workflows;
-separate tests require identical standalone and R-wrapped results. See
-[testing and parity][testing] for platform, R, sanitizer and full-GTEx checks.
+The [validation summary][comparison] reports 0.6.0 precision and
+performance for eleven full GTEx v8 Kidney Cortex contrasts. Independent
+reference tests cover numerical stages and complete workflows. Separate
+tests check that standalone and R-wrapped results agree.
+[Testing and parity][testing] covers ARM release checks, R, sanitizers
+and the full GTEx replay.
 
 ## Rust Usage
 
@@ -96,8 +87,8 @@ Cargo features, all enabled by default:
 | `formula` | ICU locale collation for formula factor levels; without it only `"C"` collation is accepted |
 | `shrinkage` | `rsdeseq2::shrinkage` (ashr- and apeglm-style posteriors) |
 
-A library-only build without the CLI uses
-`rsdeseq2 = { version = "...", default-features = false, features = ["formula", "shrinkage"] }`.
+A library-only checkout dependency can use `default-features = false`
+with `features = ["formula", "shrinkage"]`.
 
 ## CLI
 
@@ -129,7 +120,6 @@ BSD-3-Clause and BSD-2-Clause-Views terms. The crate includes `LICENSE` and
 
 [contract]: https://github.com/deminden/rsdeseq2/blob/main/docs/native-supported-contract.md
 [compatibility]: https://github.com/deminden/rsdeseq2/blob/main/docs/compatibility.md
-[gtex-benchmark]: https://github.com/deminden/rsdeseq2/blob/main/docs/reports/gtex-native-wald-benchmark.md
 [comparison]: https://github.com/deminden/rsdeseq2/blob/main/README.md#validation-and-performance
 [release]: https://github.com/deminden/rsdeseq2/blob/main/docs/release.md
 [testing]: https://github.com/deminden/rsdeseq2/blob/main/docs/testing-parity.md

@@ -1,9 +1,8 @@
 # Standalone Rust and R wrapper contract
 
-Version 0.5.0 uses one numerical engine. This inventory maps supported public
-entry points and option families to their Rust owners and independent tests.
-[Compatibility](compatibility.md) lists explicit limits; [testing](testing-parity.md)
-records current passing CI.
+This inventory maps supported 0.6.0 entry points and options to their Rust
+implementations and independent tests. See [compatibility](compatibility.md)
+for limits and [testing](testing-parity.md) for validation.
 
 ## Numerical ownership
 
@@ -135,9 +134,8 @@ poll callback. R exposes the same budget as `max.grid.evaluations`, with explici
 
 ## Validation
 
-[Current CI](testing-parity.md#ci-status) passes both Linux R lanes, five target
-panels, the full Rust suite, full GTEx replay and native-boundary instrumentation.
-Independent original references and standalone/wrapped identity remain separate
-requirements. [Reproducibility](reproducibility.md) identifies generators, frozen
-inputs and acceptance gates. [Benchmarks](benchmarks.md) defines measured scope;
-version changes do not turn saved timings into newly measured results.
+[Local acceptance](testing-parity.md#ci-status) covers the ARM release panels,
+R packages and full GTEx replay. Accuracy checks use independent original R
+references. Interface checks compare standalone Rust with the R wrapper.
+[Reproducibility](reproducibility.md) identifies generators, frozen inputs and
+acceptance gates.

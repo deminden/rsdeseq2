@@ -1,9 +1,9 @@
 # Numerical evidence and active validation inputs
 
-This directory contains the records used by the current guides and validation tools:
+This directory contains records and inputs used by validation tools:
 
-- `ci_0.5.0.json`: passing implementation run/job identities and downloaded log hashes.
-- `native_sqp_warning_native_*` and `gtex_comparison_provenance.json`: the raw
+- `ci_0.5.0.json`: archived 0.5.0 run/job identities and downloaded log hashes.
+- `native_sqp_warning_native_*` and `gtex_comparison_provenance.json`: the historical
   eleven-contrast original-DESeq2 precision/time/RSS comparison and its provenance.
 - `review_fixes_2026-11-12_R.tsv` and `r_workflow_provenance.json`: complete R payload
   checks, measured workflow costs and their original source/measurement scope.

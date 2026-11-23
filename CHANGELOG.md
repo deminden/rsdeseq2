@@ -1,7 +1,6 @@
 # Changelog
 
-Public API and user-visible behaviour changes. Release notes for published
-versions live in [docs/releases](docs/releases/).
+Public API and user-visible behaviour changes. Version notes live in [docs/releases](docs/releases/).
 
 ## 0.6.0
 
@@ -217,7 +216,7 @@ versions live in [docs/releases](docs/releases/).
   (119 sites). 57 of these messages were reworded into the one form
   "*operation* requires *prerequisite*"; for example "MAP dispersions are
   required before Wald fitting" is now "Wald fitting requires MAP
-  dispersions". The full list is in `docs/design/structured-errors.md`.
+  dispersions". See the [structured error fields](docs/design/structured-errors.md).
 
 - The reusable R-compatibility code is split into crates of the rcompat
   series, which do not depend on rsdeseq2 and keep their own versions:

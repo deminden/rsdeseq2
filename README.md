@@ -1,9 +1,5 @@
 # rsdeseq2
 
-[![Rust CI](https://github.com/deminden/rsdeseq2/actions/workflows/rust.yml/badge.svg)](https://github.com/deminden/rsdeseq2/actions/workflows/rust.yml)
-[![R CI](https://github.com/deminden/rsdeseq2/actions/workflows/r.yml/badge.svg)](https://github.com/deminden/rsdeseq2/actions/workflows/r.yml)
-[![crates.io](https://img.shields.io/crates/v/rsdeseq2.svg)](https://crates.io/crates/rsdeseq2)
-[![API documentation](https://img.shields.io/docsrs/rsdeseq2)](https://docs.rs/rsdeseq2)
 [![License: MIT + BSD notices](https://img.shields.io/badge/license-MIT%20%2B%20BSD-blue.svg)](THIRD_PARTY_NOTICES.md)
 
 `rsdeseq2` independently implements DESeq2-compatible count-data
@@ -29,88 +25,30 @@ describe the changes and current validation status.
 
 ## Validation and Performance
 
-The recorded process comparison uses native R 4.6.2 / DESeq2 1.52.0 on eleven
-GTEx v8 Kidney Cortex contrasts: biological comparisons and reproducible
-blocked/unblocked random splits. Every contrast uses all 56,200 genes.
+The 0.6.0 release panels and golden outputs passed on macOS arm64 and
+Linux arm64. The full 56,200-gene GTEx replay passed in both numeric
+profiles. Both profiles also passed all 130 precision gates across the
+eleven full GTEx v8 Kidney Cortex Wald contrasts against R 4.6.2 / DESeq2
+1.52.0. The contrast runs estimate normalization and dispersions with Cook's
+masking and independent filtering disabled. Both profiles had zero
+significance flips at adjusted p-value cutoffs of 0.05 and 0.1.
 
-### Precision
+| Numeric profile | Max absolute LFC error | Max absolute SE error | Max absolute p-value error | Max absolute adjusted p-value error |
+| --- | ---: | ---: | ---: | ---: |
+| Portable | `3.65e-6` | `6.18e-5` | `7.25e-5` | `3.57e-5` |
+| Host R | `7.15e-6` | `2.75e-5` | `3.74e-5` | `2.87e-5` |
 
-Maximum absolute differences from matched DESeq2 results, including estimated
-dispersions. Group values are maxima across distinct contrasts; gene coverage
-and finite/NA patterns match throughout.
-
-| Contrast group | Contrasts | Max LFC error | Max SE error | Max p-value error | Max adjusted p-value error |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Original blocked | 1 | `7.84e-07` | `1.38e-06` | `3.73e-07` | `1.14e-06` |
-| Male vs female | 1 | `1.41e-09` | `1.35e-05` | `2.98e-05` | `3.42e-11` |
-| Male age 4 vs 3 | 1 | `1.47e-07` | `2.34e-05` | `2.16e-05` | `8.25e-07` |
-| Blocked random splits | 5 | `7.15e-06` | `2.75e-05` | `3.74e-05` | `1.26e-05` |
-| Unblocked random splits | 3 | `5.28e-09` | `1.2e-05` | `1.72e-05` | `2.87e-05` |
-
-Significance agreement for the same contrasts, from
-`scripts/validation/gtex_significance.py` (Linux x86_64 build of the current
-source; the absolute errors above were measured on macOS). Significance flips
-are a hard gate.
-
-| Contrast group | Max log10 p error (p < 1e-3) | Max log10 padj error (padj < 1e-3) | Min Spearman (stat) | Min top-100 / 500 / 2,000 overlap | Flips at padj 0.05 / 0.1 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Original blocked | `8.1e-08` | none below 1e-3 | `0.999998` | 100% / 100% / 100% | 0 / 0 |
-| Male vs female | `4.6e-10` | `4.6e-10` | `0.999956` | 100% / 100% / 100% | 0 / 0 |
-| Male age 4 vs 3 | `4.8e-10` | `4.8e-10` | `0.999983` | 100% / 100% / 100% | 0 / 0 |
-| Blocked random splits | `1.5e-05` | `5.3e-06` | `0.999996` | 100% / 100% / 100% | 0 / 0 |
-| Unblocked random splits | `5.1e-06` | `9.2e-11` | `0.999979` | 100% / 100% / 100% | 0 / 0 |
-
-### Speed
-
-| Contrast group | Rust (s) | DESeq2 (s) | DESeq2 / Rust |
-| --- | ---: | ---: | ---: |
-| Original blocked | 5.96 | 31.03 | 5.20× |
-| Male vs female | 2.75 | 17.69 | 6.42× |
-| Male age 4 vs 3 | 2.38 | 14.54 | 6.10× |
-| Blocked random splits | 4.39 | 23.71 | 5.40× |
-| Unblocked random splits | 3.43 | 19.63 | 5.72× |
-
-One process run per tool and contrast on Apple M5/macOS, with one fitting/BLAS
-thread. Multiple-contrast groups show medians across distinct contrasts. Timings
-include startup, loading, fitting and completed output. Summed time is
-**43.33 seconds for Rust versus 242.12 seconds for DESeq2**, an observed **5.59×** ratio.
-These are single-pass observations, without discarded outliers. Other user and
-system workloads were active; the measurements do not establish small speed
-changes between development revisions.
-
-### Memory
-
-| Contrast group | Rust peak RSS (MiB) | DESeq2 peak RSS (MiB) | DESeq2 / Rust |
-| --- | ---: | ---: | ---: |
-| Original blocked | 304.62 | 1571.23 | 5.16× |
-| Male vs female | 243.05 | 1689.53 | 6.95× |
-| Male age 4 vs 3 | 213.61 | 1600.56 | 7.49× |
-| Blocked random splits | 304.41 | 1681.58 | 5.52× |
-| Unblocked random splits | 244.09 | 1643.09 | 6.73× |
-
-Peak whole-process RSS from the same runs; MiB = 2^20 bytes, including the R
-interpreter and libraries. Groups show medians across distinct contrasts.
-Rust peaks at **214–307 MiB**, using **80.6–86.7% less peak RSS than DESeq2**.
-
-Per-contrast measurements, provenance, precision checks and reproducible scripts
-are in the [current comparison](docs/reports/gtex-native-wald-benchmark.md).
-Rust and R tests also cover documented normalization, Wald/LRT, transforms,
-shrinkage, fitted-object reuse and batched results. This establishes behavior for
-the tested inputs and settings; the complete Bioconductor API is outside scope.
+A single four-worker macOS arm64 run of the portable CLI took 15.85 s
+across the eleven contrasts and peaked at 259.41 MiB RSS.
+[Validation and measurement details](docs/reports/hardening-progress.md#batched-acceptance-after-the-portable-arithmetic-changes)
+record the checked revision, comparison settings and output checks.
 
 ## Installation
 
-The library and CLI are distributed through [crates.io](https://crates.io/crates/rsdeseq2/0.5.0).
-Install the published CLI with `cargo install rsdeseq2 --version 0.5.0 --locked`,
-or add the library with `cargo add rsdeseq2@0.5.0`. Prebuilt CLI archives are
-attached to the [versioned GitHub release](https://github.com/deminden/rsdeseq2/releases/tag/v0.5.0).
-
-For source installation, check out `main`:
-
-```bash
-git clone --branch main https://github.com/deminden/rsdeseq2.git
-cd rsdeseq2
-```
+This checkout contains the **0.6.0** source. The published version is **0.5.0**
+on [crates.io](https://crates.io/crates/rsdeseq2/0.5.0) and
+[GitHub Releases](https://github.com/deminden/rsdeseq2/releases/tag/v0.5.0).
+Use the checkout for the 0.6.0 interfaces described here.
 
 Source installation requires **Rust 1.96.0 or newer, with Cargo**. Installing
 the R package also compiles Rust and requires R and its native build tools.

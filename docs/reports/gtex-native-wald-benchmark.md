@@ -5,8 +5,9 @@ The recorded comparison uses native R 4.6.2 / DESeq2 1.52.0 in
 pass over eleven full contrasts. Each contrast retains all 56,200 genes.
 The measured CLI SHA-256 is
 `447ff5b2df1d2f55b94d4940c2c6507cb5063c859e4d6e3c667bae3c8982a780`.
-These are measurements of that binary, not a newly timed 0.5.0 build.
-The current implementation separately passes [0.5.0 CI](../testing-parity.md#ci-status).
+This measurement belongs to the recorded binary. The
+[0.6.0 acceptance report](hardening-progress.md#batched-acceptance-after-the-portable-arithmetic-changes)
+records the later validation and separate paired runs.
 The directory named `sex_female_vs_male` tests male versus female.
 
 ## Precision

@@ -1,14 +1,14 @@
 # Release preparation
 
-The source is staged for **0.6.0**. The [release notes](releases/0.6.0.md)
-describe its behavior and the remaining validation. The tag-triggered workflow
-validates the release source and binds published artifacts to its commit.
+The checkout contains **0.6.0**. See the [version notes](releases/0.6.0.md)
+and [local acceptance results](testing-parity.md#ci-status). Release workflows
+check the tagged source and bind artifacts to its commit.
 
 ## Local source checks
 
-The Rust crates, R package, R backend and own lockfile entries must agree on
-the version. Check that, and that the R package's core copy can be generated,
-without writing anything:
+Run the source and package checks before staging a release. The vendor
+check verifies version agreement across the Rust crates, R package,
+R backend and their lockfiles.
 
 ```sh
 scripts/release/sync_r_vendor.sh --check
@@ -34,8 +34,8 @@ journals, OS metadata and machine-specific paths. Both package inventories must
 exclude `.DS_Store`. Preserve measurement/reference identities rather than
 relabelling them as measurements of a new binary.
 
-The macOS arm64 R compiled-code check still reports the Rust runtime
-`abort` import. Record package-check warnings with the release results.
+Record package-check warnings with the release results. The local R 4.6.2
+macOS arm64 check reports the Rust runtime's `_abort` import.
 
 ## CI and artifact binding
 
@@ -74,7 +74,7 @@ To inspect the documentation locally, use a fresh ignored staging directory:
 mkdir -p results/release-docs
 cp LICENSE THIRD_PARTY_NOTICES.md results/release-docs/
 python3 scripts/release/prepare_release_docs.py --tag v0.6.0 binary \
-  --directory results/release-docs --target x86_64-unknown-linux-gnu
+  --directory results/release-docs --target aarch64-unknown-linux-gnu
 python3 scripts/release/prepare_release_docs.py --tag v0.6.0 notes \
   --output results/release-docs/release-notes.md
 ```

@@ -30,7 +30,7 @@ compatibility helpers expose their own explicit expanded layout.
 `Analysis::beta_prior(true)` uses the standard-design MLE and expanded
 contrasts for eligible formula-based Wald fits. The legacy expanded-design
 Rust and CLI APIs use an expanded-design MLE and averaged coefficients.
-See the [beta-prior design record](design/beta-prior-results-request.md#finding-the-expanded-primitives-do-not-reproduce-deseqbetaprior--true).
+See the [expanded-matrix beta-prior workflow](design/beta-prior-results-request.md#expanded-matrix-fits).
 
 Formula functions are restricted to declared built-ins. Custom functions are
 rejected without execution. Restricted likelihood and frozen-dispersion
@@ -102,6 +102,5 @@ R indices are one-based. See [algorithms](algorithms.md) for statistical formula
   contract. Native `mixIP` is KKT checked; it does not reproduce an unavailable
   original Mosek execution.
 
-Current [CI evidence](testing-parity.md#ci-status) and the
-[GTEx comparison](reports/gtex-native-wald-benchmark.md) establish the tested
-inputs and settings. They do not certify the complete DESeq2 API.
+[Validation](testing-parity.md#ci-status) records the tested platforms,
+profiles and data for this version.

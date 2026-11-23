@@ -1,136 +1,33 @@
-# Design note 4.2 — one `DeseqBuilder::run` entry point
+# Analysis entry point
 
-Status: **shape approved** (2026-11-17). One `run`, as the plan's target table
-says: "1 `run` plus deprecated wrappers, then 1"; stopping early is part of
-`run`. Implementation follows the migration steps below.
+Use `DeseqBuilder::run(&Analysis)` for an end-to-end fit or an early stage.
+The Rust CLI and R bridge use the same workflow. The builder configures
+threading, size-factor estimation and other fitting settings. Each `Analysis`
+selects the design, test and outputs for one run.
 
-## Problem
+## Request and output
 
-`DeseqBuilder` exposes 143 `pub fn fit*` methods. Each method is one point
-in a product of independent choices, spelled out in its name:
+| Setting | Current API |
+| --- | --- |
+| Design | `Analysis::new(counts, design)` for a numeric matrix, `Analysis::formula(counts, formula)` for the builder's model frame, or `Analysis::without_design(counts)` for size factors |
+| Test and dispersion | Wald with estimated dispersion by default. Use `lrt` or `lrt_formula` to supply a reduced design, and `fixed_dispersion` to supply dispersions |
+| Mean model and trend | `means(MeanModel)` selects automatic, GLM or linear means. `fit_type(FitType)` overrides the builder's trend for one run |
+| Result column | `result(ResultColumn)` selects a coefficient or contrast |
+| Other output controls | `cooks_replacement` requests replacement and refitting, `stop_after(Stage)` selects an early stage, and `beta_prior(true)` selects the supported formula beta-prior Wald fit |
 
-| Axis | Values in method names | Methods using it |
-| --- | --- | ---: |
-| Test | `wald`, `lrt` (reduced design as an extra argument) | 32 / 59 |
-| Mean model for dispersion | automatic, `glm_mu`, `linear_mu` | 33 / 23 |
-| Dispersion | estimated, `fixed_dispersion` (caller-supplied vector) | 24 fixed |
-| Trend | builder `fit_type`, or `_parametric` suffix | 20 |
-| Design input | matrix, `formula` (string plus model frame) | 18 formula |
-| Result selection | default last coefficient, `_name`, `_contrast` (numeric), `_contrast_spec`, `_factor_level_contrast`, `_results_contrast`, `_contrast_request`, `_from_model_frame` | 83 |
-| Cook's replacement | off, `_with_cooks_replacement` | 47 |
-| Output | fit only, `_with_results`, `_with_test_results` | — |
-| Stage | full pipeline, or stop after size factors, gene-wise, trend or MAP | ~10 |
+`run` validates the request before fitting. Its `RunOutput` distinguishes
+fit-only, result, replacement and beta-prior output. Use `fit()` to borrow
+the fitted state or `into_fit_and_results()` to consume the output and
+assemble the final fit and result, including merged replacement rows.
 
-Adding one axis value, for example a new contrast form, doubles the methods
-on some axes. The R bridge and CLI call 25 distinct methods, and docs and
-tests cannot cover every combination.
+The legacy builder fit methods are deprecated in 0.6.0. Their Rust API docs
+show the equivalent `Analysis` request. The [run equivalence tests](../../crates/rsdeseq2/tests/run_equivalence.rs)
+compare the two entry points.
 
-## Proposal
+## Preferred public API
 
-Add one entry point that takes a request value. Keep the existing methods as
-thin wrappers around it, first deprecated and then removed.
-
-```rust
-pub struct Analysis<'a> {
-    pub counts: &'a CountMatrix,
-    pub design: DesignInput<'a>,          // Matrix(&DesignMatrix) | Formula { formula: &str, frame: &FormulaModelFrame }
-    pub test: TestRequest<'a>,            // Wald | Lrt { reduced: DesignInput<'a> }
-    pub dispersion: DispersionRequest<'a>,// Estimate | Fixed(&[f64])
-    pub means: MeanModel,                 // Auto (default) | GlmMu | LinearMu
-    pub result: ResultRequest<'a>,        // FitOnly | Default | Coefficient(usize) | Name(&str)
-                                          // | Numeric(&[f64]) | Spec(&ContrastSpec)
-                                          // | Results { contrast: &ResultsContrast, sample_levels: Option<&[&str]> }
-    pub replacement: Replacement<'a>,     // Off | Cooks(&CooksReplacementOptions)
-    pub stop_after: Stage,                // Results (default) | SizeFactors | GeneWise | Trend | Map
-}
-
-impl DeseqBuilder {
-    pub fn run(&self, analysis: &Analysis<'_>) -> Result<RunOutput, DeseqError>;
-}
-
-#[non_exhaustive]
-pub struct RunOutput {
-    pub fit: DeseqFit,                    // merged fit when replacement refit rows
-    pub results: Option<DeseqResults>,    // None for FitOnly or an early Stage
-    pub replacement: Option<ReplacementOutput>, // original fit and results, refit plan and refit
-}
-```
-
-- The `_parametric` suffix becomes `fit_type(FitType::Parametric)` on the
-  builder, which already exists. Options stay on the builder: thread count,
-  Cook's cutoff, filtering, IRLS and size-factor options.
-- `Analysis::new(counts, design)` fills the defaults. These match today's
-  `fit_with_results`: Wald, estimated dispersion, automatic means, the default
-  coefficient, no replacement. Each axis then has a `with_*` setter.
-- Every combination is validated once, in `run`. For example, `Fixed`
-  dispersion with `Stage::Trend` becomes an `Options` error.
-
-## Migration (one PR per step, IDENTICAL unless noted)
-
-1. **Add `run`.** Implement it by dispatching to the existing private
-   workflow functions, not the public wrappers. Golden harness, plus a new
-   test that runs each of the 143 methods and its `run` equivalent on the toy
-   inputs and compares the outputs bit for bit.
-2. **Rewrite every public `fit*` as a one-line call to `run`** and mark them
-   `#[deprecated(since = "0.6.0", note = "use DeseqBuilder::run with …")]`.
-   Each note names the exact `Analysis` that replaces the method.
-3. **Move the R bridge and CLI to `run`.** This removes 25 call sites and
-   leaves no deprecated calls inside the workspace.
-4. **Release 0.6.0** with the deprecations, and remove the wrappers in 0.7.0.
-
-The metric `builder_fit_methods` goes from 143 to 1 plus the deprecated
-wrappers, then to 1, the target in `hardening-progress.md`.
-
-## Risks
-
-- **Semver.** Step 2 adds deprecation warnings for downstream users. The R
-  package is in-tree and moves in step 3. No other dependents are known.
-- **Hidden differences between near-duplicate methods.** Some pairs may
-  differ subtly, for example which contrast forms consult the model frame.
-  The step-1 equivalence test exists to find these before anything is
-  rewritten. Any real difference becomes an explicit `ResultRequest` variant,
-  not a silent unification.
-- **Diff size.** The wrappers are mechanical (about 1,500 lines across
-  `builder/`). Steps 2 and 3 are large but contain no logic changes.
-
-## Implementation notes (step 1, 2026-11-18)
-
-Three small changes from the sketch above, found while writing step 1:
-
-- `ResultRequest` is named `ResultColumn`, because `rsdeseq2::results`
-  already exports a `ResultRequest`. The early-stop "fit only" form needs no
-  variant: methods that return only a fit still choose a column, and the fit
-  records that column's test, so their wrappers take `run(..)?.fit()`.
-- `RunOutput` is an enum (`Fit`, `Results`, `Replacement`) rather than a
-  struct. With replacement, the merged fit is built by consuming the original
-  fit, so a struct holding both would need a full copy of the fit.
-  `RunOutput::into_fit_and_results` merges on request.
-- `DesignInput::Formula` takes the formula only and uses the builder's stored
-  model frame, as the formula methods do today; a different frame for one run
-  is `ResultColumn::Results { model_frame, .. }` for contrast resolution. The
-  `_parametric` suffix is `Analysis::fit_type`, an optional per-run override
-  of the builder's trend type, so wrappers do not clone the builder to change
-  it. `DesignInput::None` covers the design-free size-factor stage.
-
-Step 1 dispatches to the existing leaf methods. The generated test
-`tests/run_equivalence.rs` (from `tools/validation/gen_run_equivalence.py`)
-checks 208 method/request pairs, covering all 140 `fit*` methods except the
-two fast-VST trend helpers, which stay outside `run` and will be renamed in
-4.3. All 208 pairs are identical, and none fails on both sides.
-
-## Decisions
-
-1. One `run(&Analysis)` returning `RunOutput`, not separate `run_wald` and
-   `run_lrt`.
-2. Deprecated in 0.6.0 and all removed in 0.7.0, leaving one entry point.
-3. Stopping early is `Analysis::stop_after: Stage`; the staged methods become
-   deprecated wrappers too.
-
-## Reviewed public surface for 1.0
-
-The public paths below are the starting point for the 1.0 API. They cover
-complete matrix-design analyses, reuse of fitted models, and callers that
-use individual DESeq2 stages.
+These are the preferred public paths for complete analyses, fitted-model
+queries and individual DESeq2 stages in 0.6.0.
 
 | Area | Public paths |
 | --- | --- |
@@ -140,11 +37,6 @@ use individual DESeq2 stages.
 | Standalone stages | Size-factor options and estimation, gene-wise/trend/MAP dispersion estimation, `DispersionFitInput` for lower-level search, `GlmInput` and the canonical fixed-dispersion fits, `vst_with_dispersion_trend_and_offsets` and the offset-based rlog functions |
 | Configuration | `DeseqError`, `ErrorKind`, runtime `NumericProfile` and `DeseqBuilder::threads` |
 
-The 0.6 prelude documents the preferred workflow and retains existing
-imports. Remove the deprecated builder aliases during the 0.7 migration.
-Check the transitive types in public signatures, including replacement plans
-and GLM options, before narrowing any exports. Expressions evaluated directly
-from formulas and the ashr and apeglm implementations retain their
-experimental scope. Cooperative cancellation currently controls posterior work
-through `PosteriorWorkControl`, so it belongs to shrinkage rather than to the
-matrix-design workflow API.
+The prelude exports the preferred workflow types. Formula evaluation and
+ashr and apeglm shrinkage are experimental. `PosteriorWorkControl` provides
+cooperative cancellation for shrinkage.

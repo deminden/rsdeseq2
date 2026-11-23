@@ -15,8 +15,8 @@ the dataset also gets `replaceCounts` and `replaceCooks` assays.
 `results()` metadata includes the replacement threshold, eligible samples, and
 refit rows.
 
-The R package is tested with R 4.6.2 / DESeq2 1.52.0. Numerical reference fixtures record the
-R/DESeq2 versions that generated them.
+The 0.6.0 R package is tested with R 4.6.2 / DESeq2 1.52.0 and
+R 4.5.3 / DESeq2 1.50.2. Each fixture records its reference versions.
 
 ## Install and Run an Analysis
 

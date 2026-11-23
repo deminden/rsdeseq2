@@ -1234,9 +1234,9 @@ implemented Rust path remains narrower than DESeq2 because it only supports
 the supported linear-mu no-weight or GLM-mu optionally weighted,
 parametric/local/mean-trend, deterministic-prior branches.
 `DeseqBuilder::run(&Analysis)` is the entry point for every combination of
-these choices. `Analysis::new(counts, design)` runs the GLM-mu Wald branch with
-automatic dispersion means and reports the last design coefficient, matching
-DESeq2's default result coefficient. `Analysis::result` selects another column:
+these choices. `Analysis::new(counts, design)` requests Wald with estimated
+dispersions and automatic mean selection. It reports the last design
+coefficient by default. `Analysis::result` selects another column:
 `ResultColumn::Name` (a design coefficient by name, using the same exact-first
 R-cleaned aliases as named primitive contrasts), `Numeric`, `Spec` (named or
 list contrasts), `FactorLevel` (caller-supplied factor-level contrasts) or
@@ -1256,8 +1256,7 @@ selected-coefficient Wald replacement refits reuse the two-group low-count
 Cook's condition when the selected coefficient is the non-reference
 comparison for one two-level factor. An LRT is `Analysis::lrt(reduced)` (or
 `lrt_formula` with a formula design), because callers must provide a reduced
-design. The older `DeseqBuilder::fit*` methods are deprecated one-line
-wrappers around `run` and will be removed in 0.7.0.
+design. The deprecated `DeseqBuilder::fit*` methods wrap `run`.
 LRT contrast result tables report the requested full-model
 effect size, but keep the full-vs-reduced LRT statistic and p-value; when
 DESeq2's numeric or character/factor-level `contrastAllZero` rule applies,

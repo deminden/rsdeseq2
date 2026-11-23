@@ -1,9 +1,9 @@
 # R wrapper
 
-Version 0.5.0 runs supported fitting, inference, transformations and shrinkage in
+The R package runs supported fitting, inference, transformations and shrinkage in
 the standalone Rust core. R translates arguments, aligns identifiers and builds
 R/Bioconductor objects; C marshals buffers. The [contract](native-supported-contract.md)
-maps every export to its numerical owner. [CI](testing-parity.md#ci-status)
+maps every export to its numerical owner. [Validation](testing-parity.md#ci-status)
 checks original-package accuracy and exact standalone/wrapped equality.
 
 ## Fitting and stored objects

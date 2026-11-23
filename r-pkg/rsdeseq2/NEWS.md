@@ -1,4 +1,4 @@
-# rsdeseq2 (development)
+# rsdeseq2 0.6.0
 
 * With `fitType = "parametric"`, a failed parametric dispersion trend is now
   replaced by the local trend inside the Rust core for `DESeq()` as well as the
@@ -8,7 +8,7 @@
 * Remove the `parityMode` argument of `DESeq()` and `fitRust()`. Only strict
   parity mode was ever implemented; `"fast"` and `"diagnostic"` had no effect.
 
-# rsdeseq2 0.5.0 (prepared)
+# rsdeseq2 0.5.0
 
 * Run supported fitting, formulas, result queries, transforms and normal/ashr/
   apeglm calculations in shared standalone Rust; R translates and constructs objects.
@@ -28,4 +28,3 @@
   R package checks retain the known Rust compiled-symbol warning.
 
 See the supported contract and current R guide for method/option limits.
-No 0.5.0 release has been published.

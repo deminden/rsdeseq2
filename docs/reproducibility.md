@@ -54,7 +54,7 @@ python3 scripts/benchmarks/benchmark_gtex_native_wald.py --exploration --repeats
 `--counts-only` on the Python generator reproduces inputs/designs without fitting
 new R references. Fresh references can differ in their final bits across recorded
 environments. Exploration mode reports those differences; it does not silently
-replace the accepted frozen reference set. See the [measured comparison](reports/gtex-native-wald-benchmark.md).
+replace the accepted frozen reference set. See the [historical DESeq2 timing record](reports/gtex-native-wald-benchmark.md).
 
 ## Eleven-contrast acceptance
 

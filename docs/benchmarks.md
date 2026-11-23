@@ -1,8 +1,9 @@
 # Benchmark procedure
 
-The [GTEx comparison](reports/gtex-native-wald-benchmark.md) contains the measured
-precision, process-time ratios and peak memory against original DESeq2 for the
-eleven full Wald contrasts. The main README reports the same comparison.
+The [0.6.0 acceptance report](reports/hardening-progress.md#batched-acceptance-after-the-portable-arithmetic-changes)
+records the current eleven-contrast GTEx replay and paired Rust timings.
+The [earlier DESeq2 comparison](reports/gtex-native-wald-benchmark.md)
+preserves its own binary and environment provenance.
 
 ## Full quantification
 
@@ -20,7 +21,7 @@ measurements without accepting them as optimisation/release evidence.
 Time and memory cover the entire process: startup, libraries, input parsing,
 fitting and output serialization. Peak RSS is per process, not a sum of peaks.
 R's interpreter and loaded libraries remain included. Use one fitting/BLAS worker
-for the documented comparison. Record source, executable, package, compiler,
+for comparisons against DESeq2. Record source, executable, package, compiler,
 platform, settings and input/reference hashes.
 
 A time ratio is **DESeq2 seconds / Rust seconds**. The aggregate ratio divides

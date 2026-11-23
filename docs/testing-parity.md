@@ -2,31 +2,30 @@
 
 Independent original R references check accuracy, and separate standalone and
 wrapped runs check interface equality. The [0.6.0 development report](reports/hardening-progress.md)
-records the completed local checks.
+records provenance for the local checks.
 
-## CI status
+<a id="ci-status"></a>
 
-The last recorded hosted matrix is for 0.5.0. All nine executed jobs passed on source commit
-[`2d86916`](https://github.com/deminden/rsdeseq2/commit/2d86916c089f55bcddb33aee1af9b079f2b9384e)
-on 2026-11-12 UTC. Final release preparation updates documentation and package
-discovery metadata; numerical code, tests and retained reference values are
-unchanged. The tag-triggered release workflow validates the final source again.
+## Validation status
 
-| Workflow | Passing checks |
+The local 0.6.0 acceptance run checked source revision `a0808b2`.
+
+| Check | Result |
 | --- | --- |
-| [Rust](https://github.com/deminden/rsdeseq2/actions/runs/43331557396) | Vendor/version integrity, formatting, Clippy, full workspace and Python tooling tests |
-| [R](https://github.com/deminden/rsdeseq2/actions/runs/43331557387) | Both pinned R 4.6.2 and current R: package checks and exact standalone/wrapped comparisons. Pinned R also checks fresh formula/SQP/uniform references, interruption/reuse, sanitizers and actual R payload gates |
-| [Five platforms](https://github.com/deminden/rsdeseq2/actions/runs/43331557382) | Linux x86_64/aarch64, macOS x86_64/aarch64 and Windows x86_64 numerical/CLI panels in release profile |
-| [Full GTEx](https://github.com/deminden/rsdeseq2/actions/runs/43331570676) | All 56,200 genes, 61 samples and six Wald result fields |
+| macOS arm64 release panel | 128 host R tests and 37 portable tests passed |
+| Linux arm64 release panel | 145 host R tests and 37 portable tests passed |
+| Golden outputs | 8,032 fields matched in each profile on both ARM targets |
+| Full GTEx | Both profiles passed the 56,200-gene replay and all 130 eleven-contrast precision gates, with zero significance flips |
+| R source package on macOS arm64 | R 4.5.3 and R 4.6.2 each passed 2,874 expectations with zero skips. Both passed native installation and SIGINT recovery checks |
+| Rust source archives | Four archives reproduced byte for byte and passed 226 offline library tests |
 
-[Machine-readable evidence](data/ci_0.5.0.json) binds run/job IDs and downloaded
-log hashes to that commit. The full-only Parity dispatch intentionally skips its
-ordinary-oracle job because Rust CI already runs those tests. No checks were
-weakened and no reference bounds were widened.
+The R 4.6.2 package check reported the Rust runtime's `_abort` import.
+R 4.5.3 reported `Status: OK`. The [acceptance report](reports/hardening-progress.md#batched-acceptance-after-the-portable-arithmetic-changes)
+records the checked artifacts and exact interface comparisons.
 
-Both R package checks retain one known compiled-symbol warning for Rust runtime
-termination entry points. Their tests pass; this is not a warning-free package
-or CRAN-acceptance claim.
+The [release procedure](release.md#ci-and-artifact-binding) defines the
+hosted gates for publication. Native Intel macOS and Windows x64 runtime
+checks are outside the local development acceptance above.
 
 ## Numerical coverage
 
@@ -102,7 +101,6 @@ see [reproducibility](reproducibility.md#eleven-contrast-acceptance).
 Use the pinned environment and its restored dependencies. From the repository root:
 
 ```sh
-repo_root="$PWD"
 mkdir -p results/checks/r
 scripts/release/build_r_source.sh results/checks/r
 (cd results/checks/r && \
@@ -119,7 +117,7 @@ RSDESEQ2_TEST_RLIB="$PWD/results/checks/r/rsdeseq2.Rcheck" \
   python3 -m unittest discover -s scripts/tests -p test_profile_r_workflows.py
 ```
 
-Use fresh output directories. `.github/workflows/r.yml` lists the complete
+Use fresh output directories. The [R workflow](../.github/workflows/r.yml) lists the complete
 matrix/fresh-fit, expression, factor, frozen-local, mixture, posterior, warning
 and live-reference identity panels; it is the executable combined gate.
 
