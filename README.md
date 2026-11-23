@@ -7,8 +7,9 @@ Rust. Use it from the command line, as a Rust library, or as an R package.
 The CLI and Rust library run without R or DESeq2.
 
 In a single-worker benchmark on an Apple M5, the rsdeseq2 CLI ran **4× as
-fast as DESeq2** and used **86% less peak RAM** for a Wald analysis of
-56,200 genes across 61 GTEx samples. [Benchmark details](#single-worker-benchmark)
+fast as DESeq2** and used **86% less peak RAM** for an end-to-end
+differential expression analysis of 56,200 genes across 61 GTEx samples.
+[Benchmark details](#single-worker-benchmark)
 
 ## Installation
 
@@ -48,25 +49,34 @@ R CMD INSTALL r-pkg/rsdeseq2
 The R package accepts matrices, lists, formulas, and supported `DESeqDataSet`
 inputs. [R usage guide](docs/r-wrapper.md)
 
-## Run a Wald test
+## Compare treated and control samples
 
-Use `counts.tsv` for raw, nonnegative integer counts. Put gene IDs in the
-first column (`gene`) and sample IDs in the remaining column headers. In
-`design.tsv`, put sample IDs in the first column (`sample`), followed by the
-numeric design columns.
+Use `counts.tsv` with one row per gene and one raw-count column per sample.
+Put gene IDs in the first column. In `samples.tsv`, put matching sample IDs
+in the first column and label each sample `control` or `treated` in a
+`condition` column.
 
-```sh
-rsdeseq2 wald \
-  --counts counts.tsv \
-  --design design.tsv \
-  --fit-type mean \
-  --coefficient 1 \
-  --output results.tsv
+```r
+counts <- as.matrix(read.delim("counts.tsv", row.names = 1, check.names = FALSE))
+samples <- read.delim("samples.tsv", row.names = 1)
+stopifnot(all(colnames(counts) %in% rownames(samples)))
+samples <- samples[colnames(counts), , drop = FALSE]
+samples$condition <- factor(samples$condition, levels = c("control", "treated"))
+
+design <- model.matrix(~ condition, data = samples)
+fit <- rsdeseq2::DESeq(counts, design = design)
+res <- as.data.frame(rsdeseq2::results(fit, name = "conditiontreated"))
+
+write.table(
+  data.frame(gene = rownames(res), res),
+  "differential_expression.tsv",
+  sep = "\t", quote = FALSE, row.names = FALSE
+)
 ```
 
-This tests the second design coefficient and writes the results to
-`results.tsv`. The example uses a constant dispersion trend (`--fit-type mean`).
-[CLI commands, file formats, and contrasts](docs/cli.md)
+The results include log2 fold changes and adjusted p-values for each gene.
+A positive log2 fold change means higher expression in the treated group.
+For the same workflow from the command line, see the [CLI guide](docs/cli.md).
 
 ## Supported Workflows
 
