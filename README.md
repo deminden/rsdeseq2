@@ -23,25 +23,8 @@ calculations. The [supported contract](docs/native-supported-contract.md)
 records methods and limits. The [0.6.0 release notes](docs/releases/0.6.0.md)
 describe the changes and current validation status.
 
-## Validation and Performance
-
-The 0.6.0 release panels and golden outputs passed on macOS arm64 and
-Linux arm64. The full 56,200-gene GTEx replay passed in both numeric
-profiles. Both profiles also passed all 130 precision gates across the
-eleven full GTEx v8 Kidney Cortex Wald contrasts against R 4.6.2 / DESeq2
-1.52.0. The contrast runs estimate normalization and dispersions with Cook's
-masking and independent filtering disabled. Both profiles had zero
-significance flips at adjusted p-value cutoffs of 0.05 and 0.1.
-
-| Numeric profile | Max absolute LFC error | Max absolute SE error | Max absolute p-value error | Max absolute adjusted p-value error |
-| --- | ---: | ---: | ---: | ---: |
-| Portable | `3.65e-6` | `6.18e-5` | `7.25e-5` | `3.57e-5` |
-| Host R | `7.15e-6` | `2.75e-5` | `3.74e-5` | `2.87e-5` |
-
-A single four-worker macOS arm64 run of the portable CLI took 15.85 s
-across the eleven contrasts and peaked at 259.41 MiB RSS.
-[Validation and measurement details](docs/reports/hardening-progress.md#batched-acceptance-after-the-portable-arithmetic-changes)
-record the checked revision, comparison settings and output checks.
+In 0.6.0, Rust callers use `DeseqBuilder::run(&Analysis)` for full fits and
+individual stages. See the [Analysis API guide](docs/design/run-entry-point.md).
 
 ## Installation
 
@@ -55,11 +38,11 @@ the R package also compiles Rust and requires R and its native build tools.
 R 4.6.2 is the pinned comparison environment; see the
 [R guide](docs/r-wrapper.md) for supported interfaces and optional dependencies.
 
-| Interface | Install from the checkout root | Usage |
+| Interface | Install | Usage |
 | --- | --- | --- |
-| CLI | `cargo install --path crates/rsdeseq2 --locked` | [Commands and input schemas](docs/cli.md) |
+| CLI | `cargo install --path crates/rsdeseq2 --locked` from the checkout root | [Commands and input schemas](docs/cli.md) |
 | Rust library | `cargo add rsdeseq2 --path /absolute/path/to/rsdeseq2/crates/rsdeseq2` from your application | [Library usage](crates/rsdeseq2/README.md#rust-usage) |
-| R package | `R CMD INSTALL r-pkg/rsdeseq2` | [Fitting and results](docs/r-wrapper.md) |
+| R package | `R CMD INSTALL r-pkg/rsdeseq2` from the checkout root | [Fitting and results](docs/r-wrapper.md) |
 
 For a Wald analysis with your own count and numeric design tables:
 
@@ -98,6 +81,30 @@ functions are outside scope. Method-specific restrictions are maintained in
 [compatibility and limits](docs/compatibility.md) and the
 [supported contract](docs/native-supported-contract.md).
 The public Rust API is pre-1.0 and can change between minor releases.
+
+## Validation and Performance
+
+The 0.6.0 acceptance run at `a0808b2` passed the release panels and golden
+comparisons on macOS arm64 and Linux arm64. Both numeric profiles passed the
+full 56,200-gene GTEx replay and all 130 precision gates across eleven
+full GTEx v8 Kidney Cortex Wald contrasts against R 4.6.2 / DESeq2 1.52.0.
+The contrast runs estimate normalization and dispersions with Cook's
+masking and independent filtering disabled. Both profiles had zero
+significance flips at adjusted p-value cutoffs of 0.05 and 0.1.
+
+| Numeric profile | Max absolute LFC error | Max absolute SE error | Max absolute p-value error | Max absolute adjusted p-value error |
+| --- | ---: | ---: | ---: | ---: |
+| Portable | `3.65e-6` | `6.18e-5` | `7.25e-5` | `3.57e-5` |
+| Host R | `7.15e-6` | `2.75e-5` | `3.74e-5` | `2.87e-5` |
+
+A single four-worker macOS arm64 run of the portable CLI took 15.85 s
+across the eleven contrasts and peaked at 259.41 MiB RSS.
+[Validation and measurement details](docs/reports/hardening-progress.md#batched-acceptance-after-the-portable-arithmetic-changes)
+record the checked revision, comparison settings and output checks.
+
+After the builder API cleanup, both numeric profiles passed the macOS arm64
+integration and golden checks. See the
+[API cleanup validation](docs/reports/hardening-progress.md#analysis-api-cleanup).
 
 ## Documentation
 
