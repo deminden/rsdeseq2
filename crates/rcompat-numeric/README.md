@@ -9,7 +9,7 @@ functions, or share checked arithmetic and dense matrices across an analysis.
 Requires Rust 1.96 or newer.
 
 ```sh
-cargo add rcompat-numeric@0.1.1
+cargo add rcompat-numeric@0.1.2
 ```
 
 ## Example
@@ -33,9 +33,8 @@ fn main() {
 - Profile-aware elementary functions and reductions. The default portable
   profile uses Rust math. The R-host profile follows system math and the
   reduction schedule for the host. Both run without an R installation.
-- A checked row-major matrix, borrowed views, and structured errors. The
-  optional `csv` feature adds conversion from CSV errors.
+- A checked row-major matrix, borrowed views, and structured errors.
 
 [API documentation](https://docs.rs/rcompat-numeric) ·
-[License](https://github.com/deminden/rsdeseq2/blob/rcompat-v0.1.1/crates/rcompat-numeric/LICENSE) ·
-[Third-party notices](https://github.com/deminden/rsdeseq2/blob/rcompat-v0.1.1/crates/rcompat-numeric/THIRD_PARTY_NOTICES.md)
+[MIT license](LICENSE) ·
+[Third-party notices](THIRD_PARTY_NOTICES.md)

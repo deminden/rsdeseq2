@@ -924,12 +924,11 @@ dependencies = [
 
 [[package]]
 name = "rcompat-formula"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "icu_collator",
  "icu_locale",
  "rcompat-numeric",
- "rustc_apfloat",
 ]
 
 [[package]]
@@ -946,10 +945,9 @@ checksum = "242a0ea0fc186cafd47b36676c3f6393a81683463174decd0163a9ceefa4d94b"
 
 [[package]]
 name = "rcompat-numeric"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "approx",
- "csv",
  "libm",
  "statrs",
  "thiserror",
@@ -957,7 +955,7 @@ dependencies = [
 
 [[package]]
 name = "rcompat-shrinkage"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "libm",
  "nalgebra",
@@ -999,12 +997,13 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "rsdeseq2"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "approx",
  "clap",
  "criterion",
  "csv",
+ "csv-core",
  "libm",
  "nalgebra",
  "proptest",
@@ -1020,16 +1019,6 @@ dependencies = [
  "sha2",
  "statrs",
  "thiserror",
-]
-
-[[package]]
-name = "rustc_apfloat"
-version = "0.2.3+llvm-462a31f5a5ab"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "486c2179b4796f65bfe2ee33679acf0927ac83ecf583ad6c91c3b4570911b9ad"
-dependencies = [
- "bitflags",
- "smallvec",
 ]
 
 [[package]]

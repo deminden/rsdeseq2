@@ -60,7 +60,10 @@ fn labelled_readers_keep_their_error_wording() {
             (format!("{what} columns"), 2, 3)
         );
         // A ragged row is rejected by the TSV parser itself.
-        assert!(matches!(read(b"a\tb\nx\t1\t2\n"), Err(DeseqError::Csv(_))));
+        assert!(matches!(
+            read(b"a\tb\nx\t1\t2\n"),
+            Err(DeseqError::InvalidTableWidth { .. })
+        ));
         assert_eq!(
             dimensions(read(b"a\tb\n").unwrap_err()),
             (format!("{what} rows"), 1, 0)

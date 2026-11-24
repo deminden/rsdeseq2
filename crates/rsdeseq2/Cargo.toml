@@ -1,6 +1,6 @@
 [package]
 name = "rsdeseq2"
-version = "0.6.1"
+version = "0.6.2"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -12,7 +12,7 @@ categories = ["science", "command-line-utilities"]
 readme = "README.md"
 autoexamples = false
 autotests = false
-exclude = [".DS_Store", "**/.DS_Store"]
+exclude = [".DS_Store", "**/.DS_Store", "/tests/data/pasilla_holdout/"]
 
 [lints]
 workspace = true
@@ -57,13 +57,13 @@ shrinkage = ["dep:rcompat-shrinkage"]
 
 [dependencies]
 clap = { workspace = true, optional = true }
-csv.workspace = true
+csv-core.workspace = true
 libm.workspace = true
 nalgebra.workspace = true
 rayon.workspace = true
 rcompat-formula.workspace = true
 rcompat-shrinkage = { workspace = true, optional = true }
-rcompat-numeric = { workspace = true, features = ["csv"] }
+rcompat-numeric.workspace = true
 rcompat-lbfgsb.workspace = true
 rcompat-locfit.workspace = true
 serde.workspace = true
@@ -74,6 +74,7 @@ thiserror.workspace = true
 
 [dev-dependencies]
 approx.workspace = true
+csv.workspace = true
 criterion.workspace = true
 proptest.workspace = true
 sha2.workspace = true

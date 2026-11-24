@@ -2,6 +2,17 @@
 
 Public API and user-visible behaviour changes. Version notes live in [docs/releases](docs/releases/).
 
+## 0.6.2
+
+- Update `rcompat-numeric`, `rcompat-formula`, and `rcompat-shrinkage` to
+  0.1.2. All four workspace crates declare MIT for their source.
+- Implement formula reductions and binary128 accumulation in Rust with no
+  `rustc_apfloat` dependency. Preserve the rounding rules used by the R
+  profiles.
+- Read and write TSV using `csv-core`. Rust readers report mismatched widths
+  and invalid UTF-8 as structured errors with line numbers.
+- Fetch the Pasilla holdout separately for validation and verify its checksums.
+
 ## 0.6.1
 
 - Use version 0.1.1 of `rcompat-numeric`, `rcompat-formula`, and

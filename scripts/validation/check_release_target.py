@@ -7,6 +7,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import subprocess
 
+from scripts.references.fetch_pasilla_validation import main as fetch_pasilla_validation
+
 ROOT = Path(__file__).resolve().parents[2]
 RELEASE_TESTS = (
     'model_validity', 'wald_reference', 'lrt_reference', 'dispersion_reference',
@@ -33,6 +35,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--target', required=True)
     args = parser.parse_args()
+    fetch_pasilla_validation()
     build = ['--release', '--locked', '-p', 'rsdeseq2', '--target', args.target]
     linux_arm64 = args.target == 'aarch64-unknown-linux-gnu'
     tests = RELEASE_TESTS + LINUX_ARM64_FORMULA_TESTS if linux_arm64 else RELEASE_TESTS

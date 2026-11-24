@@ -1,17 +1,23 @@
 # Independent Pasilla validation panel
 
-This contains 2,048 genes from all seven samples in `pasilla` 1.40.0, provided by
+This fixture uses 2,048 genes from all seven samples in `pasilla` 1.40.0, provided by
 Wolfgang Huber and Alejandro Reyes. The original experiment is Brooks et al.,
 "Conservation of an RNA regulatory map between Drosophila and mammals",
 Genome Research 21(2):193–202 (2011), PMID 20921232.
 
-The source package declares `License: LGPL`. Its data are retained here as a
-separate validation fixture with source attribution; this notice does not change
-the Rust code's license. Original data, license metadata and processing context:
+The source package declares `License: LGPL`. Download the data separately
+for validation from the repository root:
+
+```sh
+python3 scripts/references/fetch_pasilla_validation.py
+```
+
+The source archive contains the original data, license metadata and processing
+context.
 https://bioconductor.org/packages/3.23/data/experiment/src/contrib/pasilla_1.40.0.tar.gz
 
 The archive SHA-256, expression strata and fixed selection rule are recorded in
-`provenance.json`. Selection uses expression and gene IDs, never fit errors.
+`provenance.json`. Selection uses expression and gene IDs.
 The model adjusts for single-read/paired-end library type and tests treatment.
 The LRT removes treatment while retaining library type.
 

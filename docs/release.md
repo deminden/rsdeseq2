@@ -1,6 +1,6 @@
 # Release preparation
 
-The checkout contains **0.6.1**. See the [version notes](releases/0.6.1.md)
+The checkout contains **0.6.2**. See the [version notes](releases/0.6.2.md)
 and [local acceptance results](testing-parity.md#ci-status). Release workflows
 check the tagged source and bind artifacts to its commit.
 
@@ -72,9 +72,9 @@ To inspect the documentation locally, use a fresh ignored staging directory:
 ```sh
 mkdir -p results/release-docs
 cp LICENSE THIRD_PARTY_NOTICES.md results/release-docs/
-python3 scripts/release/prepare_release_docs.py --tag v0.6.1 binary \
+python3 scripts/release/prepare_release_docs.py --tag v0.6.2 binary \
   --directory results/release-docs --target aarch64-unknown-linux-gnu
-python3 scripts/release/prepare_release_docs.py --tag v0.6.1 notes \
+python3 scripts/release/prepare_release_docs.py --tag v0.6.2 notes \
   --output results/release-docs/release-notes.md
 ```
 

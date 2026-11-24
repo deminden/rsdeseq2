@@ -58,6 +58,7 @@ alongside the host R numerical and CLI panels. Linux arm64 also runs the
 exact formula panels and checks its host R output hashes.
 
 ```sh
+python3 scripts/references/fetch_pasilla_validation.py
 cargo run --release --locked -p rsdeseq2 --example golden -- --check
 ```
 
@@ -104,7 +105,7 @@ Use the pinned environment and its restored dependencies. From the repository ro
 mkdir -p results/checks/r
 scripts/release/build_r_source.sh results/checks/r
 (cd results/checks/r && \
-  R CMD check --no-manual --no-build-vignettes rsdeseq2_0.6.1.tar.gz)
+  R CMD check --no-manual --no-build-vignettes rsdeseq2_0.6.2.tar.gz)
 cargo build --release --locked -p rsdeseq2 --example evaluate_r_interface
 Rscript --vanilla scripts/validation/check_rust_r_identity.R \
   target/release/examples/evaluate_r_interface results/checks/r/rsdeseq2.Rcheck \

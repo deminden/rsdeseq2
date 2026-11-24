@@ -1,109 +1,97 @@
-// Arithmetic schedules adapted from OpenBLAS 0.3.26.
-// See OPENBLAS-LICENSE in this directory for its BSD license.
-//! Explicit, portable reduction order for the small polynomial QR problem.
+//! Fixed binary64 arithmetic for polynomial QR.
 //!
-//! These operations specify rounding rather than delegating it to whichever
-//! BLAS the calling frontend happens to load. Rust and R use the same schedule.
+//! These reductions express the rounding observed in the R reference
+//! profiles. The block size determines where the sequential tail starts.
+
+use crate::numeric::profile::{r_linux_arm64, r_linux_x86};
+
 pub(super) fn dot(x: &[f64], y: &[f64]) -> f64 {
-    if crate::numeric::profile::r_linux_x86() {
-        dot_reference_haswell(x, y)
-    } else if crate::numeric::profile::r_linux_arm64() {
-        dot_reference_armv8(x, y)
+    if r_linux_x86() {
+        lane_dot::<16>(x, y, false)
+    } else if r_linux_arm64() {
+        two_lane_dot(x, y)
     } else {
-        dot_binary64(x, y)
+        lane_dot::<32>(x, y, true)
     }
 }
-// The contiguous ARMV8 ddot multiplies and adds separately in each
-// pair of lanes, then fuses the scalar tail into the horizontal sum.
-fn dot_reference_armv8(x: &[f64], y: &[f64]) -> f64 {
-    let mut even = 0.0;
-    let mut odd = 0.0;
-    let end = x.len() / 4 * 4;
-    for start in (0..end).step_by(4) {
-        even += x[start] * y[start];
-        odd += x[start + 1] * y[start + 1];
-        even += x[start + 2] * y[start + 2];
-        odd += x[start + 3] * y[start + 3];
-    }
-    let mut total = even + odd;
-    for i in end..x.len() {
-        total = x[i].mul_add(y[i], total);
-    }
-    total
-}
-fn dot_binary64(x: &[f64], y: &[f64]) -> f64 {
-    let blocks = x.len() / 32;
-    let mut lanes = [0.0; 16];
-    for block in 0..blocks {
-        let start = block * 32;
-        for half in [0, 16] {
-            for lane in 0..16 {
-                lanes[lane] = x[start + half + lane].mul_add(y[start + half + lane], lanes[lane]);
+
+fn lane_dot<const BLOCK: usize>(x: &[f64], y: &[f64], fused_tail: bool) -> f64 {
+    let (x_blocks, x_tail) = x.as_chunks::<BLOCK>();
+    let (y_blocks, y_tail) = y.as_chunks::<BLOCK>();
+    let mut lane_totals = [0.0; 16];
+    for (x_block, y_block) in x_blocks.iter().zip(y_blocks) {
+        for (left, right) in x_block
+            .as_chunks::<16>()
+            .0
+            .iter()
+            .zip(y_block.as_chunks::<16>().0)
+        {
+            for (total, (&a, &b)) in lane_totals.iter_mut().zip(left.iter().zip(right)) {
+                *total = a.mul_add(b, *total);
             }
         }
     }
-    let mut sum = if blocks == 0 {
-        0.0
-    } else {
-        let left_even = (lanes[0] + lanes[2]) + (lanes[4] + lanes[6]);
-        let left_odd = (lanes[1] + lanes[3]) + (lanes[5] + lanes[7]);
-        let right_even = (lanes[8] + lanes[10]) + (lanes[12] + lanes[14]);
-        let right_odd = (lanes[9] + lanes[11]) + (lanes[13] + lanes[15]);
-        (left_even + right_even) + (left_odd + right_odd)
+    let groups = lane_totals.as_chunks::<4>().0;
+    let parity = |i| {
+        let partial = |four: &[f64; 4]| four[i] + four[i + 2];
+        (partial(&groups[0]) + partial(&groups[1])) + (partial(&groups[2]) + partial(&groups[3]))
     };
-    for index in blocks * 32..x.len() {
-        sum = x[index].mul_add(y[index], sum);
-    }
-    sum
-}
-pub(super) fn norm(x: &[f64]) -> f64 {
-    if crate::numeric::profile::r_linux_x86() {
-        super::extended::norm(x)
-    } else {
-        norm_binary64(x)
-    }
-}
-fn norm_binary64(x: &[f64]) -> f64 {
-    let mut scale = 0.0;
-    let mut squares = 1.0;
-    for value in x.iter().map(|v| v.abs()).filter(|&v| v != 0.0) {
-        if value > scale {
-            let ratio = scale / value;
-            squares = 1.0 + squares * (ratio * ratio);
-            scale = value;
+    let sum = parity(0) + parity(1);
+    x_tail.iter().zip(y_tail).fold(sum, |total, (&a, &b)| {
+        if fused_tail {
+            a.mul_add(b, total)
         } else {
-            let ratio = value / scale;
-            squares = ratio.mul_add(ratio, squares);
+            total + a * b
         }
+    })
+}
+
+fn two_lane_dot(x: &[f64], y: &[f64]) -> f64 {
+    let end = x.len() - x.len() % 4;
+    let pairs = x[..end]
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .zip(y[..end].as_chunks::<2>().0);
+    let totals = pairs.fold([0.0; 2], |mut totals, (left, right)| {
+        for (sum, (&a, &b)) in totals.iter_mut().zip(left.iter().zip(right)) {
+            *sum += a * b;
+        }
+        totals
+    });
+    x[end..]
+        .iter()
+        .zip(&y[end..])
+        .fold(totals[0] + totals[1], |total, (&a, &b)| a.mul_add(b, total))
+}
+
+pub(super) fn norm(x: &[f64]) -> f64 {
+    if r_linux_x86() {
+        return super::extended::norm(x);
     }
+    // Keep the accumulated sum of squares in units of the largest magnitude
+    // seen so far. Rescale it when a larger magnitude arrives.
+    let (scale, squares) = x
+        .iter()
+        .copied()
+        .fold((0.0_f64, 1.0), |(scale, squares), value| {
+            let magnitude = value.abs();
+            if magnitude == 0.0 {
+                return (scale, squares);
+            }
+            if magnitude > scale {
+                let relative = scale / magnitude;
+                (magnitude, 1.0 + squares * (relative * relative))
+            } else {
+                let relative = magnitude / scale;
+                (scale, relative.mul_add(relative, squares))
+            }
+        });
     scale * squares.sqrt()
 }
 
-fn dot_reference_haswell(x: &[f64], y: &[f64]) -> f64 {
-    let mut lanes = [0.0; 16];
-    let end = x.len() / 16 * 16;
-    for start in (0..end).step_by(16) {
-        for i in 0..16 {
-            lanes[i] = x[start + i].mul_add(y[start + i], lanes[i]);
-        }
-    }
-    let mut pair = [0.0; 8];
-    for group in 0..4 {
-        for i in 0..2 {
-            pair[group * 2 + i] = lanes[group * 4 + i] + lanes[group * 4 + i + 2];
-        }
-    }
-    let even = (pair[0] + pair[2]) + (pair[4] + pair[6]);
-    let odd = (pair[1] + pair[3]) + (pair[5] + pair[7]);
-    let mut total = even + odd;
-    for i in end..x.len() {
-        total += x[i] * y[i];
-    }
-    total
-}
-/// Fused axpy, including the scalar tail in Ubuntu 26.04's Haswell kernel.
 pub(super) fn axpy(weight: f64, x: &[f64], y: &mut [f64]) {
-    for (v, &x) in y.iter_mut().zip(x) {
-        *v = weight.mul_add(x, *v);
-    }
+    y.iter_mut().zip(x).for_each(|(target, source)| {
+        *target = weight.mul_add(*source, *target);
+    });
 }

@@ -38,3 +38,6 @@ mutants.out.old/
 # Full GTEx tables are restored from the pinned reference revision.
 /crates/rsdeseq2/tests/data/gtex_v8_real_wald/counts.tsv
 /crates/rsdeseq2/tests/data/gtex_v8_real_wald/reference_results.tsv
+
+# Independently distributed validation data.
+/crates/rsdeseq2/tests/data/pasilla_holdout/*.tsv

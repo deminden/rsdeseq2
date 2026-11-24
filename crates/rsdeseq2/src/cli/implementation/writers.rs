@@ -70,7 +70,7 @@ pub(super) fn write_cli_fit_diagnostics_summary(
     analysis: &CliAnalysisOutput,
 ) -> Result<(), DeseqError> {
     let fit = require_cli_fit(analysis, "fit diagnostics summary output")?;
-    let mut writer = csv::WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = crate::io::TsvWriter::from_path(path)?;
     writer.write_record(["fit", "nonfinite_covariance_rows"])?;
     for (name, fit) in [("original", Some(fit)), ("refit", analysis.refit.as_ref())] {
         if let Some(fit) = fit {

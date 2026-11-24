@@ -433,10 +433,23 @@ pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
-    /// CSV/TSV parser error (feature `csv`).
-    #[cfg(feature = "csv")]
-    #[error(transparent)]
-    Csv(#[from] csv::Error),
+    /// An input table record has a different width from its header.
+    #[error("table record on line {line} has {actual} fields, expected {expected}")]
+    InvalidTableWidth {
+        /// One-based line on which the record begins.
+        line: u64,
+        /// Number of fields in the header.
+        expected: usize,
+        /// Number of fields in this record.
+        actual: usize,
+    },
+
+    /// An input table record contains invalid UTF-8.
+    #[error("table record on line {line} contains invalid UTF-8")]
+    InvalidTableEncoding {
+        /// One-based line on which the record begins.
+        line: u64,
+    },
 
     /// Integer parsing error in an input table.
     #[error("failed to parse integer value '{value}' in {context}")]
@@ -1074,8 +1087,7 @@ impl Error {
             Self::InvalidNegativeBinomialValue { stage, .. } => stage.kind(),
             Self::UnsupportedFeature { .. } => ErrorKind::Unsupported,
             Self::Io(_) => ErrorKind::Io,
-            #[cfg(feature = "csv")]
-            Self::Csv(_) => ErrorKind::Parse,
+            Self::InvalidTableWidth { .. } | Self::InvalidTableEncoding { .. } => ErrorKind::Parse,
             Self::ParseInt { .. } | Self::ParseFloat { .. } => ErrorKind::Parse,
             Self::InvalidParameter { domain, .. }
             | Self::MissingPrerequisite { domain, .. }

@@ -719,6 +719,9 @@ fn load(
     primary_fit_type: FitType,
 ) -> Result<Input, Box<dyn Error>> {
     let dir = data_dir();
+    if name == "pasilla_holdout" && !dir.join(counts).is_file() {
+        return Err("download the Pasilla fixture with python3 scripts/references/fetch_pasilla_validation.py".into());
+    }
     let counts = read_count_matrix_tsv(dir.join(counts))?;
     let design = read_design_matrix_tsv(dir.join(design))?;
     let reduced = match reduced {

@@ -35,15 +35,17 @@ jobs:
         run: cargo test --locked --workspace
       - name: Fuzz targets build (stable; fuzzing itself runs weekly on nightly)
         run: cargo check --locked --manifest-path fuzz/Cargo.toml
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Fetch validation data
+        run: python scripts/references/fetch_pasilla_validation.py
       - name: Golden output hashes
         run: cargo run --release --locked -p rsdeseq2 --example golden -- --check
       - name: Portable golden output hashes
         env:
           RSDESEQ2_NUMERIC_PROFILE: portable
         run: cargo run --release --locked -p rsdeseq2 --example golden -- --check
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: '3.12'
       - name: Documentation and release-document checks
         run: python scripts/validation/check_docs.py
       - name: Module dependency cycles

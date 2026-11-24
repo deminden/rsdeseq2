@@ -1,85 +1,81 @@
 //! R scalar reductions using IEEE binary128 on Linux arm64.
 
-use rustc_apfloat::ieee::{Double, Quad};
-use rustc_apfloat::{Float, FloatConvert};
+mod wide;
+use wide::Wide;
 
-fn wide(x: f64) -> Quad {
-    let bits = if x.is_nan() {
-        x.to_bits() | (1 << 51)
-    } else {
-        x.to_bits()
-    };
-    Double::from_bits(u128::from(bits))
-        .convert(&mut false)
-        .value
-}
-
-fn narrow(x: Quad) -> f64 {
-    let value: Double = x.convert(&mut false).value;
-    f64::from_bits(value.to_bits() as u64)
-}
-
-fn sum(values: impl Iterator<Item = f64>) -> Quad {
-    values.map(wide).fold(Quad::ZERO, add)
+fn sum(values: impl Iterator<Item = f64>) -> Wide {
+    values.map(Wide::from_double).fold(Wide::ZERO, Wide::add)
 }
 
 pub(super) fn sum_as_double(values: impl Iterator<Item = f64>) -> f64 {
-    narrow(sum(values))
+    sum(values).to_double()
 }
 
 pub(in crate::design) fn sum_argument(values: impl Iterator<Item = f64>) -> f64 {
     let total = sum(values);
-    let limit = wide(f64::MAX);
-    if total > limit {
-        f64::INFINITY
-    } else if total < -limit {
-        f64::NEG_INFINITY
+    let narrowed = total.to_double();
+    if total.exceeds_double() {
+        f64::INFINITY.copysign(narrowed)
     } else {
-        narrow(total)
+        narrowed
     }
 }
 
 pub(super) fn column_mean(values: impl Iterator<Item = f64>, count: usize) -> f64 {
-    narrow((sum(values) / Quad::from_u128(count as u128).value).value)
+    sum(values).divide(count).to_double()
 }
 
 pub(super) fn mean(values: &[f64]) -> f64 {
     if values.is_empty() {
         return f64::NAN;
     }
-    let n = Quad::from_u128(values.len() as u128).value;
+    let n = values.len();
     let total = sum(values.iter().copied());
-    let finite = narrow(total).is_finite();
+    let finite = total.to_double().is_finite();
     let initial = if finite {
-        (total / n).value
+        total.divide(n)
     } else {
-        sum(values.iter().map(|x| x / values.len() as f64))
+        sum(values.iter().map(|x| x / n as f64))
     };
-    if !narrow(initial).is_finite() {
-        return narrow(initial);
+    let narrowed = initial.to_double();
+    if !narrowed.is_finite() {
+        return narrowed;
     }
-    let corrections = values.iter().map(|&x| (wide(x) - initial).value);
+    let corrections = values
+        .iter()
+        .map(|&x| Wide::from_double(x).subtract(initial));
     let correction = if finite {
-        (corrections.fold(Quad::ZERO, add) / n).value
+        corrections.fold(Wide::ZERO, Wide::add).divide(n)
     } else {
-        corrections.map(|x| (x / n).value).fold(Quad::ZERO, add)
+        corrections.map(|x| x.divide(n)).fold(Wide::ZERO, Wide::add)
     };
-    narrow((initial + correction).value)
+    initial.add(correction).to_double()
 }
 
-fn add(a: Quad, b: Quad) -> Quad {
-    // GCC's binary128 addition preserves the first NaN operand. Opposite
-    // infinities create a positive quiet NaN with the payload bits set.
-    if a.is_nan() {
-        return a;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rounds_each_operation_at_binary128_precision() {
+        let wide = 2.0_f64.powi(112);
+        assert_eq!(sum_as_double([wide, 1.0, -wide].into_iter()), 1.0);
+        let wide = 2.0_f64.powi(113);
+        assert_eq!(sum_as_double([wide, 1.0, -wide].into_iter()), 0.0);
     }
-    if b.is_nan() {
-        return b;
-    }
-    let sum = (a + b).value;
-    if sum.is_nan() {
-        wide(f64::from_bits(0x7fff_ffff_ffff_ffff))
-    } else {
-        sum
+
+    #[test]
+    fn narrows_subnormals_and_preserves_r_sum_special_values() {
+        let smallest = f64::from_bits(1);
+        assert_eq!(column_mean([smallest].into_iter(), 2).to_bits(), 0);
+        assert_eq!(column_mean([3.0 * smallest].into_iter(), 2).to_bits(), 2);
+        let near_limit = [f64::MAX, 2.0_f64.powi(960)];
+        assert_eq!(sum_as_double(near_limit.into_iter()), f64::MAX);
+        assert_eq!(sum_argument(near_limit.into_iter()), f64::INFINITY);
+        let r_na = f64::from_bits(0x7ff0_0000_0000_07a2);
+        assert_eq!(
+            sum_as_double([r_na, f64::NAN].into_iter()).to_bits(),
+            0x7ff8_0000_0000_07a2
+        );
     }
 }

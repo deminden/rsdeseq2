@@ -54,7 +54,7 @@ pub fn write_count_matrix_tsv(
     path: impl AsRef<Path>,
     counts: &CountMatrix,
 ) -> Result<(), DeseqError> {
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record(matrix_header(
         counts.sample_names(),
         counts.n_samples(),
@@ -93,7 +93,7 @@ pub fn write_normalized_counts_tsv(
     )?;
     normalized_counts.validate_finite("normalized count export")?;
 
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record(matrix_header(
         sample_names,
         normalized_counts.n_cols(),
@@ -138,7 +138,7 @@ pub fn write_normalization_factors_tsv(
     )?;
     validate_positive_finite_matrix("normalization factor export", normalization_factors)?;
 
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record(matrix_header(
         sample_names,
         normalization_factors.n_cols(),
@@ -169,7 +169,7 @@ pub fn write_size_factors_tsv(
     validate_optional_names("size-factor sample names", sample_names, size_factors.len())?;
     validate_positive_finite_values("size-factor export", size_factors)?;
 
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record(["sample", "size_factor"])?;
     for (idx, size_factor) in size_factors.iter().copied().enumerate() {
         let sample = sample_names
@@ -191,7 +191,7 @@ pub fn write_base_mean_tsv(
     validate_optional_names("base-mean gene names", gene_names, base_mean.len())?;
     validate_nonnegative_finite_values("base-mean export", base_mean)?;
 
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record(["gene", "base_mean"])?;
     for (idx, value) in base_mean.iter().copied().enumerate() {
         let gene = gene_names
@@ -232,7 +232,7 @@ pub fn write_base_metadata_tsv(
         ));
     }
 
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record(["gene", "baseMean", "baseVar", "allZero"])?;
     for gene in 0..base_mean.len() {
         writer.write_record([
@@ -298,7 +298,7 @@ pub fn write_cooks_row_metadata_tsv(
         ));
     }
 
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record(["gene", "maxCooks", "cooksRobustDispersion"])?;
     for gene in 0..cooks.cooks.n_rows() {
         writer.write_record([
@@ -330,7 +330,7 @@ pub fn write_cooks_sample_metadata_tsv(
         ));
     }
 
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record(["sample", "samplesForCooks"])?;
     for (sample, &samples_for_cooks) in cooks.samples_for_cooks.iter().enumerate() {
         writer.write_record([
@@ -389,7 +389,7 @@ pub fn write_cooks_replacement_row_metadata_tsv(
         .copied()
         .collect::<HashSet<_>>();
 
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record([
         "gene",
         "replace",
@@ -429,7 +429,7 @@ pub(super) fn write_logical_matrix_tsv(
     validate_optional_names("logical matrix gene names", gene_names, matrix.n_rows())?;
     validate_optional_names("logical matrix sample names", sample_names, matrix.n_cols())?;
 
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record(matrix_header(sample_names, matrix.n_cols(), "sample"))?;
     for gene in 0..matrix.n_rows() {
         let mut record = Vec::with_capacity(matrix.n_cols() + 1);
@@ -451,7 +451,7 @@ pub fn write_optional_numeric_matrix_tsv(
     validate_optional_names("numeric matrix gene names", gene_names, matrix.n_rows())?;
     validate_optional_names("numeric matrix sample names", sample_names, matrix.n_cols())?;
 
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record(matrix_header(sample_names, matrix.n_cols(), "sample"))?;
     for gene in 0..matrix.n_rows() {
         let mut record = Vec::with_capacity(matrix.n_cols() + 1);

@@ -9,7 +9,7 @@ contrasts, interactions, numeric transforms, and offsets.
 Requires Rust 1.96 or newer.
 
 ```sh
-cargo add rcompat-formula@0.1.1
+cargo add rcompat-formula@0.1.2
 ```
 
 ## Example
@@ -56,5 +56,4 @@ Formula expressions use supported built-ins and caller-supplied values. The
 crate runs without an R interpreter.
 
 [API documentation](https://docs.rs/rcompat-formula) ·
-[License](https://github.com/deminden/rsdeseq2/blob/rcompat-v0.1.1/crates/rcompat-formula/LICENSE) ·
-[Third-party notices](https://github.com/deminden/rsdeseq2/blob/rcompat-v0.1.1/crates/rcompat-formula/THIRD_PARTY_NOTICES.md)
+[MIT license](LICENSE)

@@ -9,7 +9,7 @@ priors for supported regression likelihoods.
 Requires Rust 1.96 or newer.
 
 ```sh
-cargo add rcompat-shrinkage@0.1.1
+cargo add rcompat-shrinkage@0.1.2
 ```
 
 ## Example
@@ -40,5 +40,5 @@ fn main() -> Result<(), rcompat_shrinkage::Error> {
 - Native Rust execution and structured errors, with no R runtime dependency.
 
 [API documentation](https://docs.rs/rcompat-shrinkage) ·
-[License](https://github.com/deminden/rsdeseq2/blob/rcompat-v0.1.1/crates/rcompat-shrinkage/LICENSE) ·
-[Third-party notices](https://github.com/deminden/rsdeseq2/blob/rcompat-v0.1.1/crates/rcompat-shrinkage/THIRD_PARTY_NOTICES.md)
+[MIT license](LICENSE) ·
+[Third-party notices](THIRD_PARTY_NOTICES.md)

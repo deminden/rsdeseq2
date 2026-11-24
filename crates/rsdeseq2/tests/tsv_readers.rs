@@ -94,10 +94,11 @@ fn reused_matrix_records_keep_error_coordinates() {
     let error = read_count_matrix_tsv_from_reader(&counts[..]).unwrap_err();
     std::assert_matches!(
         error,
-        DeseqError::Csv(error)
-            if matches!(error.kind(), csv::ErrorKind::UnequalLengths {
-                pos: Some(position), expected_len: 3, len: 2
-            } if position.line() == 3)
+        DeseqError::InvalidTableWidth {
+            line: 3,
+            expected: 3,
+            actual: 2
+        }
     );
 
     let design = b"sample\tintercept\tcondition\n\"s\t1\"\t1\t0\ns2\t1\tNaN\n";
@@ -106,5 +107,21 @@ fn reused_matrix_records_keep_error_coordinates() {
         error,
         DeseqError::NonFiniteValue { context, index: Some(3), value }
             if context == "design matrix" && value.is_nan()
+    );
+}
+
+#[test]
+fn quoted_records_cross_buffer_boundaries_and_validate_field_encoding() {
+    let label = format!("{}\tline\n\"quoted\"", "é".repeat(5000));
+    let escaped = label.replace('"', "\"\"");
+    let input = format!("sample\tintercept\n\"{escaped}\"\t1\n");
+    let result = read_labeled_design_matrix_tsv_from_reader(input.as_bytes()).unwrap();
+    assert_eq!(result.sample_names, [label]);
+
+    // These bytes form a valid character only if the field delimiter is ignored.
+    let bad = b"sample\tintercept\n\xc3\t\xa9\n";
+    std::assert_matches!(
+        read_labeled_design_matrix_tsv_from_reader(&bad[..]),
+        Err(DeseqError::InvalidTableEncoding { line: 2 })
     );
 }

@@ -1,6 +1,6 @@
 # rsdeseq2
 
-[![License: MIT + BSD notices](https://img.shields.io/badge/license-MIT%20%2B%20BSD-blue.svg)](THIRD_PARTY_NOTICES.md)
+[![Project license MIT](https://img.shields.io/badge/project%20license-MIT-blue.svg)](LICENSE)
 
 `rsdeseq2` runs DESeq2-compatible RNA-seq differential expression analyses in
 Rust. Use it from the command line, as a Rust library, or as an R package.
@@ -13,7 +13,7 @@ differential expression analysis of 56,200 genes across 61 GTEx samples.
 
 ## Installation
 
-The steps below build **0.6.1** from this repository. You’ll need
+The steps below build **0.6.2** from this repository. You’ll need
 **Rust 1.96.0 or newer** with Cargo. For published versions, see
 [crates.io](https://crates.io/crates/rsdeseq2) and
 [GitHub Releases](https://github.com/deminden/rsdeseq2/releases).
@@ -188,7 +188,7 @@ disabled. They agreed on significant genes at adjusted p-value cutoffs of
 
 ## Documentation
 
-- [0.6.1 release notes](docs/releases/0.6.1.md)
+- [0.6.2 release notes](docs/releases/0.6.2.md)
 - [Algorithms](docs/algorithms.md)
 - [Benchmarks](docs/benchmarks.md) and [reproducibility](docs/reproducibility.md)
 - [Development guide](docs/development.md) and [release checklist](docs/release.md)
@@ -205,6 +205,6 @@ Love, Huber, and Anders (2014).
 
 ## License
 
-Project code is MIT-licensed. Adapted numerical components also carry
-BSD-3-Clause and BSD-2-Clause-Views terms.
-[License](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md)
+The project’s source code is [MIT-licensed](LICENSE). See the
+[third-party notices](THIRD_PARTY_NOTICES.md) for incorporated code.
+Dependencies and external validation datasets retain their own terms.

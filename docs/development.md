@@ -54,6 +54,7 @@ versions. CI rejects drift rather than repairing source before testing.
 ```sh
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
+python3 scripts/references/fetch_pasilla_validation.py
 cargo golden --check
 cargo test --locked --workspace
 python3 scripts/validation/check_docs.py

@@ -1,5 +1,3 @@
-// Arithmetic schedules adapted from OpenBLAS 0.3.26.
-// See OPENBLAS-LICENSE in this directory for its BSD license.
 //! Linux x86 R uses the x87 extended accumulator for scalar reductions.
 //! Keep that arithmetic in the Rust core, including the final rounding to f64.
 use std::arch::asm;
@@ -84,17 +82,27 @@ pub(super) fn mean(values: &[f64]) -> f64 {
 }
 
 pub(super) fn norm(values: &[f64]) -> f64 {
-    let mut lanes = [Extended::new(0.0); 4];
-    let end = values.len() / 8 * 8;
-    for (i, &x) in values[..end].iter().enumerate() {
-        lanes[i % 4].add(Extended::square(x));
+    // Complete blocks contribute two squares to each accumulator. Keep the
+    // tail and the final addition order explicit for the R reference profile.
+    let (blocks, tail) = values.as_chunks::<8>();
+    let mut totals = [Extended::new(0.0); 4];
+    for block in blocks {
+        let (first, second) = block.split_at(4);
+        for (total, (&a, &b)) in totals.iter_mut().zip(first.iter().zip(second)) {
+            total.add(Extended::square(a));
+            total.add(Extended::square(b));
+        }
     }
-    for &x in &values[end..] {
-        lanes[0].add(Extended::square(x));
-    }
-    let mut total = lanes[2];
-    total.add(lanes[0]);
-    total.add(lanes[1]);
-    total.add(lanes[3]);
+    let [first, second, third, fourth] = totals;
+    let first = tail.iter().fold(first, |mut combined, &value| {
+        combined.add(Extended::square(value));
+        combined
+    });
+    let total = [first, second, fourth]
+        .into_iter()
+        .fold(third, |mut combined, partial| {
+            combined.add(partial);
+            combined
+        });
     total.sqrt().value()
 }

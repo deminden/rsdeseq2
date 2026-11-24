@@ -1,3 +1,8 @@
+# rsdeseq2 0.6.2
+
+* Bundle version 0.1.2 of the Rust numerical, formula, and shrinkage crates.
+* Use Rust binary128 arithmetic for the Linux arm64 formula profile.
+
 # rsdeseq2 0.6.1
 
 * Update the bundled Rust numerical, formula, and shrinkage crates to 0.1.1.

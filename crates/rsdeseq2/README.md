@@ -10,14 +10,14 @@ genes across 61 GTEx samples. [Benchmark details][benchmark]
 
 ## Install
 
-The 0.6.1 release requires **Rust 1.96.0 or newer**.
+The 0.6.2 release requires **Rust 1.96.0 or newer**.
 
 ```sh
 # Add the library to your Rust project.
-cargo add rsdeseq2@0.6.1
+cargo add rsdeseq2@0.6.2
 
 # Install the standalone command.
-cargo install rsdeseq2 --version 0.6.1 --locked
+cargo install rsdeseq2 --version 0.6.2 --locked
 ```
 
 Building from a checkout? Follow the [source installation instructions][source-install].
@@ -93,9 +93,8 @@ enable only the features you need.
 When reporting a bug or a numerical difference, include the rsdeseq2 version,
 a minimal reproducer, and the reference tool version. [GitHub Issues][issues]
 
-Project code is MIT-licensed. Adapted numerical components also carry
-BSD-3-Clause and BSD-2-Clause-Views terms. [License][license] ·
-[Third-party notices][notices]
+The rsdeseq2 Rust code is [MIT-licensed][license]. The CLI and R distributions
+include [third-party notices][notices] for their dependencies.
 
 [analysis]: https://github.com/deminden/rsdeseq2/blob/main/docs/design/run-entry-point.md
 [api]: https://docs.rs/rsdeseq2

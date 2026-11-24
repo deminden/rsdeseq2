@@ -1,6 +1,6 @@
 [package]
 name = "rcompat-numeric"
-version = "0.1.1"
+version = "0.1.2"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -15,12 +15,7 @@ exclude = [".DS_Store", "**/.DS_Store"]
 [lints]
 workspace = true
 
-[features]
-# A `Csv` error variant converting from `csv::Error`.
-csv = ["dep:csv"]
-
 [dependencies]
-csv = { workspace = true, optional = true }
 libm.workspace = true
 thiserror.workspace = true
 

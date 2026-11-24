@@ -59,9 +59,9 @@ For bugs, report the version, target and command through
 
 ## License
 
-Project code is MIT-licensed. Adapted numerical components additionally carry
-BSD-3-Clause and BSD-2-Clause-Views terms. Keep [LICENSE](LICENSE) and
-[third-party notices](THIRD_PARTY_NOTICES.md) with redistributed binaries.
+Original project code is covered by the [MIT license](LICENSE). The
+[third-party notices](THIRD_PARTY_NOTICES.md) cover incorporated source code.
+Dependencies carry their own license terms.
 '''
 
 

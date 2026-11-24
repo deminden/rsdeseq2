@@ -170,10 +170,22 @@ def main():
                 for file in ('Cargo.toml', 'README.md'):
                     shutil.copyfile(expected_root/name/file, target/file)
             print(f'Synchronized Rust core ({", ".join(crates)}) into {VENDOR_ROOT}')
-        for name in ('LICENSE', 'THIRD_PARTY_NOTICES.md'):
-            for crate in crates:
-                sync_notice(ROOT/name, Path(workspace[crate]['manifest_path']).parent/name, args.check)
-        sync_notice(ROOT/'THIRD_PARTY_NOTICES.md', ROOT/'r-pkg/rsdeseq2/inst/COPYRIGHTS', args.check)
+        for crate in crates:
+            sync_notice(ROOT/'LICENSE', Path(workspace[crate]['manifest_path']).parent/'LICENSE', args.check)
+
+        # Include the notices for source incorporated into the CLI and R
+        # package. Each crate's own archive carries its relevant notices.
+        notice_name = 'THIRD_PARTY_NOTICES.md'
+        heading = b'# Third-party notices\n\n'
+        sections = [
+            (Path(workspace[crate]['manifest_path']).parent/notice_name)
+            .read_bytes().removeprefix(heading).strip()
+            for crate in ('rcompat-numeric', 'rcompat-shrinkage')
+        ]
+        notices = expected_root/notice_name
+        notices.write_bytes(heading + b'\n\n'.join(sections) + b'\n')
+        sync_notice(notices, ROOT/notice_name, args.check)
+        sync_notice(notices, ROOT/'r-pkg/rsdeseq2/inst/COPYRIGHTS', args.check)
         if args.check:
             print('R vendor manifests, notices and package versions match.')
 

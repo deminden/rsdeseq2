@@ -9,7 +9,7 @@ resolver = "3"
 
 [workspace.package]
 edition = "2024"
-license = "MIT AND BSD-3-Clause AND BSD-2-Clause-Views"
+license = "MIT"
 repository = "https://github.com/deminden/rsdeseq2"
 rust-version = "1.96.0"
 
@@ -37,13 +37,14 @@ lto = false
 missing_docs = "deny"
 
 [workspace.dependencies]
-rcompat-formula = { path = "crates/rcompat-formula", version = "0.1.1" }
-rcompat-numeric = { path = "crates/rcompat-numeric", version = "0.1.1" }
-rcompat-shrinkage = { path = "crates/rcompat-shrinkage", version = "0.1.1" }
+rcompat-formula = { path = "crates/rcompat-formula", version = "0.1.2" }
+rcompat-numeric = { path = "crates/rcompat-numeric", version = "0.1.2" }
+rcompat-shrinkage = { path = "crates/rcompat-shrinkage", version = "0.1.2" }
 approx = "0.5.1"
 clap = { version = "4.6.7", features = ["derive"] }
 criterion = { version = "0.8.2", features = ["html_reports"] }
 csv = "1.4.0"
+csv-core = "0.1.13"
 icu_collator = "2.4.0"
 icu_locale = "2.4.0"
 libm = "0.2.16"

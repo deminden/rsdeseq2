@@ -4,7 +4,7 @@ pub(super) use std::collections::{HashMap, HashSet};
 pub(super) use std::io::Read;
 pub(super) use std::path::Path;
 
-pub(super) use csv::{ReaderBuilder, WriterBuilder};
+use super::tsv::TsvReader;
 
 pub(super) use crate::cooks::{CooksOutput, CooksRefitPlan};
 pub(super) use crate::design::DesignMatrix;
@@ -77,7 +77,7 @@ pub fn read_count_matrix_tsv_from_reader(reader: impl Read) -> Result<CountMatri
 }
 
 fn read_count_matrix_tsv_records<R: Read>(
-    reader: csv::Reader<R>,
+    reader: TsvReader<R>,
     path_ref: &Path,
 ) -> Result<CountMatrix, DeseqError> {
     let TsvMatrix {
@@ -122,7 +122,7 @@ pub fn read_labeled_design_matrix_tsv_from_reader(
 }
 
 fn read_labeled_design_matrix_tsv_records<R: Read>(
-    reader: csv::Reader<R>,
+    reader: TsvReader<R>,
     path_ref: &Path,
 ) -> Result<LabeledDesignMatrix, DeseqError> {
     let TsvMatrix {
@@ -133,7 +133,6 @@ fn read_labeled_design_matrix_tsv_records<R: Read>(
         reader,
         MatrixTsvSchema::Numeric {
             columns: "design matrix columns",
-            record: "design matrix record columns",
             rows: "design matrix rows",
             label: "design sample names",
         },
@@ -171,7 +170,6 @@ pub fn read_labeled_normalization_factors_tsv(
     let factors = read_labeled_assay_matrix_tsv(
         path_ref,
         "normalization factor columns",
-        "normalization factor record columns",
         "normalization factor rows",
         "normalization factor matrix",
         "normalization factor gene names",
@@ -200,7 +198,6 @@ pub fn read_labeled_observation_weights_tsv(
     let weights = read_labeled_assay_matrix_tsv(
         path_ref,
         "observation weight columns",
-        "observation weight record columns",
         "observation weight rows",
         "observation weights",
         "observation weight gene names",
@@ -212,7 +209,6 @@ pub fn read_labeled_observation_weights_tsv(
 fn read_labeled_assay_matrix_tsv(
     path_ref: &Path,
     column_context: &str,
-    record_context: &str,
     row_context: &str,
     value_context: &str,
     gene_context: &str,
@@ -225,7 +221,6 @@ fn read_labeled_assay_matrix_tsv(
         tsv_from_path(path_ref)?,
         MatrixTsvSchema::Numeric {
             columns: column_context,
-            record: record_context,
             rows: row_context,
             label: gene_context,
         },
@@ -243,7 +238,6 @@ enum MatrixTsvSchema<'a> {
     Counts,
     Numeric {
         columns: &'a str,
-        record: &'a str,
         rows: &'a str,
         label: &'a str,
     },
@@ -256,11 +250,11 @@ struct TsvMatrix<T> {
 }
 
 fn read_labelled_matrix<R: Read, T>(
-    mut reader: csv::Reader<R>,
+    mut reader: TsvReader<R>,
     schema: MatrixTsvSchema<'_>,
     mut cell: impl FnMut(usize, &str) -> Result<T, DeseqError>,
 ) -> Result<TsvMatrix<T>, DeseqError> {
-    let headers = reader.headers()?;
+    let headers = reader.next_record()?.unwrap_or_default();
     let width = headers.len();
     if width < 2 {
         return Err(match schema {
@@ -273,21 +267,7 @@ fn read_labelled_matrix<R: Read, T>(
     let columns = headers.iter().skip(1).map(ToOwned::to_owned).collect();
     let mut rows = Vec::new();
     let mut values = Vec::new();
-    let mut record = csv::StringRecord::new();
-    while reader.read_record(&mut record)? {
-        if record.len() != width {
-            return Err(match schema {
-                MatrixTsvSchema::Counts => DeseqError::InvalidCounts {
-                    reason: format!(
-                        "record has {} columns but header has {width} columns",
-                        record.len()
-                    ),
-                },
-                MatrixTsvSchema::Numeric {
-                    record: context, ..
-                } => invalid_dimensions(context, width, record.len()),
-            });
-        }
+    while let Some(record) = reader.next_record()? {
         let label = record.get(0).unwrap_or_default();
         if label.is_empty()
             && let MatrixTsvSchema::Numeric { label: context, .. } = schema
@@ -343,7 +323,7 @@ pub fn read_labeled_size_factors_tsv_from_reader(
 }
 
 fn read_labeled_size_factors_tsv_records<R: Read>(
-    reader: csv::Reader<R>,
+    reader: TsvReader<R>,
     path_ref: &Path,
 ) -> Result<Vec<SampleNumericValue>, DeseqError> {
     let values = read_labelled(
@@ -394,7 +374,7 @@ pub fn read_labeled_geometric_means_tsv_from_reader(
 }
 
 fn read_labeled_geometric_means_tsv_records<R: Read>(
-    reader: csv::Reader<R>,
+    reader: TsvReader<R>,
     path_ref: &Path,
 ) -> Result<Vec<GeneNumericValue>, DeseqError> {
     let values = read_labelled(
@@ -439,7 +419,7 @@ pub fn read_labeled_sample_numeric_tsv_from_reader(
 }
 
 fn read_labeled_sample_numeric_tsv_records<R: Read>(
-    reader: csv::Reader<R>,
+    reader: TsvReader<R>,
     path_ref: &Path,
     context: &str,
 ) -> Result<Vec<SampleNumericValue>, DeseqError> {
@@ -475,7 +455,7 @@ pub fn read_labeled_gene_numeric_tsv_from_reader(
 }
 
 fn read_labeled_gene_numeric_tsv_records<R: Read>(
-    reader: csv::Reader<R>,
+    reader: TsvReader<R>,
     path_ref: &Path,
     context: &str,
 ) -> Result<Vec<GeneNumericValue>, DeseqError> {
@@ -524,7 +504,7 @@ pub fn read_labeled_wald_t_degrees_of_freedom_tsv_from_reader(
 }
 
 fn read_labeled_wald_t_degrees_of_freedom_tsv_records<R: Read>(
-    reader: csv::Reader<R>,
+    reader: TsvReader<R>,
     path_ref: &Path,
 ) -> Result<Vec<GeneNumericValue>, DeseqError> {
     read_labelled(
@@ -559,7 +539,7 @@ pub fn read_sample_levels_tsv_from_reader(
 }
 
 fn read_sample_levels_tsv_records<R: Read>(
-    reader: csv::Reader<R>,
+    reader: TsvReader<R>,
 ) -> Result<Vec<SampleLevel>, DeseqError> {
     read_labelled(
         reader,
@@ -585,12 +565,12 @@ fn read_sample_levels_tsv_records<R: Read>(
 /// and value text into an entry. Errors name `{what} columns`,
 /// `{what} record columns` and `{what} rows`.
 fn read_labelled<R: Read, T>(
-    mut reader: csv::Reader<R>,
+    mut reader: TsvReader<R>,
     what: &str,
     empty_label: &str,
     mut cell: impl FnMut(usize, &str, &str) -> Result<T, DeseqError>,
 ) -> Result<Vec<T>, DeseqError> {
-    let headers = reader.headers()?.clone();
+    let headers = reader.next_record()?.unwrap_or_default();
     if headers.len() != 2 {
         return Err(DeseqError::InvalidDimensions {
             context: format!("{what} columns"),
@@ -599,16 +579,8 @@ fn read_labelled<R: Read, T>(
         });
     }
     let mut values = Vec::new();
-    let mut record = csv::StringRecord::new();
-    while reader.read_record(&mut record)? {
+    while let Some(record) = reader.next_record()? {
         let idx = values.len();
-        if record.len() != 2 {
-            return Err(DeseqError::InvalidDimensions {
-                context: format!("{what} record columns"),
-                expected: 2,
-                actual: record.len(),
-            });
-        }
         let label = record.get(0).unwrap_or_default();
         if label.is_empty() {
             return Err(DeseqError::InvalidOptions {
@@ -627,16 +599,10 @@ fn read_labelled<R: Read, T>(
     Ok(values)
 }
 
-fn tsv_from_path(path: &Path) -> Result<csv::Reader<std::fs::File>, csv::Error> {
-    ReaderBuilder::new()
-        .delimiter(b'\t')
-        .has_headers(true)
-        .from_path(path)
+fn tsv_from_path(path: &Path) -> Result<TsvReader<std::fs::File>, std::io::Error> {
+    std::fs::File::open(path).map(TsvReader::new)
 }
 
-fn tsv_from_reader<R: Read>(reader: R) -> csv::Reader<R> {
-    ReaderBuilder::new()
-        .delimiter(b'\t')
-        .has_headers(true)
-        .from_reader(reader)
+fn tsv_from_reader<R: Read>(reader: R) -> TsvReader<R> {
+    TsvReader::new(reader)
 }

@@ -28,6 +28,10 @@ pub use write_results::*;
 mod format_validation;
 use format_validation::*;
 
+#[path = "implementation/tsv.rs"]
+mod tsv;
+pub(crate) use tsv::TsvWriter;
+
 // Unit tests for I/O helpers.
 #[cfg(test)]
 #[path = "implementation/tests.rs"]

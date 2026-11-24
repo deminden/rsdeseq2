@@ -32,7 +32,7 @@ pub(super) fn write_deseq_results_with_row_header_tsv(
 ) -> Result<(), DeseqError> {
     validate_deseq_results_export(results)?;
     let frame = results.data_frame();
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     let mut header = Vec::with_capacity(frame.columns.len() + 1);
     header.push(row_header.to_string());
     header.extend(
@@ -169,7 +169,7 @@ pub fn write_deseq_result_column_metadata_tsv(
     results: &DeseqResults,
 ) -> Result<(), DeseqError> {
     let metadata = results.column_metadata();
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record(["name", "type", "description"])?;
     for column in metadata {
         writer.write_record([column.name, column.column_type, column.description])?;
@@ -183,7 +183,7 @@ pub fn write_deseq_result_table_metadata_tsv(
     path: impl AsRef<Path>,
     results: &DeseqResults,
 ) -> Result<(), DeseqError> {
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record(["name", "value"])?;
     for entry in results.metadata.scalar_metadata() {
         writer.write_record([entry.name, entry.value])?;
@@ -197,7 +197,7 @@ pub fn write_cooks_replacement_metadata_tsv(
     path: impl AsRef<Path>,
     refit_plan: &CooksRefitPlan,
 ) -> Result<(), DeseqError> {
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record(["name", "value"])?;
     for entry in refit_plan.scalar_metadata() {
         writer.write_record([entry.name, entry.value])?;
@@ -227,7 +227,7 @@ pub fn write_deseq_mcols_diagnostics_tsv(
             names.len(),
         ));
     }
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     let mut header = Vec::with_capacity(frame.columns.len() + 1);
     header.push("gene".to_string());
     header.extend(frame.columns.iter().map(|column| column.name.to_string()));
@@ -259,7 +259,7 @@ pub fn write_independent_filter_num_rej_tsv(
     filtering: &IndependentFilteringOutput,
 ) -> Result<(), DeseqError> {
     validate_independent_filtering_export(filtering)?;
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record(["theta", "numRej"])?;
     for row in filtering.filter_num_rej() {
         writer.write_record([row.theta.to_string(), row.num_rejections.to_string()])?;
@@ -276,7 +276,7 @@ pub fn write_independent_filter_lowess_tsv(
     filtering: &IndependentFilteringOutput,
 ) -> Result<(), DeseqError> {
     validate_independent_filtering_export(filtering)?;
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record(["x", "y"])?;
     for row in filtering.lowess_fit_table() {
         writer.write_record([row.theta.to_string(), row.fitted_rejections.to_string()])?;
@@ -294,7 +294,7 @@ pub fn write_independent_filter_metadata_tsv(
     filtering: &IndependentFilteringOutput,
 ) -> Result<(), DeseqError> {
     validate_independent_filtering_export(filtering)?;
-    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    let mut writer = TsvWriter::from_path(path)?;
     writer.write_record(["name", "value"])?;
     for entry in filtering.scalar_metadata() {
         writer.write_record([entry.name, entry.value.to_string()])?;
