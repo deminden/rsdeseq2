@@ -38,7 +38,6 @@ without upstream source code open.
 | `crates/rcompat-numeric/src/numeric/special.rs` | Gamma, digamma, incomplete gamma, beta, normal and gamma quantiles | MIT code | Port of `statrs` 0.19.1 (MIT); `erf_inv` uses Boost rational approximations by way of statrs | to replace |
 | `crates/rcompat-shrinkage/src/shrinkage/heavy_tail/unbounded_lbfgs.rs` | Unbounded L-BFGS with strong-Wolfe line search | MIT code | Adaptation of LBFGSpp (MIT); notice in `LBFGSPP-LICENSE` | to replace |
 | `crates/rcompat-shrinkage/src/shrinkage/mixture_fit/sqp/compatibility.rs` | Active-set and floored EM policy of the mixture SQP solver | MIT code | Implements mixsqp 0.3-54 (MIT); notice in `MIXSQP-LICENSE` | to replace |
-| `crates/rcompat-shrinkage/src/shrinkage/mixture_fit/sqp/MIXSQP-LICENSE` | Licence notice for the mixsqp algorithm | MIT code | Covers `sqp/compatibility.rs` | to remove |
 | `crates/rcompat-shrinkage/src/shrinkage/gamma_normalization.rs` | Gamma function series for the R profiles | public-domain code | Fullerton's SLATEC `dgamma.f` tables, cited; SLATEC guide section 4 | clean |
 | `crates/rcompat-numeric/src/probability/normal_log.rs` | Log normal tail probabilities | paper | Cody (1969), Math. Comp. | clean |
 | `crates/rcompat-numeric/src/probability/digamma.rs` | Digamma for positive arguments | paper | DLMF 5.5 and 5.11 | clean |
@@ -67,3 +66,4 @@ listed so that the record stays complete; the check ignores this section.
 | Linux formula references and golden manifests | Exact R 4.6.2 outputs on Linux | black-box | Data, not code; removed with the profiles | 0.7.0 |
 | `crates/rcompat-formula/src/design/numeric_transform/reduction.rs` | Dot product, norm and axpy order for polynomial QR | upstream source | 0.6.1 header: "Arithmetic schedules adapted from OpenBLAS 0.3.26"; reshaped in 0.6.2 | 0.7.0 |
 | `crates/rcompat-shrinkage/src/shrinkage/heavy_tail/LBFGSPP-LICENSE` | Licence notice of the LBFGSpp adaptation | MIT code | Removed with the code it covered | 0.7.0 |
+| `crates/rcompat-shrinkage/src/shrinkage/mixture_fit/sqp/MIXSQP-LICENSE` | Licence notice of the mixsqp algorithm | MIT code | Removed with the code it covered | 0.7.0 |
