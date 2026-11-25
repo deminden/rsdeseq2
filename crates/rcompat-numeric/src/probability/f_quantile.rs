@@ -89,3 +89,37 @@ fn from_inverse_beta(value: f64, df1: f64, df2: f64) -> f64 {
     (1.0 / beta - 1.0) * (df2 / df1)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::f_99_quantile;
+
+    // qf(0.99, df1, df2) from R 4.6.2 (scripts/references/generate_f_quantile_reference.R),
+    // for df1 up to 200 and df2 up to 100,000.
+    const REFERENCE: &str = include_str!("../../tests/data/f_quantile_r462.tsv");
+
+    #[test]
+    fn matches_r_qf_over_the_supported_degrees_of_freedom() {
+        let mut worst = (0.0_f64, 0.0, 0.0);
+        let mut rows = 0;
+        for line in REFERENCE.lines().filter(|l| !l.starts_with('#')).skip(1) {
+            let fields: Vec<&str> = line.split('\t').collect();
+            let df1: f64 = fields[0].parse().unwrap();
+            let df2: f64 = fields[1].parse().unwrap();
+            let expected = f64::from_bits(u64::from_str_radix(fields[2], 16).unwrap());
+            let actual = f_99_quantile(df1, df2);
+            let relative = ((actual - expected) / expected).abs();
+            if relative > worst.0 {
+                worst = (relative, df1, df2);
+            }
+            rows += 1;
+        }
+        assert_eq!(rows, 22 * 26);
+        eprintln!(
+            "largest relative difference {:e} at df1 {} df2 {}",
+            worst.0, worst.1, worst.2
+        );
+        assert!(worst.0 <= TOLERANCE, "{worst:?}");
+    }
+
+    const TOLERANCE: f64 = 2e-14;
+}
