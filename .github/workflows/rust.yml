@@ -48,6 +48,8 @@ jobs:
         run: cargo run --release --locked -p rsdeseq2 --example golden -- --check
       - name: Documentation and release-document checks
         run: python scripts/validation/check_docs.py
+      - name: Provenance ledger
+        run: python scripts/validation/check_provenance.py
       - name: Module dependency cycles
         run: python scripts/validation/check_module_cycles.py
       - name: Parity and benchmark integrity checks

@@ -62,6 +62,7 @@ python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 python3 scripts/validation/check_module_cycles.py
 cargo deny check                  # licences (default features: MIT only), advisories, bans, sources
 cargo deny --config deny-all-features.toml check   # optional features
+python3 scripts/validation/check_provenance.py   # every provenance statement has a resolved ledger row
 ```
 
 Use the default test profile for routine checks. For optimized local
