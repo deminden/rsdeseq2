@@ -1,5 +1,5 @@
 //! Fixed Cook's F quantile from a stable beta-logistic density.
-use super::gamma::{chi_square_upper_quantile, log1pmx, stirling_correction};
+use super::gamma::{log1pmx, stirling_correction};
 use super::quadrature::integrate_positive_tail;
 use crate::numeric::math::ProfileMath;
 
@@ -27,17 +27,6 @@ fn logistic_loss(y: f64, p: f64) -> f64 {
 /// The 0.99 quantile of the F distribution with `df1` and `df2` degrees of
 /// freedom, as DESeq2 uses for its Cook's distance cutoff.
 pub fn f_99_quantile(df1: f64, df2: f64) -> f64 {
-    // Match the established qf large-df limit policy used by DESeq2. This is
-    // a compatibility approximation, applied identically by both interfaces:
-    // https://github.com/wch/r-source/blob/trunk/src/nmath/qf.c . The actual
-    // chi-square calculations above are standalone Rust implementations.
-    if df1 <= df2 && df2 > 400000.0 {
-        return chi_square_upper_quantile(1.0 - 0.99, df1) / df1;
-    }
-    if df1 > 400000.0 {
-        return df2 / chi_square_upper_quantile(0.99, df2);
-    }
-
     // Closed exponential/beta cases avoid an unnecessary inversion.
     if df1 == 2.0 {
         let value = (0.5 * df2) * (-2.0 * (1.0_f64 - 0.99).ln_p() / df2).exp_m1_p();
@@ -99,3 +88,4 @@ fn from_inverse_beta(value: f64, df1: f64, df2: f64) -> f64 {
     };
     (1.0 / beta - 1.0) * (df2 / df1)
 }
+

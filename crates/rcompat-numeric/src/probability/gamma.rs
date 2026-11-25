@@ -96,37 +96,3 @@ pub fn large_shape_chi_square_tail(statistic: f64, df: f64) -> f64 {
     });
     (if lower { 1.0 - integral } else { integral }).clamp(0.0, 1.0)
 }
-
-// Chi-square inverse from the same standalone tails used for inference. The
-// argument is an upper-tail probability, including the small complementary
-// probability used by DESeq2/R's large-df F approximation.
-pub(super) fn chi_square_upper_quantile(upper: f64, df: f64) -> f64 {
-    if df == 2.0 {
-        return -2.0 * upper.ln_p();
-    }
-    let distribution = match crate::numeric::special::GammaDistribution::chi_squared(df) {
-        Some(value) => value,
-        None => return f64::NAN,
-    };
-    let survival = |x: f64| {
-        if df >= 64.0 {
-            large_shape_chi_square_tail(x, df)
-        } else {
-            distribution.sf(x)
-        }
-    };
-    let mut low = -740.0;
-    let mut high = (df + 1.0).ln_p() + 8.0;
-    for _ in 0..96 {
-        let mid = low + (high - low) * 0.5;
-        if mid == low || mid == high {
-            break;
-        }
-        if survival(mid.exp_p()) > upper {
-            low = mid;
-        } else {
-            high = mid;
-        }
-    }
-    (low + 0.5 * (high - low)).exp_p()
-}
