@@ -17,11 +17,38 @@ add <- function(name, x, tol = 1e-7) {
   q <- qr(x, tol = tol)
   y <- diag(diag(q$qr), nrow(x), ncol(x))
   qy <- if (nrow(x) > 0L && ncol(x) > 0L) qr.qy(q, y) else y
-  cases[[length(cases) + 1L]] <<- list(
+  case <- list(
     name = name, rows = nrow(x), cols = ncol(x), tolerance = bits(tol),
     x = bits(x), rank = q$rank, pivot = q$pivot,
     qr = bits(q$qr), qraux = bits(q$qraux), qy = bits(qy))
+  # The larger downdate set keeps rank, pivot and qraux only; contr.poly
+  # inputs are outer(seq_len(n) - (n + 1) / 2, 0:(n - 1), "^") and are not stored.
+  if (downdate) {
+    case$qr <- NULL; case$qy <- NULL
+    if (startsWith(name, "contr_poly_")) case$x <- NULL
+  }
+  cases[[length(cases) + 1L]] <<- case
 }
+downdate <- "--downdate" %in% args
+if ("--downdate" %in% args) {
+  # Larger polynomial problems, where the remaining column norms are small
+  # relative to the original norms and the deferral decisions are close.
+  out <- setdiff(args, "--downdate")[[1L]]
+  for (n in 11:120) {
+    center <- (n + 1) / 2
+    add(paste0("contr_poly_", n), outer(seq_len(n) - center, 0:(n - 1), "^"))
+  }
+  for (n in c(25, 50, 75, 100, 150)) for (d in c(5, 10, 15, 20)) {
+    x <- seq(0.37, 41.1, length.out = n)
+    add(paste0("poly_", n, "_", d), outer(x - mean(x), 0:d, "^"))
+  }
+  for (k in 1:40) {
+    n <- sample(20:60, 1); p <- sample(4:12, 1)
+    x <- matrix(rnorm(n * p), n, p)
+    x[, p] <- x[, 1] + x[, 2] + 10^-sample(4:10, 1) * rnorm(n)
+    add(paste0("near_dependent_", k), x)
+  }
+} else {
 add("identity3", diag(3))
 add("zero_column_middle", cbind(1:4, 0, c(2, 3, 5, 7)))
 add("zero_column_first", cbind(0, 1:4, c(2, 3, 5, 7)))
@@ -52,6 +79,7 @@ for (k in 1:30) {
   x <- matrix(rnorm(n * p) * 2^sample(-8:8, n * p, TRUE), n, p)
   if (p > 2 && k %% 3 == 0) x[, p] <- x[, 1] - 2 * x[, 2]
   add(paste0("random_", k), x)
+}
 }
 json <- function(v) {
   if (is.list(v)) {

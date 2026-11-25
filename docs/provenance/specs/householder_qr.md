@@ -39,12 +39,10 @@ arithmetic is binary64; `dot`, `norm` and `axpy` are the reductions of
 Before the loop, record `orig_j = norm(x(1:n, j))` for every column.
 `active` starts at p. For l = 1, 2, ..., min(n, p):
 
-1. Deferral (help page rule; this implementation's own design recomputes the
-   remaining norm directly instead of updating it): while l <= active and
-   `norm(x(l:n, l)) < tol * orig_l`, move column l (with its `orig`) to the
-   end, shifting columns l+1..p one place left, and decrease `active`.
-   Whether an all-zero column (orig = 0) is moved is decided by the
-   observation file below, not by this text.
+1. Deferral (help page rule): while l <= active and the remaining norm
+   `rn_l` of column l is below `tol * orig_l`, move column l (with its
+   `orig` and `rn`) to the end, shifting columns l+1..p one place left, and
+   decrease `active`. Columns with orig = 0 are moved (observed).
 2. If l = n, stop: the last row has no reflector.
 3. `nrmxl = norm(x(l:n, l))`. If it is 0, set qraux_l = 0 and go to the next l.
 4. If x(l,l) != 0, give nrmxl the sign of x(l,l).
@@ -55,6 +53,27 @@ Before the loop, record `orig_j = norm(x(1:n, j))` for every column.
    t = -dot(x(l:n, l), x(l:n, j)) / x(l,l);
    x(l:n, j) = axpy(t, x(l:n, l), x(l:n, j)).
 8. qraux_l = x(l,l); x(l,l) = -nrmxl.
+
+### Remaining norms
+
+`rn_j` starts as `orig_j`. After step l has transformed column j (j > l),
+the part of column j below row l loses the entry x(l,j), so its norm is
+downdated as in QR with column pivoting (Golub and Van Loan, Matrix
+Computations, 4th ed., section 5.4.2, norm downdating):
+`rn_j <- rn_j * sqrt(max(0, 1 - (|x(l,j)| / rn_j)^2))`, skipped when
+`rn_j = 0`. Because the update loses accuracy under heavy cancellation, it
+is replaced by a direct recomputation `rn_j = norm(x(l+1:n, j))` when the
+update becomes unreliable.
+
+The observations fix the details that this description leaves open: the
+condition that triggers recomputation (candidates include a threshold on the
+factor `1 - ratio^2` and a threshold on `rn_j` relative to `orig_j`), and
+the rounding of the update (fused or separate operations). R stores `rn_j`
+in `qraux_j` for positions without a reflector (l >= n and the extra columns
+of wide matrices), so those qraux values expose the updated norms directly.
+Choose the variant that reproduces rank, pivot and qraux of every case in
+both observation files, and document it. If none does, report the cases.
+
 
 The rank is the number of columns not moved, but never more than n. Rank
 and pivot of the cases in the observation file decide the details (when the
@@ -73,8 +92,16 @@ product applied to y = d_j e_j with d_j = x(j,j) of the compact matrix
 
 ## Observation and acceptance
 
+`--downdate` mode of the same script writes
+`docs/provenance/observations/qr_downdate_cases_r462_macos.json`: 170 larger
+cases (`contr.poly` inputs for 11 to 120 levels, centred polynomial bases up
+to degree 20, near-dependent random matrices) with rank, pivot and qraux.
+The `contr_poly_n` inputs are not stored; they are
+`outer(seq_len(n) - (n + 1) / 2, 0:(n - 1), "^")` evaluated in R, so compute
+them with R or check that Rust `powi`/`powf` reproduces those bits.
+
 `scripts/provenance/probe_qr_rules.R` writes
-`docs/provenance/observations/qr_cases_r462_macos.json`: for 70 matrices
+`docs/provenance/observations/qr_cases_r462_macos.json`: for 65 matrices
 (identity, zero columns, all-zero, one row, one column, wide, dependent,
 near-collinear at 1e-5 to 1e-11 in two scalings, other tolerances, mixed
 magnitudes, centred Vandermonde matrices like `poly()` builds, `contr.poly()`
@@ -84,11 +111,9 @@ hex (matrices column-major; scalars wrapped in one-element arrays).
 
 Acceptance:
 
-- `rank` and `pivot` match every case exactly.
-- `qr`, `qraux` and the basis match bit for bit for every case where the
-  pivot order matches. If a case differs only because the deferral decision
-  differs (the remaining norm is recomputed rather than updated), report it
-  with both norms; do not consult any source.
+- `rank`, `pivot` and `qraux` match every case of both files exactly.
+- `qr` and the basis match bit for bit for every case of the first file.
+  Report any case that does not; do not consult any source.
 - The existing tests pass unchanged: rank fixtures
   (`crates/rsdeseq2/tests/data/rank_r462.tsv`, `rank_reference_r462.json`,
   integration modules `design_rank::` and `model_validity::`), the exact
