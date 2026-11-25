@@ -32,6 +32,17 @@
 //! of the objective test and the iteration-limit status were fixed by
 //! black-box runs (`scripts/provenance/probe_unbounded_lbfgs.R`, output in
 //! `docs/provenance/observations/unbounded_lbfgs_probe_r462_macos.txt`).
+//!
+//! The same runs fix the floating-point evaluation order, because the
+//! posterior-mode prefits that use this optimizer feed a refinement step
+//! that amplifies last-bit differences. Inner products and norms accumulate
+//! even- and odd-indexed terms separately and add the two partial sums; the
+//! two-loop recursion divides by `y's` rather than multiplying by its
+//! reciprocal and scales by dividing by `y'y / s'y`; and the zoom trial is
+//! `a - g_a * ((w * w) / (2 * (f_b - f_a - g_a * w)))` with `w = b - a`.
+//! With these choices the evaluation sequences of the four-coefficient
+//! count-regression probes agree bit for bit except for one zoom trial,
+//! one unit in the last place apart, whose cause was not identified.
 use rcompat_lbfgsb::{OptimCounts, OptimResult};
 use std::collections::VecDeque;
 
@@ -152,7 +163,7 @@ impl<F: FnMut(&[f64]) -> (f64, Vec<f64>)> Objective<F> {
     }
 }
 
-/// The newest correction pairs `(s, y, 1 / y's)`, oldest first.
+/// The newest correction pairs `(s, y, y's)`, oldest first.
 #[derive(Default)]
 struct Memory {
     pairs: VecDeque<(Vec<f64>, Vec<f64>, f64)>,
@@ -173,24 +184,24 @@ impl Memory {
         if self.pairs.len() == MEMORY {
             self.pairs.pop_front();
         }
-        self.pairs.push_back((s, y, 1.0 / sy));
+        self.pairs.push_back((s, y, sy));
     }
 
     /// `-H g` by the two-loop recursion (Nocedal and Wright, Algorithm 7.4).
     fn direction(&self, gradient: &[f64]) -> Vec<f64> {
         let mut q = gradient.to_vec();
         let mut alphas = [0.0; MEMORY];
-        for (k, (s, y, rho)) in self.pairs.iter().enumerate().rev() {
-            let alpha = rho * dot(s, &q);
+        for (k, (s, y, sy)) in self.pairs.iter().enumerate().rev() {
+            let alpha = dot(s, &q) / sy;
             alphas[k] = alpha;
             axpy(-alpha, y, &mut q);
         }
-        if let Some((s, y, _)) = self.pairs.back() {
-            let gamma = dot(s, y) / dot(y, y);
-            q.iter_mut().for_each(|v| *v *= gamma);
+        if let Some((_, y, sy)) = self.pairs.back() {
+            let theta = dot(y, y) / sy;
+            q.iter_mut().for_each(|v| *v /= theta);
         }
-        for (k, (s, y, rho)) in self.pairs.iter().enumerate() {
-            let beta = rho * dot(y, &q);
+        for (k, (s, y, sy)) in self.pairs.iter().enumerate() {
+            let beta = dot(y, &q) / sy;
             axpy(alphas[k] - beta, s, &mut q);
         }
         q.iter_mut().for_each(|v| *v = -*v);
@@ -277,8 +288,8 @@ fn line_search<F: FnMut(&[f64]) -> (f64, Vec<f64>)>(
     let mut last_finite = None;
     for _ in 0..MAX_PHASE_TRIALS {
         let width = high.step - low.step;
-        let mut step = low.step
-            - low.slope * width * width / (2.0 * (high.value - low.value - low.slope * width));
+        let excess = high.value - low.value - low.slope * width;
+        let mut step = low.step - low.slope * ((width * width) / (2.0 * excess));
         let (a, b) = (low.step.min(high.step), low.step.max(high.step));
         let margin = SAFEGUARD * (b - a);
         if !(step >= a + margin && step <= b - margin) {
@@ -303,8 +314,13 @@ fn line_search<F: FnMut(&[f64]) -> (f64, Vec<f64>)>(
     Err(last_finite)
 }
 
+/// Inner product with even- and odd-indexed terms summed separately.
 fn dot(a: &[f64], b: &[f64]) -> f64 {
-    a.iter().zip(b).map(|(a, b)| a * b).sum()
+    let mut lanes = [0.0, 0.0];
+    for (i, (a, b)) in a.iter().zip(b).enumerate() {
+        lanes[i % 2] += a * b;
+    }
+    lanes[0] + lanes[1]
 }
 
 fn norm(a: &[f64]) -> f64 {
@@ -325,7 +341,7 @@ mod tests {
         let t1 = x[1] - x[0] * x[0];
         let t2 = 1.0 - x[0];
         (
-            100.0 * t1 * t1 + t2 * t2,
+            100.0 * (t1 * t1) + t2 * t2,
             vec![-400.0 * x[0] * t1 - 2.0 * t2, 200.0 * t1],
         )
     }
@@ -361,9 +377,8 @@ mod tests {
         let (r, points) = traced(rosenbrock, vec![-1.2, 1.0], 1e-6, 1e-5);
         assert_eq!((r.convergence, points.len()), (0, 54), "{}", r.message);
         assert_eq!(r.counts.function, 54);
-        assert!(close(r.par[0], 0.99996829440208279, 1e-8), "{:?}", r.par);
-        assert!(close(r.par[1], 0.9999353850282976, 1e-8), "{:?}", r.par);
-        assert!(close(r.value, 1.1503946922813757e-09, 1e-6));
+        assert_eq!(r.par, vec![0.99996829440208279, 0.9999353850282976]);
+        assert_eq!(r.value, 1.1503946922813757e-09);
         let r = minimize(rosenbrock, vec![-1.2, 1.0]);
         assert_eq!(r.convergence, 0);
         assert!(r.par.iter().all(|v| (v - 1.0).abs() < 1e-6), "{:?}", r.par);
@@ -590,5 +605,122 @@ mod tests {
                 "{start} {tolerance}"
             );
         }
+    }
+
+    /// The four-coefficient count regression of the probe, with the same
+    /// left-to-right scalar arithmetic as its R closure.
+    fn count_regression(y: [f64; 6], s: f64) -> impl Fn(&[f64]) -> (f64, Vec<f64>) {
+        const DESIGN: [[f64; 4]; 6] = [
+            [1., 0., 0., 0.],
+            [1., 0., 0., 0.],
+            [1., 1., 0., 0.],
+            [1., 1., 0., 1.],
+            [1., 0., 1., 1.],
+            [1., 0., 1., 0.],
+        ];
+        let raw = move |b: &[f64]| {
+            let mut v = 0.0;
+            let mut g = vec![0.0; 4];
+            for k in 0..6 {
+                let mut eta = b[0] * DESIGN[k][0];
+                for j in 1..4 {
+                    eta += b[j] * DESIGN[k][j];
+                }
+                let mu = eta.exp();
+                v += mu - y[k] * eta;
+                for j in 0..4 {
+                    g[j] += (mu - y[k]) * DESIGN[k][j];
+                }
+            }
+            v += b[0] * b[0] / 450.0;
+            g[0] += b[0] / 225.0;
+            for j in 1..4 {
+                v += ((b[j] / s) * (b[j] / s)).ln_1p();
+                g[j] += 2.0 * b[j] / (s * s + b[j] * b[j]);
+            }
+            (v, g)
+        };
+        let scale = raw(&[0.0; 4]).0.max(1.0);
+        move |b: &[f64]| {
+            let (v, g) = raw(b);
+            (v / scale + 10.0, g.iter().map(|g| g / scale).collect())
+        }
+    }
+
+    #[test]
+    fn four_coefficient_runs_reproduce_the_observed_evaluation_order() {
+        // Observations `count_regression_4d_{a,b,d}`: every evaluation point
+        // and the returned point agree bit for bit.
+        let start = vec![0.1, -0.1, 0.1, -0.1];
+        for (y, s, evaluations, end) in [
+            (
+                [3., 5., 12., 40., 7., 2.],
+                0.05,
+                22,
+                [
+                    1.1961511225589609,
+                    1.4571565570425382,
+                    -0.003456899605904843,
+                    0.94202838808769829,
+                ],
+            ),
+            (
+                [100., 120., 900., 3000., 40., 20.],
+                0.001,
+                27,
+                [
+                    4.7003632024002782,
+                    2.1103010358988468,
+                    -2.047692668694709,
+                    1.1928679606108219,
+                ],
+            ),
+            (
+                [30., 25., 80., 60., 10., 12.],
+                1.0,
+                21,
+                [
+                    3.3146291412994131,
+                    1.0485256835356129,
+                    -0.75212621269281754,
+                    -0.26060682070497942,
+                ],
+            ),
+        ] {
+            let (r, points) = traced(count_regression(y, s), start.clone(), 1e-8, 1e-8);
+            assert_eq!((r.convergence, points.len()), (0, evaluations), "{y:?}");
+            assert_eq!(r.par, end, "{y:?}");
+        }
+        // Observation `count_regression_4d_c`: the first step needs the
+        // two-lane norm, and the next zoom trials the observed quadratic form.
+        let (_, points) = traced(
+            count_regression([0., 1., 0., 2., 0., 1.], 0.001),
+            vec![-0.1, 0.1, -0.1, 0.1],
+            1e-8,
+            1e-8,
+        );
+        assert_eq!(
+            &points[1..4],
+            &[
+                vec![
+                    -0.1477105448245303,
+                    -0.48556234287390709,
+                    0.46142294716129773,
+                    -0.48279046056133279
+                ],
+                vec![
+                    -0.11827154822793873,
+                    -0.12425085749145412,
+                    0.11500627362475582,
+                    -0.1231893189669489
+                ],
+                vec![
+                    -0.10826871644742228,
+                    -0.0014838332557285394,
+                    -0.0026997663886222517,
+                    -0.0010034382203627235
+                ],
+            ]
+        );
     }
 }
