@@ -1,0 +1,52 @@
+ashr 2.2.63 mixsqp 0.3.54 
+ash loglik -17.069049545847946 pi 1 0 0 0 0 0 0 
+objective at start 0.0149791689 (verbose mixsqp prints 1.497916890e-02)
+eigenvalues of H 6.609 0.00175 2.762e-07 3.768e-11 2.734e-15 5.603e-16 -4.536e-17 
+maxiter.activeset 1 
+  mixsqp        0.268126 0.242826 0.199719 0.13811 0.0805177 0.0707007 0 
+  min-norm      0.268126 0.242826 0.199719 0.13811 0.0805176 0.0707007 0   max abs diff 1.2e-07 
+  ridge 1e-14   0.192688 0.232214 0.269157 0.225201 0 0.0771235 0.00361669   max abs diff 0.087 
+  ridge 1e-12   0.244435 0.240727 0.222898 0.164204 0.0503798 0.0773565 0   max abs diff 0.03 
+  ridge 1e-10   0.266724 0.242532 0.200799 0.139651 0.0796769 0.0706175 0   max abs diff 0.0015 
+maxiter.activeset 2 
+  mixsqp        0.378683 0.257433 0.0940353 0 0.232399 0.0374495 0 
+  min-norm      0.378678 0.257275 0.0942476 0 0.232334 0.0374659 0   max abs diff 0.00021 
+  ridge 1e-14   0.0461396 0.294402 0.4898 0.0748517 0 0.094806 0   max abs diff 0.4 
+  ridge 1e-12   0.367091 0.260094 0.107241 0 0.226732 0.0388415 0   max abs diff 0.013 
+  ridge 1e-10   0.372645 0.252254 0.0897069 0 0.265511 0.0198831 0   max abs diff 0.033 
+maxiter.activeset 3 
+  mixsqp        0.445762 0.254703 0 0 0.27259 0.026945 0 
+  min-norm      0.445874 0.254577 0 0 0.272609 0.0269394 0   max abs diff 0.00013 
+  ridge 1e-14   0.353856 0.211997 0 0.352419 0 0.0817279 0   max abs diff 0.35 
+  ridge 1e-12   0.442714 0.257865 0 0 0.272631 0.0267893 0   max abs diff 0.0032 
+  ridge 1e-10   0.431388 0.246783 0 0 0.321746 8.23734e-05 0   max abs diff 0.049 
+maxiter.activeset 4 
+  mixsqp        0.672009 0 0 0 0.312352 0.0156385 0 
+  min-norm      0.672009 0 0 0 0.312352 0.0156387 0   max abs diff 2.2e-07 
+  ridge 1e-14   0.52677 0 0 0.394199 0 0.0790306 0   max abs diff 0.39 
+  ridge 1e-12   0.671224 0 0 0 0.314111 0.0146658 0   max abs diff 0.0018 
+  ridge 1e-10   0.431583 0.2465 0 0 0.321917 0 0   max abs diff 0.25 
+maxiter.activeset 5 
+  mixsqp        0.659379 0 0 0 0.340621 0 0 
+  min-norm      0.659379 0 0 0 0.340621 0 0   max abs diff 9e-12 
+  ridge 1e-14   0.321098 0 0 0.678902 0 0 0   max abs diff 0.68 
+  ridge 1e-12   0.659379 0 0 0 0.340621 0 0   max abs diff 7.5e-09 
+  ridge 1e-10   0 0.713629 0 0 0.286371 0 0   max abs diff 0.71 
+maxiter.activeset 6 
+  mixsqp        1 0 0 0 0 0 0 
+  min-norm      1 0 0 0 0 0 0   max abs diff 0 
+  ridge 1e-14   1 0 0 0 0 0 0   max abs diff 0 
+  ridge 1e-12   1 0 0 0 0 0 0   max abs diff 0 
+  ridge 1e-10   0 1 0 0 0 0 0   max abs diff 1 
+maxiter.activeset 7 
+  mixsqp        1 0 0 0 0 0 0 
+  min-norm      1 0 0 0 0 0 0   max abs diff 0 
+  ridge 1e-14   1 0 0 0 0 0 0   max abs diff 0 
+  ridge 1e-12   1 0 0 0 0 0 0   max abs diff 0 
+  ridge 1e-10   0 1 0 0 0 0 0   max abs diff 1 
+maxiter.activeset 8 
+  mixsqp        1 0 0 0 0 0 0 
+  min-norm      1 0 0 0 0 0 0   max abs diff 0 
+  ridge 1e-14   1 0 0 0 0 0 0   max abs diff 0 
+  ridge 1e-12   1 0 0 0 0 0 0   max abs diff 0 
+  ridge 1e-10   0 1 0 0 0 0 0   max abs diff 1 
