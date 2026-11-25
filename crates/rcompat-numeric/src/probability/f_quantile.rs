@@ -1,5 +1,5 @@
 //! Fixed Cook's F quantile from a stable beta-logistic density.
-use super::gamma::{log1pmx, stirling_correction};
+use super::gamma::{chi_square_quantile, log1pmx, stirling_correction};
 use super::quadrature::integrate_positive_tail;
 use crate::numeric::math::ProfileMath;
 
@@ -24,9 +24,23 @@ fn logistic_loss(y: f64, p: f64) -> f64 {
     }
 }
 
+/// Degrees of freedom above which `f_99_quantile` uses a chi-square limit.
+const LARGE_DF: f64 = 400_000.0;
+
 /// The 0.99 quantile of the F distribution with `df1` and `df2` degrees of
 /// freedom, as DESeq2 uses for its Cook's distance cutoff.
 pub fn f_99_quantile(df1: f64, df2: f64) -> f64 {
+    // Beyond 400000 degrees of freedom the quantile is taken from a
+    // chi-square limit of the F distribution (docs/provenance/specs/
+    // f_quantile_large_df.md): chi-square(df1) / df1 as df2 grows, and
+    // df2 / chi-square(df2) as df1 grows. When both are large, the first
+    // limit is used whenever df1 <= df2.
+    if df1 <= df2 && df2 > LARGE_DF {
+        return chi_square_quantile(0.99, df1, true) / df1;
+    }
+    if df1 > LARGE_DF {
+        return df2 / chi_square_quantile(0.99, df2, false);
+    }
     // Closed exponential/beta cases avoid an unnecessary inversion.
     if df1 == 2.0 {
         let value = (0.5 * df2) * (-2.0 * (1.0_f64 - 0.99).ln_p() / df2).exp_m1_p();
@@ -97,11 +111,17 @@ mod tests {
     // for df1 up to 200 and df2 up to 100,000.
     const REFERENCE: &str = include_str!("../../tests/data/f_quantile_r462.tsv");
 
-    #[test]
-    fn matches_r_qf_over_the_supported_degrees_of_freedom() {
+    // qf(0.99, df1, df2) from R 4.6.2
+    // (scripts/references/generate_f_quantile_large_df_reference.R) with one
+    // of df1, df2 between 400001 and 1e7, where the chi-square limits apply.
+    const LARGE_DF_REFERENCE: &str = include_str!("../../tests/data/f_quantile_large_df_r462.tsv");
+
+    /// Largest relative difference from the reference, with its df, and the
+    /// number of rows compared.
+    fn worst_relative_difference(reference: &str) -> ((f64, f64, f64), usize) {
         let mut worst = (0.0_f64, 0.0, 0.0);
         let mut rows = 0;
-        for line in REFERENCE.lines().filter(|l| !l.starts_with('#')).skip(1) {
+        for line in reference.lines().filter(|l| !l.starts_with('#')).skip(1) {
             let fields: Vec<&str> = line.split('\t').collect();
             let df1: f64 = fields[0].parse().unwrap();
             let df2: f64 = fields[1].parse().unwrap();
@@ -113,13 +133,27 @@ mod tests {
             }
             rows += 1;
         }
-        assert_eq!(rows, 22 * 26);
         eprintln!(
             "largest relative difference {:e} at df1 {} df2 {}",
             worst.0, worst.1, worst.2
         );
+        (worst, rows)
+    }
+
+    #[test]
+    fn matches_r_qf_over_the_supported_degrees_of_freedom() {
+        let (worst, rows) = worst_relative_difference(REFERENCE);
+        assert_eq!(rows, 22 * 26);
         assert!(worst.0 <= TOLERANCE, "{worst:?}");
     }
 
+    #[test]
+    fn matches_r_qf_in_the_large_degrees_of_freedom_limits() {
+        let (worst, rows) = worst_relative_difference(LARGE_DF_REFERENCE);
+        assert_eq!(rows, 2 * 9 * 6 + 4);
+        assert!(worst.0 <= LARGE_DF_TOLERANCE, "{worst:?}");
+    }
+
     const TOLERANCE: f64 = 2e-14;
+    const LARGE_DF_TOLERANCE: f64 = 1.2e-14;
 }
