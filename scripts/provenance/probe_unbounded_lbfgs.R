@@ -116,4 +116,28 @@ run("ill_conditioned_offset10_no_tolerance", function(x) { r <- quad(c(1, 1e6))(
 run("rosenbrock_offset10_no_tolerance", function(x) { r <- rosen(x); r[[1]] <- r[[1]] + 10; r }, c(-1.2, 1), eps_f = 0, eps_g = 0)
 run("exp_1d_no_tolerance", expo, 0, eps_f = 0, eps_g = 0)
 run("quartic_offset10_no_tolerance", function(x) list(10 + sum((x - c(1, -2))^4), 4 * (x - c(1, -2))^3), c(0, 0), eps_f = 0, eps_g = 0)
+# Four-coefficient count regressions with sharp priors on three slopes, as in
+# the posterior-mode prefits. Sums are accumulated left to right in scalar
+# double arithmetic so that the objective is reproducible bit for bit; the
+# runs then show the optimizer's own rounding (operation order).
+design4 <- rbind(c(1, 0, 0, 0), c(1, 0, 0, 0), c(1, 1, 0, 0), c(1, 1, 0, 1), c(1, 0, 1, 1), c(1, 0, 1, 0))
+count_regression <- function(y, s, offset = 10) {
+  raw <- function(b) {
+    v <- 0; g <- c(0, 0, 0, 0)
+    for (k in 1:6) {
+      eta <- b[1] * design4[k, 1]; for (j in 2:4) eta <- eta + b[j] * design4[k, j]
+      mu <- exp(eta); v <- v + (mu - y[k] * eta)
+      for (j in 1:4) g[j] <- g[j] + (mu - y[k]) * design4[k, j]
+    }
+    v <- v + b[1] * b[1] / 450; g[1] <- g[1] + b[1] / 225
+    for (j in 2:4) { v <- v + log1p((b[j] / s) * (b[j] / s)); g[j] <- g[j] + 2 * b[j] / (s * s + b[j] * b[j]) }
+    list(v, g)
+  }
+  scale <- max(raw(c(0, 0, 0, 0))[[1L]], 1)
+  function(b) { r <- raw(b); list(r[[1L]] / scale + offset, r[[2L]] / scale) }
+}
+run("count_regression_4d_a", count_regression(c(3, 5, 12, 40, 7, 2), 0.05), c(0.1, -0.1, 0.1, -0.1))
+run("count_regression_4d_b", count_regression(c(100, 120, 900, 3000, 40, 20), 0.001), c(0.1, -0.1, 0.1, -0.1))
+run("count_regression_4d_c", count_regression(c(0, 1, 0, 2, 0, 1), 0.001), c(-0.1, 0.1, -0.1, 0.1))
+run("count_regression_4d_d", count_regression(c(30, 25, 80, 60, 10, 12), 1), c(0.1, -0.1, 0.1, -0.1))
 writeLines(lines, out)
