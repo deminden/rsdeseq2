@@ -10,7 +10,6 @@ use crate::numeric::profile::{NumericProfile, numeric_profile};
 
 mod polynomial;
 pub(super) mod polynomial_qr;
-mod reduction;
 pub(super) use polynomial::polynomial_expression;
 pub use polynomial::{PolynomialBasis, PolynomialCoefficients, polynomial_basis};
 

@@ -187,147 +187,23 @@ pub fn matrix_rank_relative(
     matrix_rank_in_place(&mut scaled, n_rows, n_cols, tolerance)
 }
 
-/// R's default `qr()` tolerance (LINPACK `dqrdc2`).
+/// R's default `qr()` tolerance.
 pub const R_QR_TOLERANCE: f64 = 1e-7;
 
-/// Rank of a row-major matrix by R's default `qr(x)$rank`: LINPACK `dqrdc2`
-/// Householder QR with limited column pivoting.
+/// Rank of a row-major matrix as R's default `qr(x)$rank` reports it.
 ///
-/// A column is moved to the end, and does not count towards the rank, when
-/// the norm of its part not yet explained by earlier columns falls below
-/// `tolerance` times its original norm. DESeq2's `checkFullRank` compares
-/// this rank, with `tolerance = 1e-7`, to the number of columns. Follows the
-/// Fortran in R's `src/appl/dqrdc2.f`, including R's 1999 change that
-/// recomputes a column norm once the downdate ratio drops below 1e-6.
+/// Not available in this revision: the previous implementation was removed
+/// and is being replaced by one written from a specification.
 pub fn matrix_rank_r_qr(
     values: &[f64],
     n_rows: usize,
     n_cols: usize,
     tolerance: f64,
 ) -> Result<usize, Error> {
-    if !tolerance.is_finite() || tolerance < 0.0 {
-        return Err(invalid_parameter(
-            ErrorKind::Options,
-            "rank tolerance",
-            Requirement::FiniteAndNonNegative,
-        ));
-    }
-    let expected = n_rows
-        .checked_mul(n_cols)
-        .ok_or_else(|| Error::InvalidDimensions {
-            context: "rank matrix shape overflow".to_string(),
-            expected: usize::MAX,
-            actual: values.len(),
-        })?;
-    if values.len() != expected {
-        return Err(Error::InvalidDimensions {
-            context: "rank matrix values".to_string(),
-            expected,
-            actual: values.len(),
-        });
-    }
-    if let Some((index, value)) = values
-        .iter()
-        .copied()
-        .enumerate()
-        .find(|(_, value)| !value.is_finite())
-    {
-        return Err(Error::NonFiniteValue {
-            context: "rank matrix".to_string(),
-            index: Some(index),
-            value,
-        });
-    }
-    if n_rows == 0 || n_cols == 0 {
-        return Ok(0);
-    }
-    let n = n_rows;
-    let p = n_cols;
-    // Column-major working copy, as LINPACK stores it.
-    let mut x: Vec<Vec<f64>> = (0..p)
-        .map(|col| (0..n).map(|row| values[row * p + col]).collect())
-        .collect();
-    let mut qraux: Vec<f64> = x.iter().map(|col| dnrm2(col)).collect();
-    let mut work1 = qraux.clone();
-    let mut work2: Vec<f64> = qraux
-        .iter()
-        .map(|&norm| if norm == 0.0 { 1.0 } else { norm })
-        .collect();
-    let lup = n.min(p);
-    // `k` is one past the last column still in play (LINPACK's k = p + 1).
-    let mut k = p + 1;
-    for l in 0..lup {
-        // Cycle negligible columns to the end until a usable one sits at l.
-        while l + 1 < k && qraux[l] < work2[l] * tolerance {
-            let column = x.remove(l);
-            x.push(column);
-            let moved = qraux.remove(l);
-            qraux.push(moved);
-            let moved = work1.remove(l);
-            work1.push(moved);
-            let moved = work2.remove(l);
-            work2.push(moved);
-            k -= 1;
-        }
-        if l + 1 == n {
-            break;
-        }
-        let nrmxl = dnrm2(&x[l][l..]);
-        if nrmxl == 0.0 {
-            continue;
-        }
-        let nrmxl = if x[l][l] != 0.0 {
-            nrmxl.copysign(x[l][l])
-        } else {
-            nrmxl
-        };
-        for value in &mut x[l][l..] {
-            *value *= 1.0 / nrmxl;
-        }
-        x[l][l] += 1.0;
-        let (pivot, rest) = x.split_at_mut(l + 1);
-        let householder = &pivot[l][l..];
-        for (offset, column) in rest.iter_mut().enumerate() {
-            let j = l + 1 + offset;
-            let dot = householder
-                .iter()
-                .zip(&column[l..])
-                .map(|(a, b)| a * b)
-                .sum::<f64>();
-            let t = -dot / householder[0];
-            for (value, h) in column[l..].iter_mut().zip(householder) {
-                *value += t * h;
-            }
-            if qraux[j] != 0.0 {
-                let ratio = column[l].abs() / qraux[j];
-                let tt = (1.0 - ratio * ratio).max(0.0);
-                if tt.abs() < 1e-6 {
-                    qraux[j] = dnrm2(&column[l + 1..]);
-                    work1[j] = qraux[j];
-                } else {
-                    qraux[j] *= tt.sqrt();
-                }
-            }
-        }
-        qraux[l] = x[l][l];
-        x[l][l] = -nrmxl;
-    }
-    Ok((k - 1).min(n))
-}
-
-/// Euclidean norm with BLAS `dnrm2`'s scaling, so no intermediate overflows.
-fn dnrm2(values: &[f64]) -> f64 {
-    let mut scale = 0.0_f64;
-    let mut ssq = 1.0_f64;
-    for value in values.iter().map(|v| v.abs()).filter(|&v| v != 0.0) {
-        if scale < value {
-            ssq = 1.0 + ssq * (scale / value) * (scale / value);
-            scale = value;
-        } else {
-            ssq += (value / scale) * (value / scale);
-        }
-    }
-    scale * ssq.sqrt()
+    let _ = (values, n_rows, n_cols, tolerance);
+    Err(Error::UnsupportedFeature {
+        feature: "R qr() rank (being rewritten)".to_string(),
+    })
 }
 
 #[cfg(test)]
