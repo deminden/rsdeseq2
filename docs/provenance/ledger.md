@@ -37,7 +37,6 @@ without upstream source code open.
 | `crates/rcompat-numeric/src/probability/f_quantile.rs` | 0.99 F quantile for the Cook's cutoff, by inverting the upper tail of the beta-logistic density; F from the beta relation | paper, black-box | The large degrees-of-freedom branch that cited R's `qf.c` is removed; `f_quantile_r462.tsv` from `qf()` checks df1 up to 200 and df2 up to 100,000 | clean |
 | `crates/rcompat-numeric/src/numeric/special.rs` | Gamma, digamma, incomplete gamma, beta, normal and gamma quantiles | MIT code | Port of `statrs` 0.19.1 (MIT); `erf_inv` uses Boost rational approximations by way of statrs | to replace |
 | `crates/rcompat-shrinkage/src/shrinkage/heavy_tail/unbounded_lbfgs.rs` | Unbounded L-BFGS with strong-Wolfe line search | MIT code | Adaptation of LBFGSpp (MIT); notice in `LBFGSPP-LICENSE` | to replace |
-| `crates/rcompat-shrinkage/src/shrinkage/heavy_tail/LBFGSPP-LICENSE` | Licence notice for the LBFGSpp adaptation | MIT code | Covers `unbounded_lbfgs.rs` | to remove |
 | `crates/rcompat-shrinkage/src/shrinkage/mixture_fit/sqp/compatibility.rs` | Active-set and floored EM policy of the mixture SQP solver | MIT code | Implements mixsqp 0.3-54 (MIT); notice in `MIXSQP-LICENSE` | to replace |
 | `crates/rcompat-shrinkage/src/shrinkage/mixture_fit/sqp/MIXSQP-LICENSE` | Licence notice for the mixsqp algorithm | MIT code | Covers `sqp/compatibility.rs` | to remove |
 | `crates/rcompat-shrinkage/src/shrinkage/gamma_normalization.rs` | Gamma function series for the R profiles | public-domain code | Fullerton's SLATEC `dgamma.f` tables, cited; SLATEC guide section 4 | clean |
@@ -67,3 +66,4 @@ listed so that the record stays complete; the check ignores this section.
 | `crates/rcompat-formula/src/design/numeric_transform/binary128/wide.rs` | Binary128 round-to-nearest arithmetic | unknown | Written for 0.6.2 to replace `rustc_apfloat`; how it was written was not recorded | 0.7.0 |
 | Linux formula references and golden manifests | Exact R 4.6.2 outputs on Linux | black-box | Data, not code; removed with the profiles | 0.7.0 |
 | `crates/rcompat-formula/src/design/numeric_transform/reduction.rs` | Dot product, norm and axpy order for polynomial QR | upstream source | 0.6.1 header: "Arithmetic schedules adapted from OpenBLAS 0.3.26"; reshaped in 0.6.2 | 0.7.0 |
+| `crates/rcompat-shrinkage/src/shrinkage/heavy_tail/LBFGSPP-LICENSE` | Licence notice of the LBFGSpp adaptation | MIT code | Removed with the code it covered | 0.7.0 |
