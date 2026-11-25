@@ -1,30 +1,13 @@
 # Third-party notices
 
-## statrs special functions
+## Published coefficients
 
-The special functions in `rcompat-numeric` include MIT-licensed ports from
-`statrs` 0.19.1. The original copyright and permission notice follows.
+The `rcompat-numeric` crate incorporates no third-party source code. Two
+files use coefficients printed in published papers:
 
-```text
-MIT License
-
-Copyright (c) 2016 Michael Ma
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
+- `src/numeric/special.rs`: the normal quantile uses the coefficients of
+  Wichura, M. J. (1988), "Algorithm AS 241: The percentage points of the
+  normal distribution", Applied Statistics 37(3):477-484.
+- `src/probability/normal_log.rs`: the normal tail uses the rational
+  approximations of Cody, W. J. (1969), "Rational Chebyshev approximations
+  for the error function", Mathematics of Computation 23(107):631-637.
