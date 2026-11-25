@@ -1,3 +1,4 @@
+use super::householder::HouseholderQr;
 use crate::errors::Error;
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::matrix::try_alloc_matrix;
@@ -192,18 +193,25 @@ pub const R_QR_TOLERANCE: f64 = 1e-7;
 
 /// Rank of a row-major matrix as R's default `qr(x)$rank` reports it.
 ///
-/// Not available in this revision: the previous implementation was removed
-/// and is being replaced by one written from a specification.
+/// The matrix is factorized by Householder QR with limited column pivoting
+/// (`math::householder`): a column whose remaining norm
+/// falls below `tolerance` times its original norm, or that is entirely
+/// zero, does not count towards the rank. See
+/// `docs/provenance/specs/householder_qr.md`.
 pub fn matrix_rank_r_qr(
     values: &[f64],
     n_rows: usize,
     n_cols: usize,
     tolerance: f64,
 ) -> Result<usize, Error> {
-    let _ = (values, n_rows, n_cols, tolerance);
-    Err(Error::UnsupportedFeature {
-        feature: "R qr() rank (being rewritten)".to_string(),
-    })
+    validate_rank_input(values, n_rows, n_cols, tolerance)?;
+    let mut columns = try_alloc_matrix(n_cols, 1, "QR rank columns")?;
+    for col in 0..n_cols {
+        let mut column = try_alloc_matrix(n_rows, 1, "QR rank column")?;
+        column.extend((0..n_rows).map(|row| values[row * n_cols + col]));
+        columns.push(column);
+    }
+    Ok(HouseholderQr::factorize(columns, n_rows, tolerance)?.rank())
 }
 
 #[cfg(test)]

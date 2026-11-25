@@ -2,6 +2,8 @@
 
 #[doc(hidden)]
 pub mod elementary;
+#[doc(hidden)]
+pub mod householder;
 /// Medians as R's `median()` computes them.
 pub mod median;
 /// Normal-distribution log tail probabilities.
@@ -10,6 +12,8 @@ pub mod normal;
 pub mod optim;
 /// Matrix rank by Gaussian elimination and by R's pivoted QR rule.
 pub mod rank;
+/// Dot product, Euclidean norm and vector update in a fixed evaluation order.
+pub mod reduction;
 /// The trigamma function.
 pub mod special;
 
