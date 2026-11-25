@@ -65,6 +65,93 @@ testthat::test_that("R wrapper supports supplied geoMeans and control genes", {
   }
 })
 
+testthat::test_that("R wrapper follows the documented geoMeans and controlGenes rules", {
+  counts <- matrix(
+    c(
+      12L, 30L, 7L, 45L,
+      0L, 18L, 22L, 9L,
+      60L, 41L, 85L, 52L,
+      5L, 0L, 3L, 11L,
+      140L, 95L, 170L, 120L
+    ),
+    nrow = 5,
+    byrow = TRUE,
+    dimnames = list(paste0("g", 1:5), paste0("s", 1:4))
+  )
+  reference <- matrix(
+    c(
+      20L, 25L, 18L,
+      11L, 14L, 9L,
+      70L, 55L, 66L,
+      4L, 6L, 8L,
+      150L, 130L, 160L
+    ),
+    nrow = 5,
+    byrow = TRUE
+  )
+  frozen <- exp(rowMeans(log(reference)))
+
+  # geoMeans must supply one geometric mean per row of counts.
+  testthat::expect_error(estimateSizeFactorsRust(counts, geoMeans = frozen[1:3]))
+  testthat::expect_error(estimateSizeFactorsRust(counts, geoMeans = c(frozen, 1)))
+  # Rows with a zero geometric mean are skipped, so all-zero leaves nothing.
+  testthat::expect_error(estimateSizeFactorsRust(counts, geoMeans = rep(0, 5)))
+  # Geometric means cannot be missing or negative.
+  testthat::expect_error(estimateSizeFactorsRust(counts, geoMeans = c(1, 2, NA, 4, 5)))
+  testthat::expect_error(estimateSizeFactorsRust(counts, geoMeans = c(1, 2, -3, 4, 5)))
+  testthat::expect_error(estimateSizeFactorsRust(counts, geoMeans = as.character(frozen)))
+
+  # controlGenes is a numeric or logical index into the rows of counts.
+  testthat::expect_error(estimateSizeFactorsRust(counts, controlGenes = c(2, 9)))
+  testthat::expect_error(estimateSizeFactorsRust(counts, controlGenes = c(0, 2)))
+  testthat::expect_error(estimateSizeFactorsRust(counts, controlGenes = c(1.5, 3)))
+  testthat::expect_error(estimateSizeFactorsRust(counts, controlGenes = c(TRUE, FALSE)))
+  testthat::expect_error(
+    estimateSizeFactorsRust(counts, controlGenes = c(TRUE, NA, TRUE, TRUE, TRUE))
+  )
+
+  # A frozen calculation against geometric means from another matrix.
+  testthat::expect_equal(
+    estimateSizeFactorsRust(counts, geoMeans = frozen),
+    DESeq2::estimateSizeFactorsForMatrix(counts, geoMeans = frozen),
+    tolerance = 1e-12
+  )
+  # Numeric and logical indices selecting the same genes agree with DESeq2.
+  controlIdx <- c(1L, 3L, 5L)
+  controlLgl <- seq_len(nrow(counts)) %in% controlIdx
+  expected <- DESeq2::estimateSizeFactorsForMatrix(counts, controlGenes = controlIdx)
+  testthat::expect_equal(
+    estimateSizeFactorsRust(counts, controlGenes = controlIdx),
+    expected,
+    tolerance = 1e-12
+  )
+  testthat::expect_equal(
+    estimateSizeFactorsRust(counts, controlGenes = controlLgl),
+    DESeq2::estimateSizeFactorsForMatrix(counts, controlGenes = controlLgl),
+    tolerance = 1e-12
+  )
+  testthat::expect_equal(
+    estimateSizeFactorsRust(counts, controlGenes = controlLgl),
+    expected,
+    tolerance = 1e-12
+  )
+  # Both arguments together, and controlGenes with positive-count means.
+  testthat::expect_equal(
+    estimateSizeFactorsRust(counts, geoMeans = frozen, controlGenes = c(2L, 3L, 4L)),
+    DESeq2::estimateSizeFactorsForMatrix(counts, geoMeans = frozen, controlGenes = c(2L, 3L, 4L)),
+    tolerance = 1e-12
+  )
+  testthat::expect_equal(
+    estimateSizeFactorsRust(counts, method = "poscounts", controlGenes = c(1L, 2L, 3L, 5L)),
+    DESeq2::estimateSizeFactorsForMatrix(
+      counts,
+      controlGenes = c(1L, 2L, 3L, 5L),
+      type = "poscounts"
+    ),
+    tolerance = 1e-12
+  )
+})
+
 testthat::test_that("R wrapper normalized counts and base means are available", {
   counts <- matrix(
     c(
