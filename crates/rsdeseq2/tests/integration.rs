@@ -16,6 +16,8 @@ mod adaptive_result;
 mod advanced_ashr_optimizers;
 #[path = "analysis_requests.rs"]
 mod analysis_requests;
+#[path = "apeglm_prefit_sensitivity.rs"]
+mod apeglm_prefit_sensitivity;
 #[path = "ashr_mode.rs"]
 mod ashr_mode;
 #[path = "ashr_optimizers.rs"]

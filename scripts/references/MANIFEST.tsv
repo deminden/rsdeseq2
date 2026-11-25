@@ -11,6 +11,7 @@ crates/rsdeseq2/tests/data/breadth/*/reference_beta_prior_variance.tsv	scripts/r
 crates/rsdeseq2/tests/data/breadth/*/*	scripts/references/generate_breadth_references.R	cargo test --locked -p rsdeseq2 --test integration breadth_end_to_end::	-
 crates/rsdeseq2/tests/data/deseq2_reference/hard_se_covariance_*.tsv	scripts/references/generate_se_covariance_hard_fixtures.R	cargo test --locked -p rsdeseq2 --test integration se_covariance_reference::	copied in under the hard_se_covariance_ prefix; deseq2/io.R keeps these on regeneration
 crates/rsdeseq2/tests/data/deseq2_reference/*	scripts/references/generate_deseq2_references.R	cargo test --locked -p rsdeseq2 --test integration	helpers in scripts/references/deseq2/
+crates/rsdeseq2/tests/data/gtex_apeglm_prefit_r462.json	scripts/references/generate_gtex_apeglm_prefit_reference.R	cargo test --locked -p rsdeseq2 --test integration apeglm_prefit_sensitivity::	-
 crates/rsdeseq2/tests/data/gtex_auto_dispersion/*	scripts/references/generate_gtex_auto_dispersion_reference.R	cargo test --locked -p rsdeseq2 --test integration auto_dispersion::	-
 crates/rsdeseq2/tests/data/gtex_end_to_end/*	scripts/references/generate_gtex_end_to_end_reference.R	cargo test --locked -p rsdeseq2 --test integration gtex_end_to_end::	-
 crates/rsdeseq2/tests/data/gtex_v8_real_wald/compact/*	scripts/references/generate_gtex_compact_fixture.py	cargo test --locked -p rsdeseq2 --test integration gtex_real_wald_parity::	calls generate_gtex_compact_reference.R
