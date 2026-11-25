@@ -6,8 +6,8 @@
 //! These policies are independently exercised by the saturated BB profiles.
 use super::try_dense_matrix;
 use crate::{Error, matrix::try_alloc_matrix};
-use nalgebra::{DMatrix, DVector, DVectorView};
 use rcompat_lbfgsb::{OptimCounts, OptimResult};
+use rcompat_numeric::math::dense::{DenseMatrix, dot, gemv_to};
 pub(super) fn minimize(
     mut evaluate: impl FnMut(&[f64]) -> (f64, Vec<f64>),
     mut x: Vec<f64>,
@@ -18,10 +18,10 @@ pub(super) fn minimize(
     let mut inverse = try_dense_matrix(p, p, "posterior BFGS metric", |i, j| {
         if i == j { 1.0 } else { 0.0 }
     })?;
-    let workspace = |context| -> Result<DVector<f64>, Error> {
+    let workspace = |context| -> Result<Vec<f64>, Error> {
         let mut values = try_alloc_matrix(p, 1, context)?;
         values.resize(p, 0.0);
-        Ok(DVector::from_vec(values))
+        Ok(values)
     };
     let mut direction = workspace("posterior BFGS direction")?;
     let mut s = workspace("posterior BFGS step")?;
@@ -38,15 +38,18 @@ pub(super) fn minimize(
             fresh = true;
             metric_age = 0;
         }
-        let g = DVectorView::from_slice(&gradient, p);
-        direction.gemv(-1.0, &inverse, &g, 0.0);
-        let mut slope = direction.dot(&g);
+        // direction = -H g; negating the column gaxpy rounds identically.
+        gemv_to(&inverse, &gradient, &mut direction)?;
+        for d in direction.iter_mut() {
+            *d = -*d;
+        }
+        let mut slope = dot(&direction, &gradient);
         if !slope.is_finite() || slope >= 0.0 {
             inverse.fill_with_identity();
-            for (d, &value) in direction.iter_mut().zip(g.iter()) {
+            for (d, &value) in direction.iter_mut().zip(gradient.iter()) {
                 *d = -value;
             }
-            slope = -g.dot(&g);
+            slope = -dot(&gradient, &gradient);
             fresh = true;
             metric_age = 0;
         }
@@ -105,10 +108,10 @@ pub(super) fn minimize(
         gradient = next_gradient;
         accepted_gradients += 1;
         metric_age += 1;
-        let curvature = s.dot(&y);
+        let curvature = dot(&s, &y);
         if curvature > 0.0 && curvature.is_finite() {
-            inverse.mul_to(&y, &mut hy);
-            let ratio = (1.0 + y.dot(&hy) / curvature) / curvature;
+            gemv_to(&inverse, &y, &mut hy)?;
+            let ratio = (1.0 + dot(&y, &hy) / curvature) / curvature;
             update_inverse_metric(&mut inverse, &s, &hy, ratio, curvature);
             fresh = false;
         } else {
@@ -134,14 +137,14 @@ pub(super) fn minimize(
 }
 
 fn update_inverse_metric(
-    inverse: &mut DMatrix<f64>,
-    s: &DVector<f64>,
-    hy: &DVector<f64>,
+    inverse: &mut DenseMatrix,
+    s: &[f64],
+    hy: &[f64],
     ratio: f64,
     curvature: f64,
 ) {
-    for (j, mut column) in inverse.column_iter_mut().enumerate() {
-        for (i, entry) in column.iter_mut().enumerate() {
+    for j in 0..inverse.ncols() {
+        for (i, entry) in inverse.column_mut(j).iter_mut().enumerate() {
             let outer = s[i] * s[j];
             let mixed = s[i] * hy[j] + hy[i] * s[j];
             *entry += ratio * outer - mixed / curvature;
@@ -155,14 +158,18 @@ mod tests {
 
     #[test]
     fn bfgs_metric_update_matches_the_rank_two_expression() {
-        let s = DVector::from_vec(vec![2.0 / 7.0, -0.0, -3.0 / 7.0, 4.0 / 7.0, 0.0, 1.0]);
-        let hy = DVector::from_vec(vec![-0.0, -0.4, 0.0, 0.3, 5.0, -6.0]);
-        let mut metric = DMatrix::identity(s.len(), s.len());
+        let s = [2.0 / 7.0, -0.0, -3.0 / 7.0, 4.0 / 7.0, 0.0, 1.0];
+        let hy = [-0.0, -0.4, 0.0, 0.3, 5.0, -6.0];
+        let n = s.len();
+        let mut metric = DenseMatrix::identity(n).unwrap();
         let ratio = 0.53;
         let curvature = 0.27;
-        let expected = &metric
-            + (ratio * (&s * s.transpose())
-                - (&s * hy.transpose() + &hy * s.transpose()) / curvature);
+        // I + (ratio * s sᵀ - (s hyᵀ + hy sᵀ) / curvature), entry by entry.
+        let expected = DenseMatrix::try_from_fn(n, n, "test", |i, j| {
+            let identity = if i == j { 1.0 } else { 0.0 };
+            identity + (ratio * (s[i] * s[j]) - (s[i] * hy[j] + hy[i] * s[j]) / curvature)
+        })
+        .unwrap();
 
         update_inverse_metric(&mut metric, &s, &hy, ratio, curvature);
         for (actual, reference) in metric.iter().zip(expected.iter()) {

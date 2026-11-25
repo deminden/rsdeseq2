@@ -1,10 +1,11 @@
 //! Native log-barrier path following for the convex mixture problem.
 //! Scaled Newton equations avoid inverse-square weight conditioning. The
 //! accepted SQP path is neither called nor changed by this solver.
-use super::{DVector, ERROR_SCOPE, Problem, invalid_mixture_value, try_dense_matrix};
+use super::{ERROR_SCOPE, Problem, invalid_mixture_value, try_dense_matrix};
 use crate::Error;
 use crate::errors::scoped_invalid_options;
 use crate::numeric::math::ProfileMath;
+use rcompat_numeric::math::dense::{Cholesky, dot};
 #[derive(Clone, Copy, Debug)]
 /// Controls of the primal-dual interior-point weight fitter.
 pub struct InteriorPointOptions {
@@ -93,20 +94,22 @@ impl Problem {
                 }
                 scaled[(j, j)] += mu;
             }
-            let rhs = DVector::from_iterator(k, g.iter().zip(&x).map(|(g, x)| g * x - mu));
-            let direction = scaled
-                .cholesky()
-                .and_then(|h| {
-                    let v = h.solve(&rhs);
-                    v.iter().all(|v| v.is_finite()).then_some(v)
-                })
+            let rhs = g
+                .iter()
+                .zip(&x)
+                .map(|(g, x)| g * x - mu)
+                .collect::<Vec<_>>();
+            let direction = Cholesky::new(scaled)
+                .map(|h| h.solve(&rhs))
+                .transpose()?
+                .filter(|v| v.iter().all(|v| v.is_finite()))
                 .ok_or_else(|| {
                     scoped_invalid_options(
                         ERROR_SCOPE,
                         "interior-point scaled Hessian is not positive definite",
                     )
                 })?;
-            let decrement = rhs.dot(&direction);
+            let decrement = dot(&rhs, &direction);
             if decrement <= (mu * 0.1).max(1e-25) {
                 mu *= 0.1;
                 iterations += 1;

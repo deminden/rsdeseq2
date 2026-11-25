@@ -1,5 +1,7 @@
 use super::*;
-use nalgebra::{Dim, Dyn, Matrix, Matrix4, StorageMut};
+use rcompat_numeric::math::dense::householder::{reduce_column, reflect_with_sign};
+use rcompat_numeric::math::dense::triangular::{solve_lower_unit_in_place, solve_upper_in_place};
+use rcompat_numeric::math::dense::{lu_solve_in_place, matmul_to, try_inverse_in_place};
 // Weighted least squares, QR, covariance and design crossproducts.
 
 #[derive(Default)]
@@ -10,23 +12,23 @@ pub(super) struct LeastSquaresScratch {
 
 #[derive(Default)]
 pub(super) struct QrScratch {
-    augmented_design: DMatrix<f64>,
-    augmented_response: DVector<f64>,
+    augmented_design: DenseMatrix,
+    augmented_response: Vec<f64>,
     sqrt_weights: Vec<f64>,
     diagonal: Vec<f64>,
-    basis_column: DVector<f64>,
-    triangular: DMatrix<f64>,
-    coefficients: DVector<f64>,
+    basis_column: Vec<f64>,
+    triangular: DenseMatrix,
+    coefficients: Vec<f64>,
 }
 
 pub(super) fn solve_weighted_least_squares(
     scratch: &mut LeastSquaresScratch,
-    x: &DMatrix<f64>,
+    x: &DenseMatrix,
     w: &[f64],
     z: &[f64],
     ridge_lambda: &[f64],
     solver: IrlsSolver,
-    beta: &mut DVector<f64>,
+    beta: &mut Vec<f64>,
 ) -> Result<bool, DeseqError> {
     match solver {
         IrlsSolver::NormalEquations => scratch.normal.solve(x, w, z, ridge_lambda, beta),
@@ -38,16 +40,12 @@ pub(super) fn solve_weighted_least_squares(
 
 pub(super) fn solve_weighted_least_squares_qr(
     scratch: &mut QrScratch,
-    x: &DMatrix<f64>,
+    x: &DenseMatrix,
     w: &[f64],
     z: &[f64],
     ridge_lambda: &[f64],
-    beta: &mut DVector<f64>,
+    beta: &mut Vec<f64>,
 ) -> Result<bool, DeseqError> {
-    use nalgebra::{
-        ComplexField, Unit, geometry::Reflection, linalg::householder::clear_column_unchecked,
-    };
-
     let n = x.nrows();
     let p = x.ncols();
     let m = n
@@ -57,17 +55,17 @@ pub(super) fn solve_weighted_least_squares_qr(
     let column_basis = p <= 4 && crate::numeric_profile() != crate::NumericProfile::Portable;
     if scratch.augmented_design.shape() != (m, p) {
         *scratch = QrScratch {
-            augmented_design: try_zero_dmatrix(m, p, "IRLS QR augmented design")?,
-            augmented_response: try_zero_dvector(m, "IRLS QR augmented response")?,
+            augmented_design: try_zero_matrix(m, p, "IRLS QR augmented design")?,
+            augmented_response: try_zero_vector(m, "IRLS QR augmented response")?,
             sqrt_weights: try_filled_vec(n, 0.0, "IRLS QR square root weights")?,
             diagonal: try_filled_vec(p, 0.0, "IRLS QR diagonal")?,
             basis_column: if column_basis {
-                try_zero_dvector(m, "IRLS QR basis column")?
+                try_zero_vector(m, "IRLS QR basis column")?
             } else {
-                DVector::default()
+                Vec::new()
             },
-            triangular: try_zero_dmatrix(p, p, "IRLS QR triangular matrix")?,
-            coefficients: try_zero_dvector(p, "IRLS QR coefficients")?,
+            triangular: try_zero_matrix(p, p, "IRLS QR triangular matrix")?,
+            coefficients: try_zero_vector(p, "IRLS QR coefficients")?,
         };
     }
     if fill_augmented_qr_system(scratch, x, w, z, ridge_lambda).is_none() {
@@ -84,7 +82,7 @@ pub(super) fn solve_weighted_least_squares_qr(
     } = scratch;
 
     for (col, signed_norm) in diagonal.iter_mut().enumerate() {
-        *signed_norm = clear_column_unchecked(augmented_design, col, 0, None);
+        *signed_norm = reduce_column(augmented_design, col);
     }
     if column_basis {
         // Each coefficient uses the original Q-transpose reduction order.
@@ -92,34 +90,31 @@ pub(super) fn solve_weighted_least_squares_qr(
             basis_column.fill(0.0);
             basis_column[col] = 1.0;
             for (step, signed_norm) in diagonal[..=col].iter().copied().enumerate().rev() {
-                let axis = augmented_design.view_range(step.., step);
-                let reflection = Reflection::new(Unit::new_unchecked(axis), 0.0);
-                reflection.reflect_with_sign(
-                    &mut basis_column.rows_mut(step, m - step),
-                    ComplexField::signum(signed_norm),
+                reflect_with_sign(
+                    &augmented_design.column(step)[step..],
+                    &mut basis_column[step..],
+                    signed_norm.signum(),
                 );
             }
             *coefficient = basis_column
-                .as_slice()
                 .iter()
-                .zip(augmented_response.as_slice())
+                .zip(augmented_response.iter())
                 .map(|(basis, response)| basis * response)
                 .reduce(|sum, product| product + sum)
                 .unwrap_or(0.0);
         }
     } else {
         // The augmented ridge rows contribute zero to the response.
-        augmented_response.as_mut_slice()[n..].fill(0.0);
+        augmented_response[n..].fill(0.0);
         // Apply Q^T to the response in reflector order without forming Q.
         for (col, signed_norm) in diagonal.iter().copied().enumerate() {
-            let axis = augmented_design.view_range(col.., col);
-            let reflection = Reflection::new(Unit::new_unchecked(axis), 0.0);
-            reflection.reflect_with_sign(
-                &mut augmented_response.rows_mut(col, m - col),
-                ComplexField::signum(signed_norm),
+            reflect_with_sign(
+                &augmented_design.column(col)[col..],
+                &mut augmented_response[col..],
+                signed_norm.signum(),
             );
         }
-        coefficients.copy_from(&augmented_response.rows(0, p));
+        coefficients.copy_from_slice(&augmented_response[..p]);
     }
     if !solve_qr_triangle(augmented_design, diagonal, triangular, coefficients) {
         return Ok(false);
@@ -130,7 +125,7 @@ pub(super) fn solve_weighted_least_squares_qr(
 
 fn fill_augmented_qr_system(
     scratch: &mut QrScratch,
-    x: &DMatrix<f64>,
+    x: &DenseMatrix,
     w: &[f64],
     z: &[f64],
     ridge_lambda: &[f64],
@@ -150,16 +145,11 @@ fn fill_augmented_qr_system(
         augmented_response[row] = checked::mul(z[row], *sqrt_weight)?;
     }
 
-    for (col, (mut column, original)) in augmented_design
-        .column_iter_mut()
-        .zip(x.column_iter())
-        .enumerate()
-    {
-        let column = column.as_mut_slice();
-        for ((target, design_value), sqrt_weight) in column[..n]
-            .iter_mut()
-            .zip(original.as_slice())
-            .zip(&*sqrt_weights)
+    for col in 0..x.ncols() {
+        let original = x.column(col);
+        let column = augmented_design.column_mut(col);
+        for ((target, design_value), sqrt_weight) in
+            column[..n].iter_mut().zip(original).zip(&*sqrt_weights)
         {
             *target = checked::mul(*design_value, *sqrt_weight)?;
         }
@@ -175,10 +165,10 @@ fn fill_augmented_qr_system(
 }
 
 pub(super) fn solve_qr_triangle(
-    augmented_design: &DMatrix<f64>,
+    augmented_design: &DenseMatrix,
     diagonal: &[f64],
-    triangular: &mut DMatrix<f64>,
-    coefficients: &mut DVector<f64>,
+    triangular: &mut DenseMatrix,
+    coefficients: &mut [f64],
 ) -> bool {
     let p = diagonal.len();
     let mut regular = true;
@@ -207,21 +197,20 @@ pub(super) fn solve_qr_triangle(
         let needs_lower_solve = coefficients
             .iter()
             .any(|value| !value.is_finite() || value.to_bits() == (-0.0_f64).to_bits());
-        (!needs_lower_solve || triangular.solve_lower_triangular_with_diag_mut(coefficients, 1.0))
-            && triangular.solve_upper_triangular_mut(coefficients)
+        if needs_lower_solve {
+            solve_lower_unit_in_place(triangular, coefficients);
+        }
+        solve_upper_in_place(triangular, coefficients)
     } else {
         for col in 0..p {
             for row in 0..col {
                 triangular[(row, col)] = augmented_design[(row, col)];
             }
         }
-        let solved = solve_lu_in_place(triangular, coefficients);
+        let solved = lu_solve_in_place(triangular, coefficients);
         // The next QR solve overwrites the upper triangle only.
         for col in 0..p {
-            triangular
-                .column_mut(col)
-                .rows_range_mut(col + 1..)
-                .fill(0.0);
+            triangular.column_mut(col)[col + 1..].fill(0.0);
         }
         solved
     }
@@ -229,21 +218,21 @@ pub(super) fn solve_qr_triangle(
 
 #[derive(Default)]
 pub(super) struct CovarianceScratch {
-    crossproduct: DMatrix<f64>,
-    inverse: DMatrix<f64>,
-    product: DMatrix<f64>,
-    covariance: DMatrix<f64>,
+    crossproduct: DenseMatrix,
+    inverse: DenseMatrix,
+    product: DenseMatrix,
+    covariance: DenseMatrix,
     active: Vec<(usize, f64)>,
 }
 
 pub(super) enum FitCovariance<'a> {
-    Full(&'a DMatrix<f64>),
+    Full(&'a DenseMatrix),
     PositiveDiagonal,
 }
 
 pub(super) fn covariance_and_hat_diagonal<'a>(
     scratch: &'a mut CovarianceScratch,
-    x: &DMatrix<f64>,
+    x: &DenseMatrix,
     w: &[f64],
     ridge_lambda: &[f64],
     hat: Option<&mut [f64]>,
@@ -253,9 +242,9 @@ pub(super) fn covariance_and_hat_diagonal<'a>(
     let p = x.ncols();
     if scratch.crossproduct.shape() != (p, p) {
         *scratch = CovarianceScratch {
-            crossproduct: try_zero_dmatrix(p, p, "IRLS covariance crossproduct")?,
-            inverse: try_zero_dmatrix(p, p, "IRLS covariance inverse")?,
-            product: try_zero_dmatrix(p, p, "IRLS covariance intermediate")?,
+            crossproduct: try_zero_matrix(p, p, "IRLS covariance crossproduct")?,
+            inverse: try_zero_matrix(p, p, "IRLS covariance inverse")?,
+            product: try_zero_matrix(p, p, "IRLS covariance intermediate")?,
             active: try_alloc_matrix(p, 1, "IRLS covariance active columns")?,
             ..CovarianceScratch::default()
         };
@@ -279,16 +268,18 @@ pub(super) fn covariance_and_hat_diagonal<'a>(
     } else {
         None
     };
-    product.gemm(1.0, inverse, crossproduct, 0.0);
+    if matmul_to(inverse, crossproduct, product).is_err() {
+        return Ok(None);
+    }
     let fitted = if !retain_covariance
         && max_inverse.is_some_and(|max| covariance_diagonal_is_positive(product, inverse, max))
     {
         FitCovariance::PositiveDiagonal
     } else {
         if covariance.shape() != (p, p) {
-            *covariance = try_zero_dmatrix(p, p, "IRLS covariance")?;
+            *covariance = try_zero_matrix(p, p, "IRLS covariance")?;
         }
-        covariance.gemm(1.0, product, inverse, 0.0);
+        matmul_to(product, inverse, covariance)?;
         if !covariance.iter().all(|value| value.is_finite()) {
             return Ok(None);
         }
@@ -303,10 +294,10 @@ pub(super) fn covariance_and_hat_diagonal<'a>(
 }
 
 fn invert_regularized_crossproduct(
-    crossproduct: &DMatrix<f64>,
+    crossproduct: &DenseMatrix,
     ridge_lambda: &[f64],
-    inverse: &mut DMatrix<f64>,
-    product: &mut DMatrix<f64>,
+    inverse: &mut DenseMatrix,
+    product: &mut DenseMatrix,
 ) -> Option<()> {
     let p = crossproduct.ncols();
     // Once the inverse is ready, the covariance multiply overwrites product.
@@ -318,28 +309,19 @@ fn invert_regularized_crossproduct(
         *entry = checked::add(*entry, ridge)?;
     }
     let invertible = match p {
-        0..=3 => inverse.try_inverse_mut(),
-        4 => {
-            // The four-coefficient inverse uses nalgebra's same closed form
-            // with a fixed-size copy so the temporary stays on the stack.
-            let mut small = Matrix4::from_column_slice(inverse.as_slice());
-            if !small.try_inverse_mut() {
-                return None;
-            }
-            inverse.as_mut_slice().copy_from_slice(small.as_slice());
-            true
-        }
+        // Closed-form adjugate inverse up to four coefficients.
+        0..=4 => try_inverse_in_place(inverse).ok()?,
         _ => {
             inverse.fill_with_identity();
-            solve_lu_in_place(product, inverse)
+            lu_solve_in_place(product, inverse.as_mut_slice())
         }
     };
     invertible.then_some(())
 }
 
 pub(super) fn covariance_diagonal_is_positive(
-    product: &DMatrix<f64>,
-    inverse: &DMatrix<f64>,
+    product: &DenseMatrix,
+    inverse: &DenseMatrix,
     max_inverse: f64,
 ) -> bool {
     let p = product.ncols() as f64;
@@ -370,9 +352,9 @@ pub(super) fn finite_abs_max(values: &[f64]) -> Option<f64> {
 }
 
 pub(super) fn validate_unretained_hat(
-    x: &DMatrix<f64>,
+    x: &DenseMatrix,
     w: &[f64],
-    inverse: &DMatrix<f64>,
+    inverse: &DenseMatrix,
     max_design: Option<f64>,
     max_inverse: Option<f64>,
     active: &mut Vec<(usize, f64)>,
@@ -395,9 +377,9 @@ pub(super) fn validate_unretained_hat(
 }
 
 fn visit_hat_diagonal(
-    x: &DMatrix<f64>,
+    x: &DenseMatrix,
     w: &[f64],
-    inverse: &DMatrix<f64>,
+    inverse: &DenseMatrix,
     active: &mut Vec<(usize, f64)>,
     mut use_value: impl FnMut(usize, f64),
 ) -> Option<()> {
@@ -422,25 +404,25 @@ fn visit_hat_diagonal(
 
 #[derive(Default)]
 struct NormalEquationsScratch {
-    crossproduct: DMatrix<f64>,
-    response: DVector<f64>,
+    crossproduct: DenseMatrix,
+    response: Vec<f64>,
     active: Vec<(usize, f64)>,
 }
 
 impl NormalEquationsScratch {
     fn solve(
         &mut self,
-        x: &DMatrix<f64>,
+        x: &DenseMatrix,
         w: &[f64],
         z: &[f64],
         ridge_lambda: &[f64],
-        beta: &mut DVector<f64>,
+        beta: &mut Vec<f64>,
     ) -> Result<bool, DeseqError> {
         let p = x.ncols();
         if self.crossproduct.shape() != (p, p) {
             *self = Self {
-                crossproduct: try_zero_dmatrix(p, p, "IRLS normal equations crossproduct")?,
-                response: try_zero_dvector(p, "IRLS normal equations response")?,
+                crossproduct: try_zero_matrix(p, p, "IRLS normal equations crossproduct")?,
+                response: try_zero_vector(p, "IRLS normal equations response")?,
                 active: try_alloc_matrix(p, 1, "IRLS normal equations active columns")?,
             };
         } else {
@@ -448,7 +430,7 @@ impl NormalEquationsScratch {
             self.response.fill(0.0);
         }
         if fill_normal_equations(x, w, z, ridge_lambda, self).is_none()
-            || !solve_lu_in_place(&mut self.crossproduct, &mut self.response)
+            || !lu_solve_in_place(&mut self.crossproduct, &mut self.response)
         {
             return Ok(false);
         }
@@ -458,7 +440,7 @@ impl NormalEquationsScratch {
 }
 
 fn fill_normal_equations(
-    x: &DMatrix<f64>,
+    x: &DenseMatrix,
     w: &[f64],
     z: &[f64],
     ridge_lambda: &[f64],
@@ -493,45 +475,18 @@ fn fill_normal_equations(
     Some(())
 }
 
-fn solve_lu_in_place<C: Dim, S: StorageMut<f64, Dyn, C>>(
-    matrix: &mut DMatrix<f64>,
-    response: &mut Matrix<f64, Dyn, C, S>,
-) -> bool {
-    use nalgebra::linalg::{gauss_step, gauss_step_swap};
-
-    let p = matrix.ncols();
-    for col in 0..p {
-        let pivot = matrix.view_range(col.., col).icamax() + col;
-        let value = matrix[(pivot, col)];
-        if value == 0.0 {
-            return false;
-        }
-        if pivot == col {
-            gauss_step(matrix, value, col);
-        } else {
-            // Apply each LU permutation to the right-hand side immediately.
-            response.swap_rows(col, pivot);
-            matrix.columns_range_mut(..col).swap_rows(col, pivot);
-            gauss_step_swap(matrix, value, col, pivot);
-        }
-    }
-    p == 0
-        || (matrix.solve_lower_triangular_with_diag_mut(response, 1.0)
-            && matrix.solve_upper_triangular_mut(response))
-}
-
 #[cfg(test)]
-pub(super) fn xtwx_without_ridge(x: &DMatrix<f64>, w: &[f64]) -> Option<DMatrix<f64>> {
-    let mut xtwx = DMatrix::zeros(x.ncols(), x.ncols());
+pub(super) fn xtwx_without_ridge(x: &DenseMatrix, w: &[f64]) -> Option<DenseMatrix> {
+    let mut xtwx = DenseMatrix::zeros(x.ncols(), x.ncols()).ok()?;
     let mut active = Vec::with_capacity(x.ncols());
     fill_xtwx(x, w, &mut xtwx, &mut active)?;
     Some(xtwx)
 }
 
 fn fill_xtwx(
-    x: &DMatrix<f64>,
+    x: &DenseMatrix,
     w: &[f64],
-    xtwx: &mut DMatrix<f64>,
+    xtwx: &mut DenseMatrix,
     active: &mut Vec<(usize, f64)>,
 ) -> Option<()> {
     for (sample, &weight) in w.iter().enumerate().take(x.nrows()) {
@@ -552,7 +507,7 @@ fn fill_xtwx(
 }
 
 pub(super) fn fill_active_design_columns(
-    x: &DMatrix<f64>,
+    x: &DenseMatrix,
     row: usize,
     active: &mut Vec<(usize, f64)>,
 ) {

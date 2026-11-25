@@ -59,7 +59,6 @@ shrinkage = ["dep:rcompat-shrinkage"]
 clap = { workspace = true, optional = true }
 csv-core.workspace = true
 libm.workspace = true
-nalgebra.workspace = true
 rayon.workspace = true
 rcompat-formula.workspace = true
 rcompat-shrinkage = { workspace = true, optional = true }

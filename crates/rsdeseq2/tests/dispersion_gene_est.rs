@@ -29,9 +29,10 @@ fn linear_model_mu_projects_rows_onto_design_cells() {
 
 #[test]
 fn linear_model_mu_preserves_multiplication_order_for_wide_designs() {
-    use nalgebra::DMatrix;
+    use rcompat_numeric::math::dense::{DenseMatrix, matmul, try_inverse_in_place};
 
-    // All three dimensions exercise nalgebra's wide matrix multiplication.
+    // All three dimensions exceed 5, so every product takes the blocked
+    // fused path of the dense kernels.
     let (genes, samples, coefficients) = (11, 12, 7);
     let values = (0..samples * coefficients)
         .map(|i| {
@@ -49,10 +50,13 @@ fn linear_model_mu_preserves_multiplication_order_for_wide_designs() {
         .collect();
     let normalized = RowMajorMatrix::from_row_major(genes, samples, counts).unwrap();
 
-    let x = DMatrix::from_row_slice(samples, coefficients, design.matrix().as_slice());
-    let y = DMatrix::from_row_slice(genes, samples, normalized.as_slice());
-    let inverse = (x.transpose() * &x).try_inverse().unwrap();
-    let expected = y * (&x * inverse * x.transpose());
+    let x = DenseMatrix::from_row_major(samples, coefficients, design.matrix().as_slice()).unwrap();
+    let y = DenseMatrix::from_row_major(genes, samples, normalized.as_slice()).unwrap();
+    let xt = x.transpose().unwrap();
+    let mut inverse = matmul(&xt, &x).unwrap();
+    assert!(try_inverse_in_place(&mut inverse).unwrap());
+    let hat = matmul(&matmul(&x, &inverse).unwrap(), &xt).unwrap();
+    let expected = matmul(&y, &hat).unwrap();
     let actual = linear_model_mu(&normalized, &design).unwrap();
 
     for gene in 0..genes {

@@ -1,6 +1,16 @@
-use super::{DMatrix, DVector, ERROR_SCOPE, Error, MixtureFitOptions, Problem, try_dense_matrix};
+use super::{DenseMatrix, ERROR_SCOPE, Error, MixtureFitOptions, Problem, try_dense_matrix};
 use crate::errors::scoped_invalid_options;
+use rcompat_numeric::math::dense::{Cholesky, gemv};
 mod compatibility;
+
+/// `h y + c`: the column gaxpy product, then the entry-wise sum.
+fn affine(h: &DenseMatrix, y: &[f64], c: &[f64]) -> Result<Vec<f64>, Error> {
+    let mut product = gemv(h, y)?;
+    for (value, &offset) in product.iter_mut().zip(c) {
+        *value += offset;
+    }
+    Ok(product)
+}
 
 impl Problem {
     fn expectation_step(&self, weights: &[f64]) -> Result<Vec<f64>, Error> {
@@ -35,7 +45,7 @@ impl Problem {
         }
         Ok(next)
     }
-    pub(super) fn hessian_into(&self, weights: &[f64], h: &mut DMatrix<f64>) {
+    pub(super) fn hessian_into(&self, weights: &[f64], h: &mut DenseMatrix) {
         let k = self.components;
         h.fill(0.0);
         for (row, &a) in self
@@ -76,7 +86,7 @@ impl Problem {
             weights = em(&weights)?;
         }
         let mut evaluations = 0;
-        let mut hessian = DMatrix::default();
+        let mut hessian = DenseMatrix::default();
         for _ in 0..options.max_iterations {
             weights = em(&weights)?;
             for (w, &prior) in weights.iter_mut().zip(&self.prior_counts) {
@@ -124,8 +134,12 @@ impl Problem {
                     "Hessian exceeds the representable range",
                 ));
             }
-            let current = DVector::from_column_slice(&weights);
-            let linear = DVector::from_column_slice(&gradient) - &hessian * &current;
+            let current = weights.clone();
+            let linear = gemv(&hessian, &current)?
+                .iter()
+                .zip(&gradient)
+                .map(|(product, g)| g - product)
+                .collect::<Vec<_>>();
             let active_iterations = if options.sqp.automatic_active_iterations {
                 20.min(self.components.saturating_add(1))
             } else {
@@ -142,7 +156,11 @@ impl Problem {
             } else {
                 nonnegative_quadratic(&hessian, &linear, &current, active_iterations, options.sqp)?
             };
-            let direction = &candidate - &current;
+            let direction = candidate
+                .iter()
+                .zip(&current)
+                .map(|(a, b)| a - b)
+                .collect::<Vec<_>>();
             let slope = gradient
                 .iter()
                 .zip(direction.iter())
@@ -217,19 +235,19 @@ fn dual_residual(gradient: &[f64], weights: &[f64], options: MixtureFitOptions) 
 // for its target coordinates; a blocking bound shortens the move and removes
 // the corresponding coordinate. Negative bound multipliers reopen coordinates.
 fn nonnegative_quadratic(
-    h: &DMatrix<f64>,
-    c: &DVector<f64>,
-    start: &DVector<f64>,
+    h: &DenseMatrix,
+    c: &[f64],
+    start: &[f64],
     max_iterations: usize,
     options: super::MixtureSqpOptions,
-) -> Result<DVector<f64>, Error> {
+) -> Result<Vec<f64>, Error> {
     let k = c.len();
-    let mut y = start.clone();
+    let mut y = start.to_vec();
     let mut free = y.iter().map(|v| *v > 0.0).collect::<Vec<_>>();
     for _ in 0..max_iterations {
         let indices = (0..k).filter(|&i| free[i]).collect::<Vec<_>>();
         if indices.is_empty() {
-            let gradient = h * &y + c;
+            let gradient = affine(h, &y, c)?;
             let i = (0..k)
                 .min_by(|&i, &j| gradient[i].total_cmp(&gradient[j]))
                 .ok_or_else(|| crate::errors::invariant("value present"))?;
@@ -243,14 +261,14 @@ fn nonnegative_quadratic(
         let mut reduced = try_dense_matrix(n, n, "mixture SQP active Hessian", |i, j| {
             h[(indices[i], indices[j])]
         })?;
-        let rhs = DVector::from_iterator(indices.len(), indices.iter().map(|&i| -c[i]));
-        let scale = reduced.diagonal().iter().copied().fold(1.0, f64::max);
+        let rhs = indices.iter().map(|&i| -c[i]).collect::<Vec<_>>();
+        let scale = (0..n).map(|i| reduced[(i, i)]).fold(1.0, f64::max);
         let mut ridge = 0.0;
         let mut solved = None;
         for _ in 0..20 {
             let factors = try_dense_matrix(n, n, "mixture SQP Cholesky", |i, j| reduced[(i, j)])?;
-            if let Some(cholesky) = factors.cholesky() {
-                solved = Some(cholesky.solve(&rhs));
+            if let Some(cholesky) = Cholesky::new(factors) {
+                solved = Some(cholesky.solve(&rhs)?);
                 break;
             }
             let next = if ridge == 0.0 {
@@ -300,7 +318,7 @@ fn nonnegative_quadratic(
             free[i] = false;
             continue;
         }
-        let gradient = h * &y + c;
+        let gradient = affine(h, &y, c)?;
         let worst = (0..k)
             .filter(|&i| !free[i])
             .min_by(|&i, &j| gradient[i].total_cmp(&gradient[j]));

@@ -2,8 +2,8 @@
 //!
 //! Default R shrinkage routes share these implementations. Advanced optional
 //! methods remain under development; see the documented migration scope.
-use crate::{Error, matrix::try_alloc_matrix};
-use nalgebra::DMatrix;
+use crate::Error;
+use rcompat_numeric::math::dense::DenseMatrix;
 
 mod adaptive_grid;
 mod adaptive_output;
@@ -107,10 +107,6 @@ fn try_dense_matrix(
     columns: usize,
     context: &str,
     mut entry: impl FnMut(usize, usize) -> f64,
-) -> Result<DMatrix<f64>, Error> {
-    let mut values = try_alloc_matrix(rows, columns, context)?;
-    for column in 0..columns {
-        values.extend((0..rows).map(|row| entry(row, column)));
-    }
-    Ok(DMatrix::from_vec(rows, columns, values))
+) -> Result<DenseMatrix, Error> {
+    DenseMatrix::try_from_fn(rows, columns, context, &mut entry)
 }

@@ -3,6 +3,7 @@ use super::{ERROR_SCOPE, Problem, try_dense_matrix};
 use crate::Error;
 use crate::errors::scoped_invalid_options;
 use crate::matrix::try_alloc_matrix;
+use rcompat_numeric::math::dense::Svd;
 impl Problem {
     pub(super) fn truncated(&self, tolerance: f64) -> Result<Option<Self>, Error> {
         let k = self.components;
@@ -47,10 +48,13 @@ impl Problem {
                 weights.push(weight);
             }
         }
-        let svd = nalgebra::linalg::SVD::try_new(matrix, true, true, f64::EPSILON, 1000)
-            .ok_or_else(|| {
-                scoped_invalid_options(ERROR_SCOPE, "likelihood SVD did not converge")
-            })?;
+        let Svd {
+            u,
+            singular_values,
+            v_t: vt,
+        } = Svd::new(matrix)?.ok_or_else(|| {
+            scoped_invalid_options(ERROR_SCOPE, "likelihood SVD did not converge")
+        })?;
         // Original rank discovery doubles its requested singular subspace.
         // Its partial solver warns above half the smaller matrix dimension,
         // and mixsqp then falls back to the full matrix. Preserve that policy
@@ -60,13 +64,12 @@ impl Problem {
             if probe > dimension / 2 {
                 return Ok(None);
             }
-            if svd.singular_values[probe - 1] < tolerance {
+            if singular_values[probe - 1] < tolerance {
                 break;
             }
             probe = probe.saturating_mul(2).min(dimension);
         }
-        let rank = svd
-            .singular_values
+        let rank = singular_values
             .iter()
             .filter(|&&d| d > tolerance)
             .count()
@@ -74,18 +77,12 @@ impl Problem {
         if rank >= dimension {
             return Ok(None);
         }
-        let u = svd.u.ok_or_else(|| {
-            scoped_invalid_options(ERROR_SCOPE, "missing left likelihood singular vectors")
-        })?;
-        let vt = svd.v_t.ok_or_else(|| {
-            scoped_invalid_options(ERROR_SCOPE, "missing right likelihood singular vectors")
-        })?;
         let mut values = try_alloc_matrix(rows, k, "mixture truncated likelihood")?;
         let mut minimum = 0.0_f64;
         for i in 0..rows {
             for j in 0..k {
                 let value = (0..rank)
-                    .map(|r| u[(i, r)] * svd.singular_values[r] * vt[(r, j)])
+                    .map(|r| u[(i, r)] * singular_values[r] * vt[(r, j)])
                     .sum::<f64>();
                 if !value.is_finite() {
                     return Err(scoped_invalid_options(

@@ -10,7 +10,7 @@ pub(super) struct IrlsScratch {
     weights: Vec<f64>,
     response: Vec<f64>,
     gamma_terms: Vec<f64>,
-    coefficients: DVector<f64>,
+    coefficients: Vec<f64>,
     least_squares: LeastSquaresScratch,
     covariance: CovarianceScratch,
 }
@@ -38,7 +38,7 @@ impl IrlsScratch {
             weights: try_alloc_matrix(samples, 1, "IRLS weight scratch")?,
             response: try_alloc_matrix(samples, 1, "IRLS response scratch")?,
             gamma_terms: try_alloc_matrix(samples, 1, "IRLS gamma term scratch")?,
-            coefficients: try_zero_dvector(coefficients, "IRLS coefficient scratch")?,
+            coefficients: try_zero_vector(coefficients, "IRLS coefficient scratch")?,
             least_squares: LeastSquaresScratch::default(),
             covariance: CovarianceScratch::default(),
         })

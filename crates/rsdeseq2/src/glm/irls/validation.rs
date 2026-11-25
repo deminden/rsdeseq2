@@ -181,7 +181,7 @@ pub(super) fn checked_log2_covariance(
 }
 
 pub(super) fn retain_covariance_on_log2_scale(
-    covariance: &DMatrix<f64>,
+    covariance: &DenseMatrix,
     destination: Option<&mut [f64]>,
     start_index: usize,
     context: &str,

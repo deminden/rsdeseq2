@@ -17,7 +17,6 @@ workspace = true
 
 [dependencies]
 libm.workspace = true
-nalgebra.workspace = true
 rcompat-lbfgsb.workspace = true
 rcompat-numeric.workspace = true
 rcompat-formula.workspace = true

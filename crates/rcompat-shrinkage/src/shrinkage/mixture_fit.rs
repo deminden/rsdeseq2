@@ -7,7 +7,7 @@ use crate::{
     errors::invalid_dimensions,
     matrix::{MatrixView, try_alloc_matrix},
 };
-use nalgebra::{DMatrix, DVector};
+use rcompat_numeric::math::dense::DenseMatrix;
 
 fn invalid_mixture_value(
     operation: &'static str,

@@ -15,9 +15,10 @@
 //! count `b_k`, so that the objective is
 //! `f(x) = sum(x) - sum_i w_i log(L_i x + eps)` on the nonnegative orthant
 //! (the relaxed problem of section 3).
-use super::{DMatrix, DVector, ERROR_SCOPE, Error, Problem, try_dense_matrix};
+use super::{DenseMatrix, ERROR_SCOPE, Error, Problem, affine, try_dense_matrix};
 use crate::errors::scoped_invalid_options;
 use crate::shrinkage::MixtureSqpOptions;
+use rcompat_numeric::math::dense::{Cholesky, SymmetricEigen, dot, tr_gemv_to};
 
 /// Absolute amount added to every proportion before an EM update, and, scaled
 /// by the largest updated proportion, after it. Observed in mixsqp's EM
@@ -29,7 +30,7 @@ impl Problem {
     /// Hessian of the relaxed objective, `sum_i w_i L_i L_i' / (L_i x + eps)^2`
     /// (paper, section 3), over the pseudo-rows and then the data rows. Only
     /// the upper triangle is accumulated, so the result is exactly symmetric.
-    pub(super) fn ashr_hessian_into(&self, weights: &[f64], hessian: &mut DMatrix<f64>) {
+    pub(super) fn ashr_hessian_into(&self, weights: &[f64], hessian: &mut DenseMatrix) {
         let k = self.components;
         hessian.fill(0.0);
         for (i, (&count, &w)) in self.prior_counts.iter().zip(weights).enumerate() {
@@ -130,12 +131,12 @@ impl Problem {
 /// is released, or the current point is returned. A nonzero direction is
 /// followed up to the first blocking bound, which joins the working set.
 pub(super) fn quadratic(
-    h: &DMatrix<f64>,
-    c: &DVector<f64>,
-    start: &DVector<f64>,
+    h: &DenseMatrix,
+    c: &[f64],
+    start: &[f64],
     max_iterations: usize,
     options: MixtureSqpOptions,
-) -> Result<DVector<f64>, Error> {
+) -> Result<Vec<f64>, Error> {
     let k = c.len();
     if h.nrows() != k || h.ncols() != k || start.len() != k {
         return Err(scoped_invalid_options(
@@ -143,14 +144,14 @@ pub(super) fn quadratic(
             "quadratic subproblem dimensions disagree",
         ));
     }
-    let mut y = start.map(|v| v.max(0.0));
+    let mut y = start.iter().map(|v| v.max(0.0)).collect::<Vec<_>>();
     let mut free = y.iter().map(|v| *v > 0.0).collect::<Vec<_>>();
     // Without a direction threshold, a full step solves the subproblem on the
     // current free set exactly, so the next direction is taken to be zero.
     let threshold = options.search_direction_threshold;
     let mut solved_free_set = false;
     for _ in 0..max_iterations {
-        let gradient = h * &y + c;
+        let gradient = affine(h, &y, c)?;
         let indices = (0..k).filter(|&i| free[i]).collect::<Vec<_>>();
         let direction = if indices.is_empty() || (threshold.is_none() && solved_free_set) {
             None
@@ -161,7 +162,7 @@ pub(super) fn quadratic(
                 "mixture SQP active Hessian",
                 |i, j| h[(indices[i], indices[j])],
             )?;
-            let rhs = DVector::from_iterator(indices.len(), indices.iter().map(|&i| -gradient[i]));
+            let rhs = indices.iter().map(|&i| -gradient[i]).collect::<Vec<_>>();
             let p = reduced_solve(reduced, rhs, options.ridge_multiplier)?;
             let limit = threshold.unwrap_or(0.0);
             if p.iter().all(|v| v.abs() <= limit) {
@@ -222,31 +223,31 @@ pub(super) fn quadratic(
 /// Only if the eigen-decomposition fails is a ridge, growing by
 /// `ridge_multiplier`, added until a well-conditioned factor exists. Any
 /// remaining nonfinite entry is set to zero.
-fn reduced_solve(
-    a: DMatrix<f64>,
-    rhs: DVector<f64>,
-    ridge_multiplier: f64,
-) -> Result<DVector<f64>, Error> {
+fn reduced_solve(a: DenseMatrix, rhs: Vec<f64>, ridge_multiplier: f64) -> Result<Vec<f64>, Error> {
     let n = a.nrows();
     let norm = one_norm(&a);
     if !norm.is_finite() || norm <= 0.0 {
-        return Ok(DVector::zeros(n));
+        return Ok(vec![0.0; n]);
     }
     if let Some(p) = conditioned_cholesky_solve(&a, &rhs, norm, 0.0) {
         return Ok(p);
     }
-    if let Some(eigen) = nalgebra::SymmetricEigen::try_new(a.clone(), f64::EPSILON, 0) {
+    if let Some(eigen) = SymmetricEigen::new(a.clone())? {
         let largest = eigen
             .eigenvalues
             .iter()
             .copied()
             .fold(0.0_f64, |m, v| m.max(v.abs()));
         let cutoff = largest * n as f64 * f64::EPSILON;
-        let projected = eigen.eigenvectors.transpose() * &rhs;
-        let mut p = DVector::zeros(n);
+        let mut projected = vec![0.0; n];
+        tr_gemv_to(&eigen.eigenvectors, &rhs, &mut projected)?;
+        let mut p = vec![0.0; n];
         for (j, &lambda) in eigen.eigenvalues.iter().enumerate() {
             if lambda > cutoff && lambda.is_finite() {
-                p.axpy(projected[j] / lambda, &eigen.eigenvectors.column(j), 1.0);
+                let coefficient = projected[j] / lambda;
+                for (value, &vector) in p.iter_mut().zip(eigen.eigenvectors.column(j)) {
+                    *value += coefficient * vector;
+                }
             }
         }
         if p.iter().all(|v| v.is_finite()) {
@@ -273,39 +274,44 @@ fn reduced_solve(
 /// Cholesky solve of `(A + ridge I) p = r`, accepted only when the
 /// reciprocal condition estimate exceeds machine precision.
 fn conditioned_cholesky_solve(
-    a: &DMatrix<f64>,
-    rhs: &DVector<f64>,
+    a: &DenseMatrix,
+    rhs: &[f64],
     norm: f64,
     ridge: f64,
-) -> Option<DVector<f64>> {
+) -> Option<Vec<f64>> {
     let mut shifted = a.clone();
     for i in 0..shifted.nrows() {
         shifted[(i, i)] += ridge;
     }
-    let factor = shifted.cholesky()?;
-    let inverse_norm = inverse_one_norm(|v| factor.solve(v), a.nrows());
+    let factor = Cholesky::new(shifted)?;
+    let solve = |v: &[f64]| {
+        let mut x = v.to_vec();
+        factor.solve_in_place(&mut x);
+        x
+    };
+    let inverse_norm = inverse_one_norm(solve, a.nrows());
     let rcond = 1.0 / ((norm + ridge) * inverse_norm);
     if !rcond.is_finite() || rcond <= f64::EPSILON {
         return None;
     }
-    let p = factor.solve(rhs);
+    let p = solve(rhs);
     p.iter().all(|v| v.is_finite()).then_some(p)
 }
 
-fn one_norm(a: &DMatrix<f64>) -> f64 {
-    a.column_iter()
-        .map(|column| column.iter().map(|v| v.abs()).sum::<f64>())
+fn one_norm(a: &DenseMatrix) -> f64 {
+    (0..a.ncols())
+        .map(|j| a.column(j).iter().map(|v| v.abs()).sum::<f64>())
         .fold(0.0, f64::max)
 }
 
 /// Estimate of `||A^{-1}||_1` for symmetric `A` from solves alone (Hager's
 /// method as refined by Higham 1988, ACM TOMS 14:381-396, Algorithm 4.1,
 /// including its alternative test vector).
-fn inverse_one_norm(solve: impl Fn(&DVector<f64>) -> DVector<f64>, n: usize) -> f64 {
+fn inverse_one_norm(solve: impl Fn(&[f64]) -> Vec<f64>, n: usize) -> f64 {
     if n == 0 {
         return 0.0;
     }
-    let mut x = DVector::from_element(n, 1.0 / n as f64);
+    let mut x = vec![1.0 / n as f64; n];
     let mut estimate = 0.0_f64;
     let mut previous = None;
     for iteration in 0..5 {
@@ -318,7 +324,10 @@ fn inverse_one_norm(solve: impl Fn(&DVector<f64>) -> DVector<f64>, n: usize) -> 
             break;
         }
         estimate = norm;
-        let sign = y.map(|v| if v >= 0.0 { 1.0 } else { -1.0 });
+        let sign = y
+            .iter()
+            .map(|&v| if v >= 0.0 { 1.0 } else { -1.0 })
+            .collect::<Vec<_>>();
         let z = solve(&sign);
         let (j, largest) = z
             .iter()
@@ -329,20 +338,19 @@ fn inverse_one_norm(solve: impl Fn(&DVector<f64>) -> DVector<f64>, n: usize) -> 
         if !largest.is_finite() {
             return f64::INFINITY;
         }
-        if iteration > 0 && (previous == Some(j) || largest <= z.dot(&x)) {
+        if iteration > 0 && (previous == Some(j) || largest <= dot(&z, &x)) {
             break;
         }
         previous = Some(j);
-        x = DVector::zeros(n);
+        x = vec![0.0; n];
         x[j] = 1.0;
     }
-    let alternative = DVector::from_iterator(
-        n,
-        (0..n).map(|i| {
+    let alternative = (0..n)
+        .map(|i| {
             let sign = if i % 2 == 0 { 1.0 } else { -1.0 };
             sign * (1.0 + i as f64 / (n.max(2) - 1) as f64)
-        }),
-    );
+        })
+        .collect::<Vec<_>>();
     let tail = solve(&alternative).iter().map(|v| v.abs()).sum::<f64>();
     estimate.max(2.0 * tail / (3.0 * n as f64))
 }
@@ -376,7 +384,7 @@ mod tests {
             0.1,
         );
         let x = [0.4, 0.6];
-        let mut h = DMatrix::zeros(2, 2);
+        let mut h = DenseMatrix::zeros(2, 2).unwrap();
         p.ashr_hessian_into(&x, &mut h);
         let m1: f64 = 0.4 + 0.3 + 0.1;
         let m2: f64 = 0.1 + 0.6 + 0.1;
@@ -430,28 +438,21 @@ mod tests {
             ..Default::default()
         };
         // Interior minimum: H = [[2, 0], [0, 4]], c = (-2, -4) gives y = (1, 1).
-        let h = DMatrix::from_row_slice(2, 2, &[2.0, 0.0, 0.0, 4.0]);
-        let c = DVector::from_vec(vec![-2.0, -4.0]);
-        let y = quadratic(&h, &c, &DVector::from_vec(vec![0.5, 0.5]), 10, options).unwrap();
+        let h = DenseMatrix::from_row_major(2, 2, &[2.0, 0.0, 0.0, 4.0]).unwrap();
+        let c = vec![-2.0, -4.0];
+        let y = quadratic(&h, &c, &[0.5, 0.5], 10, options).unwrap();
         assert!((y[0] - 1.0).abs() < 1e-15 && (y[1] - 1.0).abs() < 1e-15);
         // Bound active at the optimum: c = (-2, 4) gives y = (1, 0).
-        let c = DVector::from_vec(vec![-2.0, 4.0]);
-        let y = quadratic(&h, &c, &DVector::from_vec(vec![0.5, 0.5]), 10, options).unwrap();
+        let c = vec![-2.0, 4.0];
+        let y = quadratic(&h, &c, &[0.5, 0.5], 10, options).unwrap();
         assert!((y[0] - 1.0).abs() < 1e-15 && y[1] == 0.0);
         // A zero coordinate with a negative multiplier is released.
-        let h = DMatrix::from_row_slice(2, 2, &[2.0, 1.0, 1.0, 2.0]);
-        let c = DVector::from_vec(vec![-3.0, -3.0]);
-        let y = quadratic(&h, &c, &DVector::from_vec(vec![1.0, 0.0]), 10, options).unwrap();
+        let h = DenseMatrix::from_row_major(2, 2, &[2.0, 1.0, 1.0, 2.0]).unwrap();
+        let c = vec![-3.0, -3.0];
+        let y = quadratic(&h, &c, &[1.0, 0.0], 10, options).unwrap();
         assert!((y[0] - 1.0).abs() < 1e-14 && (y[1] - 1.0).abs() < 1e-14);
         // The same without a direction threshold.
-        let y = quadratic(
-            &h,
-            &c,
-            &DVector::from_vec(vec![1.0, 0.0]),
-            10,
-            MixtureSqpOptions::default(),
-        )
-        .unwrap();
+        let y = quadratic(&h, &c, &[1.0, 0.0], 10, MixtureSqpOptions::default()).unwrap();
         assert!((y[0] - 1.0).abs() < 1e-14 && (y[1] - 1.0).abs() < 1e-14);
     }
 
@@ -462,27 +463,19 @@ mod tests {
             ..Default::default()
         };
         // Rank one: every minimiser has y0 + y1 = 1 when c = (-1, -1).
-        let h = DMatrix::from_row_slice(2, 2, &[1.0, 1.0, 1.0, 1.0]);
-        let c = DVector::from_vec(vec![-1.0, -1.0]);
-        let y = quadratic(&h, &c, &DVector::from_vec(vec![0.25, 0.25]), 10, options).unwrap();
+        let h = DenseMatrix::from_row_major(2, 2, &[1.0, 1.0, 1.0, 1.0]).unwrap();
+        let c = vec![-1.0, -1.0];
+        let y = quadratic(&h, &c, &[0.25, 0.25], 10, options).unwrap();
         assert!(y.iter().all(|v| v.is_finite() && *v >= 0.0));
         assert!((y[0] + y[1] - 1.0).abs() < 1e-6);
-        let p = reduced_solve(
-            DMatrix::zeros(2, 2),
-            DVector::from_vec(vec![1.0, 1.0]),
-            10.0,
-        )
-        .unwrap();
+        let p = reduced_solve(DenseMatrix::zeros(2, 2).unwrap(), vec![1.0, 1.0], 10.0).unwrap();
         assert!(p.iter().all(|v| *v == 0.0));
     }
 
     #[test]
     fn inverse_norm_estimate_is_exact_for_diagonal_matrices() {
         let d = [4.0, 0.5, 2.0];
-        let estimate = inverse_one_norm(
-            |v| DVector::from_iterator(3, v.iter().zip(&d).map(|(x, d)| x / d)),
-            3,
-        );
+        let estimate = inverse_one_norm(|v| v.iter().zip(&d).map(|(x, d)| x / d).collect(), 3);
         assert!((estimate - 2.0).abs() < 1e-15);
     }
 }

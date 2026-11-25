@@ -5,7 +5,7 @@ use crate::numeric::math::ProfileMath;
 pub(super) struct BetaObjectiveScratch {
     last_beta: Vec<f64>,
     gradient: Vec<f64>,
-    hessian: DMatrix<f64>,
+    hessian: DenseMatrix,
 }
 
 impl BetaObjectiveScratch {
@@ -13,7 +13,7 @@ impl BetaObjectiveScratch {
         Ok(Self {
             last_beta: try_filled_vec(coefficients, 0.0, "IRLS refit objective coefficients")?,
             gradient: try_filled_vec(coefficients, 0.0, "IRLS refit gradient")?,
-            hessian: try_zero_dmatrix(coefficients, coefficients, "IRLS refit Hessian")?,
+            hessian: try_zero_matrix(coefficients, coefficients, "IRLS refit Hessian")?,
         })
     }
 
@@ -66,7 +66,7 @@ impl BetaObjective<'_, '_> {
 pub(super) fn beta_log2_objective_gradient_hessian(
     input: &BetaOptimInput<'_>,
     beta: &[f64],
-) -> Result<(f64, Vec<f64>, DMatrix<f64>), DeseqError> {
+) -> Result<(f64, Vec<f64>, DenseMatrix), DeseqError> {
     let mut scratch = BetaObjectiveScratch::new(input.x.ncols())?;
     let value = scratch.for_row(*input).value(beta)?;
     Ok((value, scratch.gradient, scratch.hessian))
@@ -76,7 +76,7 @@ fn evaluate_beta_log2(
     input: &BetaOptimInput<'_>,
     beta: &[f64],
     gradient: &mut [f64],
-    hessian: &mut DMatrix<f64>,
+    hessian: &mut DenseMatrix,
 ) -> Result<f64, DeseqError> {
     let p = input.x.ncols();
     if beta.len() != p {
@@ -248,7 +248,7 @@ pub(super) fn beta_log2_nb_objective_term(count: u32, mu: f64, dispersion: f64) 
     checked::add(checked::add(first, -second)?, -third)
 }
 
-fn beta_optim_penalty(gradient: &mut [f64], hessian: &mut DMatrix<f64>) -> f64 {
+fn beta_optim_penalty(gradient: &mut [f64], hessian: &mut DenseMatrix) -> f64 {
     gradient.fill(0.0);
     hessian.fill(0.0);
     for diagonal in 0..hessian.nrows() {

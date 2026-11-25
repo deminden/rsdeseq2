@@ -2,13 +2,14 @@
 use super::*;
 use crate::numeric::math::ProfileMath;
 use approx::assert_relative_eq;
+use rcompat_numeric::math::dense::{Lu, matmul, try_inverse_in_place};
 use serde::Deserialize;
 
 #[test]
 fn rank_deficient_start_overwrites_reused_coefficients() {
     let counts = [2.0, 8.0];
     let factors = [2.0, 1.0];
-    let x = DMatrix::from_element(2, 2, 1.0);
+    let x = DenseMatrix::from_element(2, 2, 1.0).unwrap();
     let with_intercept = DesignMatrix::from_row_major(
         2,
         2,
@@ -17,7 +18,7 @@ fn rank_deficient_start_overwrites_reused_coefficients() {
     )
     .unwrap();
     let unnamed = DesignMatrix::from_row_major(2, 2, vec![1.0; 4], None).unwrap();
-    let mut beta = DVector::from_vec(vec![f64::NAN, f64::INFINITY]);
+    let mut beta = vec![f64::NAN, f64::INFINITY];
     let mut response = vec![f64::NAN; 2];
 
     InitialBeta::for_design(&with_intercept, &x)
@@ -35,9 +36,9 @@ fn rank_deficient_start_overwrites_reused_coefficients() {
 
 #[test]
 fn qr_triangle_keeps_lu_signed_zeros_and_subnormal_pivots() {
-    let mut triangular = DMatrix::zeros(4, 4);
+    let mut triangular = DenseMatrix::zeros(4, 4).unwrap();
     for first_pivot in [2.0, f64::from_bits(1), 0.0, 2.0] {
-        let upper = DMatrix::from_row_slice(
+        let upper = DenseMatrix::from_row_major(
             4,
             4,
             &[
@@ -58,10 +59,15 @@ fn qr_triangle_keeps_lu_signed_zeros_and_subnormal_pivots() {
                 0.0,
                 5.0,
             ],
-        );
+        )
+        .unwrap();
         let diagonal = [first_pivot, 3.0, 4.0, 5.0];
-        let mut response = DVector::from_vec(vec![-0.0, -0.0, -6.0, 0.0]);
-        let expected = upper.clone().lu().solve(&response);
+        let mut response = vec![-0.0, -0.0, -6.0, 0.0];
+        let mut expected = response.clone();
+        let expected = Lu::new(upper.clone())
+            .unwrap()
+            .solve_in_place(&mut expected)
+            .then_some(expected);
         let solved = solve_qr_triangle(&upper, &diagonal, &mut triangular, &mut response);
 
         assert_eq!(solved, expected.is_some());
@@ -150,8 +156,8 @@ fn reduced_outputs_match_inference_including_fallbacks() {
 
 #[test]
 fn unretained_hat_keeps_the_overflow_check() {
-    let design = DMatrix::from_row_slice(1, 1, &[1e155]);
-    let inverse = DMatrix::from_row_slice(1, 1, &[1e-160]);
+    let design = DenseMatrix::from_row_major(1, 1, &[1e155]).unwrap();
+    let inverse = DenseMatrix::from_row_major(1, 1, &[1e-160]).unwrap();
     let mut active = Vec::new();
     let mut validate = |weights: &[f64]| {
         validate_unretained_hat(
@@ -169,7 +175,7 @@ fn unretained_hat_keeps_the_overflow_check() {
 
 #[test]
 fn unretained_covariance_keeps_off_diagonal_overflow_check() {
-    let covariance = DMatrix::from_row_slice(2, 2, &[1.0, f64::MAX, 0.0, 2.0]);
+    let covariance = DenseMatrix::from_row_major(2, 2, &[1.0, f64::MAX, 0.0, 2.0]).unwrap();
     let mut stored = [0.0; 4];
     for destination in [Some(stored.as_mut_slice()), None] {
         assert!(matches!(
@@ -180,15 +186,16 @@ fn unretained_covariance_keeps_off_diagonal_overflow_check() {
 }
 
 #[test]
-fn reusable_covariance_inverse_matches_nalgebra_after_singular_fits() {
+fn reusable_covariance_inverse_matches_a_fresh_inverse_after_singular_fits() {
     let mut scratch = CovarianceScratch::default();
     for p in [4, 5, 9] {
         let samples = p + 3;
-        let design = DMatrix::from_fn(samples, p, |row, col| {
+        let design = DenseMatrix::try_from_fn(samples, p, "test", |row, col| {
             let spike = if row == col { 3.0 } else { 0.0 };
             let value = spike + ((row * 11 + col * 17) % 29) as f64 / 29.0 - 0.5;
             if col == 0 { value / 32.0 } else { value }
-        });
+        })
+        .unwrap();
         let ridge = (0..p)
             .map(|col| (col + 1) as f64 / 4096.0)
             .collect::<Vec<_>>();
@@ -201,9 +208,12 @@ fn reusable_covariance_inverse_matches_nalgebra_after_singular_fits() {
             for (col, value) in ridge.iter().copied().enumerate() {
                 regularized[(col, col)] += value;
             }
-            assert!(regularized.column(0).icamax() > 0);
-            let inverse = regularized.try_inverse().unwrap();
-            let expected = (&inverse * crossproduct) * inverse;
+            // Partial pivoting exchanges the first row.
+            let first = regularized.column(0);
+            assert!(first[1..].iter().any(|value| value.abs() > first[0].abs()));
+            let mut inverse = regularized.clone();
+            assert!(try_inverse_in_place(&mut inverse).unwrap());
+            let expected = matmul(&matmul(&inverse, &crossproduct).unwrap(), &inverse).unwrap();
             let computed = covariance_and_hat_diagonal(
                 &mut scratch,
                 &design,
@@ -242,7 +252,7 @@ fn reusable_covariance_inverse_matches_nalgebra_after_singular_fits() {
 
 #[test]
 fn unretained_covariance_checks_positive_diagonals_without_building_the_matrix() {
-    let design = DMatrix::identity(8, 8);
+    let design = DenseMatrix::identity(8).unwrap();
     let mut scratch = CovarianceScratch::default();
     let fitted = covariance_and_hat_diagonal(
         &mut scratch,
@@ -258,8 +268,8 @@ fn unretained_covariance_checks_positive_diagonals_without_building_the_matrix()
         Some(FitCovariance::PositiveDiagonal)
     ));
 
-    let mut product = DMatrix::identity(2, 2);
-    let mut inverse = DMatrix::identity(2, 2);
+    let mut product = DenseMatrix::identity(2).unwrap();
+    let mut inverse = DenseMatrix::identity(2).unwrap();
     product[(0, 1)] = -1.0;
     inverse[(1, 0)] = 1.0;
     assert!(!covariance_diagonal_is_positive(&product, &inverse, 1.0));
@@ -406,7 +416,7 @@ fn selected_glm_fits_match_compacted_rows_with_offsets_and_weights() {
 
 #[test]
 fn beta_objective_rebuilds_cached_values_for_each_row() {
-    let x = DMatrix::from_row_slice(2, 1, &[1.0, 1.0]);
+    let x = DenseMatrix::from_row_major(2, 1, &[1.0, 1.0]).unwrap();
     let first = BetaOptimInput {
         x: &x,
         counts: &[4, 9],
@@ -457,7 +467,7 @@ fn log2_output_scaling_rejects_nonfinite_values() {
 
 #[test]
 fn optim_start_keeps_finite_beta_on_bounds() {
-    let x = DMatrix::from_row_slice(2, 2, &[1.0, 0.0, 0.0, 1.0]);
+    let x = DenseMatrix::from_row_major(2, 2, &[1.0, 0.0, 0.0, 1.0]).unwrap();
     let counts = [1_u32, 2_u32];
     let nf = [1.0, 1.0];
 
@@ -468,7 +478,7 @@ fn optim_start_keeps_finite_beta_on_bounds() {
 
 #[test]
 fn optim_start_preserves_backup_qr_natural_log_values() {
-    let x = DMatrix::from_element(2, 1, 1.0);
+    let x = DenseMatrix::from_element(2, 1, 1.0).unwrap();
     let counts = [9, 9];
     let nf = [1.0, 1.0];
     let start = optim_start_beta_log2(&[f64::NAN], &x, &counts, &nf, 30.0).unwrap();
@@ -541,7 +551,7 @@ fn r_optim_candidate_disagreement_is_scaled_by_numeric_resolution() {
 
 #[test]
 fn beta_objective_uses_log2_mu_and_nb_kernel_without_gamma_constants() {
-    let x = DMatrix::from_row_slice(1, 1, &[1.0]);
+    let x = DenseMatrix::from_row_major(1, 1, &[1.0]).unwrap();
     let counts = [3_u32];
     let nf = [2.0];
     let ridge_lambda = [0.0];
@@ -570,7 +580,7 @@ fn beta_objective_uses_log2_mu_and_nb_kernel_without_gamma_constants() {
 
 #[test]
 fn beta_objective_converts_natural_log_ridge_to_log2_penalty() {
-    let x = DMatrix::from_row_slice(1, 1, &[0.0]);
+    let x = DenseMatrix::from_row_major(1, 1, &[0.0]).unwrap();
     let counts = [0_u32];
     let nf = [1.0];
     let natural_log_ridge = 2.5;
@@ -601,7 +611,7 @@ fn beta_objective_converts_natural_log_ridge_to_log2_penalty() {
 
 #[test]
 fn beta_numeric_gradient_uses_r_optim_bounded_difference() {
-    let x = DMatrix::from_row_slice(2, 1, &[1.0, 1.0]);
+    let x = DenseMatrix::from_row_major(2, 1, &[1.0, 1.0]).unwrap();
     let counts = [1_u32, 8_u32];
     let nf = [1.0, 1.5];
     let ridge_lambda = [0.25];
@@ -627,7 +637,7 @@ fn beta_numeric_gradient_uses_r_optim_bounded_difference() {
 
 #[test]
 fn centered_beta_gradient_matches_high_precision_bounded_difference() {
-    let x = DMatrix::from_row_slice(3, 2, &[1.0, -0.5, 1.0, 1.25, 1.0, 0.0]);
+    let x = DenseMatrix::from_row_major(3, 2, &[1.0, -0.5, 1.0, 1.25, 1.0, 0.0]).unwrap();
     let input = BetaOptimInput {
         x: &x,
         counts: &[5, 900, 4_000_000_000],
@@ -671,7 +681,9 @@ fn optim_fallback_replays_portable_objective_only_r_optim_gtex_cases() {
             .iter()
             .flat_map(|row| row.iter().copied())
             .collect::<Vec<_>>();
-        let x = DMatrix::from_row_slice(contrast.samples, contrast.coefficients, &design_values);
+        let x =
+            DenseMatrix::from_row_major(contrast.samples, contrast.coefficients, &design_values)
+                .unwrap();
         let counts = case
             .counts
             .iter()
@@ -742,8 +754,8 @@ fn irls_deviance_convergence_stat_rejects_nonfinite_arithmetic() {
 
 #[test]
 fn weighted_least_squares_helpers_reject_nonfinite_accumulation() {
-    let x = DMatrix::from_row_slice(1, 1, &[f64::MAX]);
-    let mut beta = DVector::from_element(1, 1.0);
+    let x = DenseMatrix::from_row_major(1, 1, &[f64::MAX]).unwrap();
+    let mut beta = vec![1.0; 1];
     assert!(
         !solve_weighted_least_squares(
             &mut LeastSquaresScratch::default(),
@@ -759,7 +771,7 @@ fn weighted_least_squares_helpers_reject_nonfinite_accumulation() {
     assert_eq!(beta[0], 1.0);
     assert!(xtwx_without_ridge(&x, &[2.0]).is_none());
 
-    let unit_x = DMatrix::from_row_slice(1, 1, &[1.0]);
+    let unit_x = DenseMatrix::from_row_major(1, 1, &[1.0]).unwrap();
     assert!(
         !solve_weighted_least_squares_qr(
             &mut QrScratch::default(),
@@ -777,10 +789,10 @@ fn weighted_least_squares_helpers_reject_nonfinite_accumulation() {
 #[test]
 fn oversized_solver_workspace_errors_allow_retry() {
     // Zero rows allow an oversized coefficient count without allocating the input.
-    let oversized = DMatrix::from_vec(0, usize::MAX, Vec::new());
-    let design = DMatrix::from_element(1, 1, 1.0);
+    let oversized = DenseMatrix::from_column_major(0, usize::MAX, Vec::new()).unwrap();
+    let design = DenseMatrix::from_element(1, 1, 1.0).unwrap();
     let mut scratch = LeastSquaresScratch::default();
-    let mut beta = DVector::from_element(1, -3.0);
+    let mut beta = vec![-3.0; 1];
 
     for (solver, allocation) in [
         (
@@ -836,14 +848,12 @@ fn oversized_solver_workspace_errors_allow_retry() {
 
 #[test]
 fn reusable_normal_equations_match_pivoted_lu_after_a_failed_solve() {
-    let x = DMatrix::from_row_slice(3, 2, &[1.0, 4.0, 1.0, 5.0, 1.0, 7.0]);
+    let x = DenseMatrix::from_row_major(3, 2, &[1.0, 4.0, 1.0, 5.0, 1.0, 7.0]).unwrap();
     let mut scratch = LeastSquaresScratch::default();
-    let mut beta = DVector::zeros(2);
-    let crossproduct = DMatrix::<f64>::from_row_slice(2, 2, &[4.0, 21.0, 21.0, 115.0]);
-    let expected = crossproduct
-        .lu()
-        .solve(&DVector::from_vec(vec![11.0, 61.0]))
-        .unwrap();
+    let mut beta = vec![0.0; 2];
+    let crossproduct = DenseMatrix::from_row_major(2, 2, &[4.0, 21.0, 21.0, 115.0]).unwrap();
+    let mut expected = vec![11.0, 61.0];
+    assert!(Lu::new(crossproduct).unwrap().solve_in_place(&mut expected));
 
     for (weights, succeeds) in [
         ([1.0, 2.0, 1.0], true),
@@ -871,7 +881,7 @@ fn reusable_normal_equations_match_pivoted_lu_after_a_failed_solve() {
 
 #[test]
 fn beta_objective_returns_penalty_for_nonfinite_accumulation() {
-    let x = DMatrix::from_row_slice(1, 1, &[f64::MAX]);
+    let x = DenseMatrix::from_row_major(1, 1, &[f64::MAX]).unwrap();
     let counts = [1_u32];
     let nf = [1.0];
     let ridge_lambda = [0.0];
@@ -894,7 +904,7 @@ fn beta_objective_returns_penalty_for_nonfinite_accumulation() {
 
 #[test]
 fn beta_objective_returns_penalty_for_overflowed_ridge_term() {
-    let x = DMatrix::from_row_slice(1, 1, &[1.0]);
+    let x = DenseMatrix::from_row_major(1, 1, &[1.0]).unwrap();
     let counts = [1_u32];
     let nf = [1.0];
     let ridge_lambda = [f64::MAX];
@@ -917,8 +927,8 @@ fn beta_objective_returns_penalty_for_overflowed_ridge_term() {
 
 #[test]
 fn fitted_mu_rejects_overflowed_linear_predictor() {
-    let x = DMatrix::from_row_slice(1, 1, &[f64::MAX]);
-    let beta = DVector::from_vec(vec![2.0]);
+    let x = DenseMatrix::from_row_major(1, 1, &[f64::MAX]).unwrap();
+    let beta = vec![2.0];
     let nf = [1.0];
 
     let err = fitted_mu(&x, &beta, &nf, 0.5).unwrap_err();
@@ -934,8 +944,8 @@ fn fitted_mu_rejects_overflowed_linear_predictor() {
 
 #[test]
 fn fitted_mu_saturates_overflowed_exponential_mean() {
-    let x = DMatrix::from_row_slice(1, 1, &[1000.0]);
-    let beta = DVector::from_vec(vec![1.0]);
+    let x = DenseMatrix::from_row_major(1, 1, &[1000.0]).unwrap();
+    let beta = vec![1.0];
     let nf = [1.0];
 
     let mu = fitted_mu(&x, &beta, &nf, 0.5).unwrap();
@@ -945,8 +955,8 @@ fn fitted_mu_saturates_overflowed_exponential_mean() {
 
 #[test]
 fn fitted_mu_avoids_intermediate_exponential_overflow_with_small_factor() {
-    let x = DMatrix::from_row_slice(1, 1, &[1000.0]);
-    let beta = DVector::from_vec(vec![1.0]);
+    let x = DenseMatrix::from_row_major(1, 1, &[1000.0]).unwrap();
+    let beta = vec![1.0];
     let nf = [f64::MIN_POSITIVE];
 
     let mu = fitted_mu(&x, &beta, &nf, 0.5).unwrap();
@@ -957,8 +967,8 @@ fn fitted_mu_avoids_intermediate_exponential_overflow_with_small_factor() {
 
 #[test]
 fn fitted_mu_saturates_final_overflowed_mean_with_small_factor() {
-    let x = DMatrix::from_row_slice(1, 1, &[2000.0]);
-    let beta = DVector::from_vec(vec![1.0]);
+    let x = DenseMatrix::from_row_major(1, 1, &[2000.0]).unwrap();
+    let beta = vec![1.0];
     let nf = [f64::MIN_POSITIVE];
 
     let mu = fitted_mu(&x, &beta, &nf, 0.5).unwrap();
@@ -968,7 +978,7 @@ fn fitted_mu_saturates_final_overflowed_mean_with_small_factor() {
 
 #[test]
 fn fitted_mu_log2_rejects_overflowed_linear_predictor() {
-    let x = DMatrix::from_row_slice(1, 1, &[f64::MAX]);
+    let x = DenseMatrix::from_row_major(1, 1, &[f64::MAX]).unwrap();
     let nf = [1.0];
 
     let err = fitted_mu_log2_unfloored(&x, &[2.0], &nf).unwrap_err();

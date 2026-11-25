@@ -1,6 +1,6 @@
 use super::*;
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
-use crate::matrix::{try_alloc_matrix, try_zero_dmatrix};
+use crate::matrix::{try_alloc_matrix, try_zero_matrix};
 use crate::numeric::math::ProfileMath;
 // Fixed design products for the unweighted optimizer path. Products are
 // checked at their original evaluation point, after the mean/weight checks.
@@ -134,7 +134,7 @@ pub(super) fn cox_reid_adjustment_weighted_with_threshold_prepared(
         CoxReidMatrixOrder::Value,
         prepared,
     )?;
-    let determinant = matrices.xtwx.determinant();
+    let determinant = determinant(&matrices.xtwx)?;
     if !determinant.is_finite() || determinant <= 0.0 {
         return Err(DeseqError::InvalidDimensions {
             context: "Cox-Reid weighted design determinant".to_string(),
@@ -146,9 +146,9 @@ pub(super) fn cox_reid_adjustment_weighted_with_threshold_prepared(
 }
 
 pub(super) struct CoxReidDesignMatrices {
-    xtwx: DMatrix<f64>,
-    d_xtwx: Option<DMatrix<f64>>,
-    d2_xtwx: Option<DMatrix<f64>>,
+    xtwx: DenseMatrix,
+    d_xtwx: Option<DenseMatrix>,
+    d2_xtwx: Option<DenseMatrix>,
 }
 
 impl CoxReidDesignMatrices {
@@ -156,12 +156,12 @@ impl CoxReidDesignMatrices {
         columns: usize,
     ) -> Result<Self, DeseqError> {
         Ok(Self {
-            xtwx: try_zero_dmatrix(columns, columns, "Cox-Reid crossproduct")?,
+            xtwx: try_zero_matrix(columns, columns, "Cox-Reid crossproduct")?,
             d_xtwx: DERIVATIVE
-                .then(|| try_zero_dmatrix(columns, columns, "Cox-Reid derivative"))
+                .then(|| try_zero_matrix(columns, columns, "Cox-Reid derivative"))
                 .transpose()?,
             d2_xtwx: SECOND_DERIVATIVE
-                .then(|| try_zero_dmatrix(columns, columns, "Cox-Reid second derivative"))
+                .then(|| try_zero_matrix(columns, columns, "Cox-Reid second derivative"))
                 .transpose()?,
         })
     }
@@ -454,9 +454,12 @@ pub(super) fn cox_reid_column_indices(
     Ok(selected)
 }
 
-pub(super) fn trace_product(left: &DMatrix<f64>, right: &DMatrix<f64>) -> Result<f64, DeseqError> {
-    let product = left * right;
-    checked_sum_indexed(product.diagonal().iter().copied(), "Cox-Reid trace product")
+pub(super) fn trace_product(left: &DenseMatrix, right: &DenseMatrix) -> Result<f64, DeseqError> {
+    let product = matmul(left, right)?;
+    checked_sum_indexed(
+        (0..product.nrows().min(product.ncols())).map(|i| product[(i, i)]),
+        "Cox-Reid trace product",
+    )
 }
 
 /// Derivative of the Cox-Reid adjustment with respect to log alpha.
@@ -522,13 +525,14 @@ pub(super) fn cox_reid_adjustment_derivative_weighted_with_threshold_prepared(
         CoxReidMatrixOrder::Derivative,
         prepared,
     )?;
-    let Some(inverse) = matrices.xtwx.try_inverse() else {
+    let mut inverse = matrices.xtwx;
+    if !try_inverse_in_place(&mut inverse)? {
         return Err(DeseqError::InvalidDimensions {
             context: "Cox-Reid weighted design inverse".to_string(),
             expected: design.n_coefficients(),
             actual: 0,
         });
-    };
+    }
     let d_xtwx = matrices
         .d_xtwx
         .ok_or_else(|| DeseqError::InvalidDimensions {
@@ -602,13 +606,14 @@ pub(super) fn cox_reid_adjustment_second_derivative_weighted_with_threshold_prep
         CoxReidMatrixOrder::SecondDerivative,
         prepared,
     )?;
-    let Some(inverse) = matrices.xtwx.try_inverse() else {
+    let mut inverse = matrices.xtwx;
+    if !try_inverse_in_place(&mut inverse)? {
         return Err(DeseqError::InvalidDimensions {
             context: "Cox-Reid weighted design inverse".to_string(),
             expected: design.n_coefficients(),
             actual: 0,
         });
-    };
+    }
     let d_xtwx = matrices
         .d_xtwx
         .ok_or_else(|| DeseqError::InvalidDimensions {
@@ -623,9 +628,12 @@ pub(super) fn cox_reid_adjustment_second_derivative_weighted_with_threshold_prep
             expected: design.n_coefficients(),
             actual: 0,
         })?;
-    let second_trace_product = &inverse * &d_xtwx * &inverse * &d_xtwx;
+    let second_trace_product = matmul(&matmul(&matmul(&inverse, &d_xtwx)?, &inverse)?, &d_xtwx)?;
     let second_trace = checked_sum_indexed(
-        second_trace_product.diagonal().iter().copied(),
+        (0..second_trace_product
+            .nrows()
+            .min(second_trace_product.ncols()))
+            .map(|i| second_trace_product[(i, i)]),
         "Cox-Reid second trace product",
     )?;
     let trace_bi_d2b = trace_product(&inverse, &d2_xtwx)?;

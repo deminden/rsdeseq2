@@ -46,27 +46,16 @@ None.
 
 ## rcompat-shrinkage, default features
 
-| Crate | Version | Licence |
-|---|---|---|
-| approx | 0.5.1 | Apache-2.0 |
-| nalgebra | 0.35.0 | Apache-2.0 |
-| nalgebra-macros | 0.3.0 | Apache-2.0 |
-| simba | 0.10.2 | Apache-2.0 |
+None.
 
 ## rcompat-shrinkage, all features
 
-| Crate | Version | Licence |
-|---|---|---|
-| approx | 0.5.1 | Apache-2.0 |
-| nalgebra | 0.35.0 | Apache-2.0 |
-| nalgebra-macros | 0.3.0 | Apache-2.0 |
-| simba | 0.10.2 | Apache-2.0 |
+None.
 
 ## rsdeseq2, default features
 
 | Crate | Version | Licence |
 |---|---|---|
-| approx | 0.5.1 | Apache-2.0 |
 | icu_collator | 2.4.0 | Unicode-3.0 |
 | icu_collator_data | 2.4.0 | Unicode-3.0 |
 | icu_collections | 2.4.0 | Unicode-3.0 |
@@ -80,10 +69,7 @@ None.
 | icu_properties | 2.4.0 | Unicode-3.0 |
 | icu_provider | 2.4.0 | Unicode-3.0 |
 | litemap | 0.8.3 | Unicode-3.0 |
-| nalgebra | 0.35.0 | Apache-2.0 |
-| nalgebra-macros | 0.3.0 | Apache-2.0 |
 | potential_utf | 0.1.6 | Unicode-3.0 |
-| simba | 0.10.2 | Apache-2.0 |
 | tinystr | 0.8.5 | Unicode-3.0 |
 | writeable | 0.6.4 | Unicode-3.0 |
 | yoke | 0.8.4 | Unicode-3.0 |
@@ -98,7 +84,6 @@ None.
 
 | Crate | Version | Licence |
 |---|---|---|
-| approx | 0.5.1 | Apache-2.0 |
 | icu_collator | 2.4.0 | Unicode-3.0 |
 | icu_collator_data | 2.4.0 | Unicode-3.0 |
 | icu_collections | 2.4.0 | Unicode-3.0 |
@@ -112,10 +97,7 @@ None.
 | icu_properties | 2.4.0 | Unicode-3.0 |
 | icu_provider | 2.4.0 | Unicode-3.0 |
 | litemap | 0.8.3 | Unicode-3.0 |
-| nalgebra | 0.35.0 | Apache-2.0 |
-| nalgebra-macros | 0.3.0 | Apache-2.0 |
 | potential_utf | 0.1.6 | Unicode-3.0 |
-| simba | 0.10.2 | Apache-2.0 |
 | tinystr | 0.8.5 | Unicode-3.0 |
 | writeable | 0.6.4 | Unicode-3.0 |
 | yoke | 0.8.4 | Unicode-3.0 |

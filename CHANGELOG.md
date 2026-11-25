@@ -4,6 +4,20 @@ Public API and user-visible behaviour changes. Version notes live in [docs/relea
 
 ## 0.7.0 (unreleased)
 
+### Added
+
+- `rcompat_numeric::math::dense`: a column-major `DenseMatrix` with matrix
+  products, LU with partial pivoting, inverses and determinants, Cholesky,
+  Householder QR with column pivoting, a symmetric Jacobi eigen-solver and a
+  one-sided Jacobi SVD.
+
+### Changed
+
+- `rsdeseq2` and `rcompat-shrinkage` no longer depend on `nalgebra` (and
+  through it `simba` and `approx`); their linear algebra uses
+  `rcompat_numeric::math::dense`. Every normal dependency of the shrinkage
+  crate is now MIT-compatible.
+
 ### Removed
 
 - The `RLinuxX86` and `RLinuxArm64` numeric profiles (`r-linux-x86_64`,

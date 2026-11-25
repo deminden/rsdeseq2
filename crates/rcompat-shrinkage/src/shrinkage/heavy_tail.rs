@@ -1,7 +1,7 @@
 //! Standalone heavy-tailed negative-binomial posterior fitting.
 use super::try_dense_matrix;
 use crate::{Error, matrix::try_alloc_matrix};
-use nalgebra::DMatrix;
+use rcompat_numeric::math::dense::DenseMatrix;
 
 mod analysis;
 mod beta_binomial;
@@ -48,7 +48,7 @@ fn finite_difference_hessian(
     beta: &[f64],
     step: f64,
     gradient: impl Fn(&[f64]) -> Vec<f64>,
-) -> Result<DMatrix<f64>, Error> {
+) -> Result<DenseMatrix, Error> {
     let p = beta.len();
     let mut hessian = try_dense_matrix(p, p, "posterior Hessian", |_, _| 0.0)?;
     let mut perturbed = try_alloc_matrix(p, 1, "posterior Hessian coefficients")?;

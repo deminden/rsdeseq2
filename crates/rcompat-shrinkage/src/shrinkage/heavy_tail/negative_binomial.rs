@@ -2,7 +2,7 @@
 use super::prior::CauchyCoefficientPrior;
 use crate::numeric::math::ProfileMath;
 use crate::{Error, matrix::MatrixView};
-use nalgebra::DMatrix;
+use rcompat_numeric::math::dense::DenseMatrix;
 pub(super) struct Row<'a> {
     pub design: MatrixView<'a, f64>,
     pub counts: Vec<f64>,
@@ -43,7 +43,7 @@ impl Row<'_> {
         }
         (value, gradient)
     }
-    pub fn hessian(&self, beta: &[f64], step: f64) -> Result<DMatrix<f64>, Error> {
+    pub fn hessian(&self, beta: &[f64], step: f64) -> Result<DenseMatrix, Error> {
         super::finite_difference_hessian(beta, step, |x| self.objective_gradient(x).1)
     }
 }

@@ -3,7 +3,6 @@ use crate::numeric::math::ProfileMath;
 use crate::numeric::validate::{
     nonnegative_finite as validate_nonnegative_finite, positive_finite as validate_positive_finite,
 };
-use nalgebra::{DMatrix, DVector};
 use rayon::prelude::*;
 use rcompat_lbfgsb::{Bounds, OptimControl, optim_lbfgsb, optim_lbfgsb_with_gradient};
 use std::cell::RefCell;
@@ -20,10 +19,10 @@ use crate::glm::nb::{
 use crate::glm::r_arithmetic::{nbinom_log, normal_log};
 use crate::math::optim::BoundedOptimizationOutput;
 use crate::matrix::CountMatrix;
+use crate::matrix::DenseMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::matrix::{
-    try_alloc_matrix, try_dmatrix_from_row_major, try_filled_vec, try_zero_dmatrix,
-    try_zero_dvector,
+    try_alloc_matrix, try_dense_from_row_major, try_filled_vec, try_zero_matrix, try_zero_vector,
 };
 use crate::normalization::Offsets;
 
@@ -548,7 +547,7 @@ fn fit_irls_rows<const SELECTED: bool>(
     let samples = rows.input.counts.n_samples();
     let genes = rows.len();
 
-    let x = try_dmatrix_from_row_major(design.matrix(), "IRLS design")?;
+    let x = try_dense_from_row_major(design.matrix(), "IRLS design")?;
     let max_design = finite_abs_max(x.as_slice());
     let initial_beta = InitialBeta::for_design(design, &x)?;
     let shared_log_offsets = match rows.input.offsets {
@@ -786,7 +785,7 @@ fn checked_output_elements(rows: usize, columns: usize) -> Result<usize, DeseqEr
 
 struct OptimFallbackInput<'a, const SELECTED: bool> {
     rows: IrlsRows<'a, SELECTED>,
-    x: &'a DMatrix<f64>,
+    x: &'a DenseMatrix,
     max_design: Option<f64>,
     ridge_lambda: &'a [f64],
     options: &'a IrlsOptions,
@@ -797,7 +796,7 @@ struct IrlsRowInput<'a, const SELECTED: bool> {
     /// `ln` of the size factors when every gene shares them.
     shared_log_offsets: Option<&'a [f64]>,
     rows: IrlsRows<'a, SELECTED>,
-    x: &'a DMatrix<f64>,
+    x: &'a DenseMatrix,
     max_design: Option<f64>,
     initial_beta: &'a InitialBeta,
     ridge_lambda: &'a [f64],

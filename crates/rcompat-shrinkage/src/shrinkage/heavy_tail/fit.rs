@@ -14,8 +14,8 @@ use crate::{
     probability::normal_upper_tail,
     shrinkage::svalues,
 };
-use nalgebra::{DMatrix, Matrix4, linalg::try_invert_to};
 use rcompat_lbfgsb::OptimResult;
+use rcompat_numeric::math::dense::{DenseMatrix, try_inverse_in_place};
 
 /// MLE scale supplied for empirical prior adaptation.
 #[derive(Clone, Copy, Debug)]
@@ -700,29 +700,15 @@ struct MapFit {
 
 struct LaplaceFit {
     map: MapFit,
-    covariance: Option<DMatrix<f64>>,
+    covariance: Option<DenseMatrix>,
 }
 
-fn invert_hessian(mut hessian: DMatrix<f64>) -> Result<Option<DMatrix<f64>>, Error> {
-    let p = hessian.nrows();
-    match p {
-        0..=3 => Ok(hessian.try_inverse_mut().then_some(hessian)),
-        4 => {
-            let mut small = Matrix4::from_column_slice(hessian.as_slice());
-            if !small.try_inverse_mut() {
-                return Ok(None);
-            }
-            hessian.as_mut_slice().copy_from_slice(small.as_slice());
-            Ok(Some(hessian))
-        }
-        _ => {
-            let mut inverse = super::try_dense_matrix(p, p, "posterior covariance", |_, _| 0.0)?;
-            Ok(try_invert_to(hessian, &mut inverse).then_some(inverse))
-        }
-    }
+/// Closed-form adjugate inverse up to four coefficients, LU beyond.
+fn invert_hessian(mut hessian: DenseMatrix) -> Result<Option<DenseMatrix>, Error> {
+    Ok(try_inverse_in_place(&mut hessian)?.then_some(hessian))
 }
 
-fn invert_finite_hessian(hessian: DMatrix<f64>) -> Result<Option<DMatrix<f64>>, Error> {
+fn invert_finite_hessian(hessian: DenseMatrix) -> Result<Option<DenseMatrix>, Error> {
     if hessian.iter().all(|v| v.is_finite()) {
         invert_hessian(hessian)
     } else {
@@ -730,7 +716,7 @@ fn invert_finite_hessian(hessian: DMatrix<f64>) -> Result<Option<DMatrix<f64>>, 
     }
 }
 
-fn has_valid_covariance_diagonal(matrix: &DMatrix<f64>) -> bool {
+fn has_valid_covariance_diagonal(matrix: &DenseMatrix) -> bool {
     (0..matrix.nrows()).all(|i| {
         let variance = matrix[(i, i)];
         variance.is_finite() && variance > 0.0

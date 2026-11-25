@@ -5,6 +5,7 @@ use crate::errors::{
     scoped_invalid_options,
 };
 use crate::{Error, matrix::RowMajorMatrix, probability::normal_upper_quantile};
+use rcompat_numeric::math::dense::DenseMatrix;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 /// How credible intervals are computed.
 pub enum PosteriorIntervalKind {
@@ -433,7 +434,7 @@ impl PosteriorAnalysis {
 pub(super) struct AnalysisRow<'a> {
     pub gene: usize,
     pub mode: &'a [f64],
-    pub covariance: &'a nalgebra::DMatrix<f64>,
+    pub covariance: &'a DenseMatrix,
     pub sd: &'a [f64],
     pub coefficient: Option<usize>,
     pub options: &'a PosteriorAnalysisOptions,

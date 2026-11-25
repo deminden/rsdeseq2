@@ -8,7 +8,8 @@ use super::{
 };
 use crate::errors::scoped_invalid_options;
 use crate::{Error, matrix::try_alloc_matrix};
-use nalgebra::DVector;
+use rcompat_numeric::math::dense::triangular::solve_upper_in_place;
+use rcompat_numeric::math::dense::{ColPivQr, matmul_to, tr_gemv_to};
 fn norm(a: &[f64], b: &[f64]) -> f64 {
     a.iter()
         .zip(b)
@@ -28,23 +29,24 @@ fn coefficients(states: &[Vec<f64>], o: SquaremOptions) -> Result<Option<Vec<f64
                 try_dense_matrix(k + 1, p, "mixture polynomial transpose", |i, j| u[(j, i)])?;
             let mut gram =
                 try_dense_matrix(k + 1, k + 1, "mixture polynomial Gram matrix", |_, _| 0.0)?;
-            transpose.mul_to(&u, &mut gram);
-            let Some(solution) = gram.col_piv_qr().solve(&DVector::from_element(k + 1, 1.0)) else {
+            matmul_to(&transpose, &u, &mut gram)?;
+            let Some(solution) = ColPivQr::new(gram)?.solve(&vec![1.0; k + 1])? else {
                 return Ok(None);
             };
-            solution.as_slice().to_vec()
+            solution
         }
         PolynomialExtrapolation::MinimalPolynomial => {
             let a = try_dense_matrix(p, k, "mixture polynomial QR design", |i, j| u[(i, j)])?;
-            let b = -u.column(k).into_owned();
-            let qr = a.col_piv_qr();
-            let mut rhs = qr.q().transpose() * b;
-            let r = qr.r();
-            if !r.solve_upper_triangular_mut(&mut rhs) {
+            let b = u.column(k).iter().map(|v| -v).collect::<Vec<_>>();
+            // Least squares by column-pivoted Householder QR with an
+            // explicit thin Q: R z = Qᵀ b, then undo the pivoting.
+            let qr = ColPivQr::new(a)?;
+            let mut rhs = vec![0.0; k];
+            tr_gemv_to(&qr.q()?, &b, &mut rhs)?;
+            if !solve_upper_in_place(&qr.r()?, &mut rhs) {
                 return Ok(None);
             }
-            qr.p().inv_permute_rows(&mut rhs);
-            let mut c = rhs.as_slice().to_vec();
+            let mut c = qr.unpermute(&rhs);
             c.push(1.0);
             c
         }

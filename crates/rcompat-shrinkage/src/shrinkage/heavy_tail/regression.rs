@@ -11,8 +11,8 @@ use super::{
 use crate::errors::{ErrorKind, PosteriorArray, PosteriorArrayAxis, scoped_invalid_options};
 use crate::numeric::math::ProfileMath;
 use crate::{Error, matrix::MatrixView};
-use nalgebra::DMatrix;
 use rcompat_lbfgsb::{Bounds, OptimControl, optim_lbfgsb_with_gradient};
+use rcompat_numeric::math::dense::DenseMatrix;
 use std::{cell::RefCell, sync::Arc};
 #[derive(Clone, Debug)]
 /// Observation likelihood of a general `apeglm` regression.
@@ -477,7 +477,7 @@ impl GeneralRow<'_> {
             .collect();
         (self.value(beta), gradient)
     }
-    pub fn hessian(&self, beta: &[f64], step: f64) -> Result<DMatrix<f64>, Error> {
+    pub fn hessian(&self, beta: &[f64], step: f64) -> Result<DenseMatrix, Error> {
         super::finite_difference_hessian(beta, step, |x| self.objective_gradient(x).1)
     }
     pub fn optimize(&self, start: Vec<f64>) -> Result<rcompat_lbfgsb::OptimResult, Error> {

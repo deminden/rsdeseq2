@@ -19,13 +19,13 @@ submodule `sqp/compatibility.rs`, which is to be rewritten:
 
 ```rust
 impl Problem {
-    pub(super) fn ashr_hessian_into(&self, weights: &[f64], hessian: &mut DMatrix<f64>);
+    pub(super) fn ashr_hessian_into(&self, weights: &[f64], hessian: &mut DenseMatrix);
     pub(super) fn ashr_expectation_step(&self, weights: &[f64]) -> Result<Vec<f64>, Error>;
 }
 pub(super) fn quadratic(
-    h: &DMatrix<f64>,
-    c: &DVector<f64>,
-    start: &DVector<f64>,
+    h: &DenseMatrix,
+    c: &[f64],
+    start: &[f64],
     max_iterations: usize,
     options: MixtureSqpOptions,
 ) -> /* see the call site in sqp.rs */;

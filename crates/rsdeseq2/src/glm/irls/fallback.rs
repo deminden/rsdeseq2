@@ -139,7 +139,7 @@ pub(super) fn refit_optim_fallback_rows<const SELECTED: bool>(
 
 pub(super) fn optim_start_beta_log2(
     current_beta_log2: &[f64],
-    x: &DMatrix<f64>,
+    x: &DenseMatrix,
     counts: &[u32],
     nf: &[f64],
     bound: f64,
@@ -166,7 +166,7 @@ pub(super) fn optim_start_beta_log2(
 
 #[derive(Clone, Copy)]
 pub(super) struct BetaOptimInput<'a> {
-    pub(super) x: &'a DMatrix<f64>,
+    pub(super) x: &'a DenseMatrix,
     pub(super) counts: &'a [u32],
     pub(super) nf: &'a [f64],
     pub(super) dispersion: f64,

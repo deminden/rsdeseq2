@@ -1,8 +1,8 @@
 use super::*;
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
-use crate::matrix::{try_alloc_matrix, try_dmatrix_from_row_major, try_zero_dmatrix};
+use crate::matrix::{try_alloc_matrix, try_dense_from_row_major, try_zero_matrix};
 use crate::numeric::math::ProfileMath;
-use nalgebra::DMatrixView;
+use rcompat_numeric::math::dense::matmul_to;
 /// Estimate gene-wise dispersions using DESeq2's linear-mu branch shape.
 ///
 /// This implements a clean Rust subset of `estimateDispersionsGeneEst`:
@@ -394,25 +394,27 @@ pub fn linear_model_mu(
     }
     let samples = design.n_samples();
     let coefficients = design.n_coefficients();
-    let x = try_dmatrix_from_row_major(design.matrix(), "linear mean design")?;
+    let x = try_dense_from_row_major(design.matrix(), "linear mean design")?;
     // The row-major design slice has the column-major layout of its transpose.
-    let xt = DMatrixView::from_slice(design.matrix().as_slice(), coefficients, samples);
-    let mut xtx = try_zero_dmatrix(coefficients, coefficients, "linear mean crossproduct")?;
-    xt.mul_to(&x, &mut xtx);
-    if !xtx.try_inverse_mut() {
+    let mut transpose = try_alloc_matrix(coefficients, samples, "linear mean design transpose")?;
+    transpose.extend_from_slice(design.matrix().as_slice());
+    let xt = DenseMatrix::from_column_major(coefficients, samples, transpose)?;
+    let mut xtx = try_zero_matrix(coefficients, coefficients, "linear mean crossproduct")?;
+    matmul_to(&xt, &x, &mut xtx)?;
+    if !try_inverse_in_place(&mut xtx)? {
         return Err(DeseqError::InvalidDimensions {
             context: "linear mu design rank".to_string(),
             expected: coefficients,
             actual: 0,
         });
     }
-    let mut left = try_zero_dmatrix(samples, coefficients, "linear mean projection left factor")?;
-    x.mul_to(&xtx, &mut left);
-    let mut hat = try_zero_dmatrix(samples, samples, "linear mean projection")?;
-    left.mul_to(&xt, &mut hat);
-    let y = try_dmatrix_from_row_major(normalized_counts, "linear mean normalized counts")?;
-    let mut fitted = try_zero_dmatrix(normalized_counts.n_rows(), samples, "linear fitted means")?;
-    y.mul_to(&hat, &mut fitted);
+    let mut left = try_zero_matrix(samples, coefficients, "linear mean projection left factor")?;
+    matmul_to(&x, &xtx, &mut left)?;
+    let mut hat = try_zero_matrix(samples, samples, "linear mean projection")?;
+    matmul_to(&left, &xt, &mut hat)?;
+    let y = try_dense_from_row_major(normalized_counts, "linear mean normalized counts")?;
+    let mut fitted = try_zero_matrix(normalized_counts.n_rows(), samples, "linear fitted means")?;
+    matmul_to(&y, &hat, &mut fitted)?;
     drop(y);
     drop(hat);
     let mut values = try_alloc_matrix(

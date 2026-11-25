@@ -694,24 +694,12 @@ dependencies = [
  "glam 0.32.1",
  "glam 0.33.12",
  "matrixmultiply",
- "nalgebra-macros",
  "num-complex",
  "num-rational",
  "num-traits",
  "rand",
  "simba",
  "typenum",
-]
-
-[[package]]
-name = "nalgebra-macros"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "973e7178a678cfd059ccec50887658d482ce16b0aa9da3888ddeab5cd5eb4889"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -957,7 +945,6 @@ name = "rcompat-shrinkage"
 version = "0.1.2"
 dependencies = [
  "libm",
- "nalgebra",
  "rcompat-formula",
  "rcompat-lbfgsb",
  "rcompat-numeric",
@@ -1004,7 +991,6 @@ dependencies = [
  "csv",
  "csv-core",
  "libm",
- "nalgebra",
  "proptest",
  "rayon",
  "rcompat-formula",

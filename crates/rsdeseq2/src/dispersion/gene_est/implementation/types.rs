@@ -1,6 +1,7 @@
 use super::*;
+pub(super) use crate::matrix::DenseMatrix;
 pub(super) use crate::numeric::special::{digamma, ln_gamma};
-pub(super) use nalgebra::DMatrix;
+pub(super) use rcompat_numeric::math::dense::{determinant, matmul, try_inverse_in_place};
 
 pub(super) use crate::design::DesignMatrix;
 pub(super) use crate::errors::{DeseqError, invalid_dimensions};

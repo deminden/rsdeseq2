@@ -9,8 +9,8 @@ use crate::errors::scoped_invalid_options;
 use crate::numeric::math::ProfileMath;
 use crate::probability::digamma_positive as psi;
 use crate::{Error, matrix::MatrixView, probability::stirling_correction};
-use nalgebra::DMatrix;
 use rcompat_lbfgsb::{Bounds, OptimControl, OptimResult, optim_lbfgsb_with_gradient};
+use rcompat_numeric::math::dense::DenseMatrix;
 
 fn psi_difference(x: f64, k: f64) -> f64 {
     if k == 0.0 {
@@ -103,7 +103,7 @@ impl Row<'_> {
         }
         (value, gradient)
     }
-    pub fn hessian(&self, beta: &[f64], step: f64) -> Result<DMatrix<f64>, Error> {
+    pub fn hessian(&self, beta: &[f64], step: f64) -> Result<DenseMatrix, Error> {
         super::finite_difference_hessian(beta, step, |x| self.objective_gradient(x, false).1)
     }
     pub fn optimize(

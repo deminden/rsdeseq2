@@ -1,14 +1,10 @@
 use super::*;
 use crate::numeric::math::ProfileMath;
-use nalgebra::{DVectorView, Dyn, linalg::LU};
+use rcompat_numeric::math::dense::{Lu, gemv_to, matmul_to};
 // Starting coefficients and stable fitted means.
 
-pub(super) fn initial_beta(
-    x: &DMatrix<f64>,
-    y: &[f64],
-    nf: &[f64],
-) -> Result<DVector<f64>, DeseqError> {
-    let mut beta = try_zero_dvector(x.ncols(), "IRLS starting coefficients")?;
+pub(super) fn initial_beta(x: &DenseMatrix, y: &[f64], nf: &[f64]) -> Result<Vec<f64>, DeseqError> {
+    let mut beta = try_zero_vector(x.ncols(), "IRLS starting coefficients")?;
     let mut response = try_alloc_matrix(y.len(), 1, "IRLS starting response")?;
     InitialBeta::least_squares(x)?.initialize(y, nf, &mut response, &mut beta)?;
     Ok(beta)
@@ -18,10 +14,7 @@ pub(super) fn initial_beta(
 pub(super) enum InitialBeta {
     /// Full-rank design (`qr(x)$rank == ncol(x)`): least squares on
     /// `log(normalized count + 0.1)`.
-    LeastSquares {
-        transpose: DMatrix<f64>,
-        lu: LU<f64, Dyn, Dyn>,
-    },
+    LeastSquares { transpose: DenseMatrix, lu: Lu },
     /// Rank-deficient design with an `Intercept` column: that coefficient
     /// starts at `log(rowMeans(normalized counts))`, the others at 0.
     LogBaseMeanIntercept(usize),
@@ -30,7 +23,7 @@ pub(super) enum InitialBeta {
 }
 
 impl InitialBeta {
-    pub(super) fn for_design(design: &DesignMatrix, x: &DMatrix<f64>) -> Result<Self, DeseqError> {
+    pub(super) fn for_design(design: &DesignMatrix, x: &DenseMatrix) -> Result<Self, DeseqError> {
         if design.rank()? == design.n_coefficients() {
             return Self::least_squares(x);
         }
@@ -42,18 +35,18 @@ impl InitialBeta {
         Ok(intercept.map_or(Self::Ones, Self::LogBaseMeanIntercept))
     }
 
-    fn least_squares(x: &DMatrix<f64>) -> Result<Self, DeseqError> {
+    fn least_squares(x: &DenseMatrix) -> Result<Self, DeseqError> {
         let coefficients = x.ncols();
         let mut transpose =
-            try_zero_dmatrix(coefficients, x.nrows(), "IRLS starting design transpose")?;
-        x.transpose_to(&mut transpose);
-        let mut crossproduct = try_zero_dmatrix(
+            try_zero_matrix(coefficients, x.nrows(), "IRLS starting design transpose")?;
+        x.transpose_to(&mut transpose)?;
+        let mut crossproduct = try_zero_matrix(
             coefficients,
             coefficients,
             "IRLS starting design crossproduct",
         )?;
-        transpose.mul_to(x, &mut crossproduct);
-        let lu = crossproduct.lu();
+        matmul_to(&transpose, x, &mut crossproduct)?;
+        let lu = Lu::new(crossproduct)?;
         Ok(Self::LeastSquares { transpose, lu })
     }
 
@@ -62,7 +55,7 @@ impl InitialBeta {
         y: &[f64],
         nf: &[f64],
         response: &mut Vec<f64>,
-        beta: &mut DVector<f64>,
+        beta: &mut [f64],
     ) -> Result<(), DeseqError> {
         match self {
             Self::LeastSquares { transpose, lu } => {
@@ -71,8 +64,8 @@ impl InitialBeta {
                     validate_positive_finite(factor, "normalization factor", 0)?;
                     response.push((count / factor + 0.1).ln_p());
                 }
-                transpose.mul_to(&DVectorView::from_slice(response, response.len()), beta);
-                if !lu.solve_mut(beta) {
+                gemv_to(transpose, response, beta)?;
+                if !lu.solve_in_place(beta) {
                     beta.fill(0.0);
                 }
             }
@@ -93,8 +86,8 @@ impl InitialBeta {
 
 #[cfg(test)]
 pub(super) fn fitted_mu(
-    x: &DMatrix<f64>,
-    beta: &DVector<f64>,
+    x: &DenseMatrix,
+    beta: &[f64],
     nf: &[f64],
     min_mu: f64,
 ) -> Result<Vec<f64>, DeseqError> {
@@ -103,7 +96,7 @@ pub(super) fn fitted_mu(
 
 #[cfg(test)]
 pub(super) fn fitted_mu_log2_unfloored(
-    x: &DMatrix<f64>,
+    x: &DenseMatrix,
     beta: &[f64],
     nf: &[f64],
 ) -> Result<Vec<f64>, DeseqError> {
@@ -113,7 +106,7 @@ pub(super) fn fitted_mu_log2_unfloored(
 }
 
 pub(super) fn fitted_mu_log2_unfloored_into(
-    x: &DMatrix<f64>,
+    x: &DenseMatrix,
     beta: &[f64],
     nf: &[f64],
     output: &mut [f64],
@@ -144,8 +137,8 @@ pub(super) fn fitted_mu_log2_unfloored_into(
 
 #[cfg(test)]
 pub(super) fn fitted_mu_impl(
-    x: &DMatrix<f64>,
-    beta: &DVector<f64>,
+    x: &DenseMatrix,
+    beta: &[f64],
     nf: &[f64],
     min_mu: Option<f64>,
 ) -> Result<Vec<f64>, DeseqError> {
@@ -155,8 +148,8 @@ pub(super) fn fitted_mu_impl(
 }
 
 pub(super) fn fitted_mu_into(
-    x: &DMatrix<f64>,
-    beta: &DVector<f64>,
+    x: &DenseMatrix,
+    beta: &[f64],
     nf: &[f64],
     min_mu: Option<f64>,
     log_nf: Option<&[f64]>,
@@ -187,11 +180,7 @@ pub(super) fn fitted_mu_into(
     Ok(())
 }
 
-pub(super) fn checked_row_dot_slice(
-    x: &DMatrix<f64>,
-    row: usize,
-    beta: &[f64],
-) -> checked::Checked {
+pub(super) fn checked_row_dot_slice(x: &DenseMatrix, row: usize, beta: &[f64]) -> checked::Checked {
     let mut sum = 0.0;
     for col in 0..x.ncols() {
         sum = x[(row, col)].mul_add(beta[col], sum);
@@ -203,9 +192,9 @@ pub(super) fn checked_row_dot_slice(
 }
 
 pub(super) fn checked_row_dot_vector(
-    x: &DMatrix<f64>,
+    x: &DenseMatrix,
     row: usize,
-    beta: &DVector<f64>,
+    beta: &[f64],
 ) -> checked::Checked {
     let mut sum = ScaledSum::default();
     for col in 0..x.ncols() {
