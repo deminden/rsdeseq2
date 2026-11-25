@@ -18,6 +18,13 @@ Public API and user-visible behaviour changes. Version notes live in [docs/relea
   `rcompat_numeric::math::dense`. Every normal dependency of the shrinkage
   crate is now MIT-compatible.
 
+- The `formula` feature (ICU locale collation, Unicode-3.0 licensed
+  dependencies) is no longer enabled by default. Without it,
+  `EvaluationOptions::default()` uses "C" collation, so formula factor
+  levels and string comparisons sort by bytes; non-ASCII levels can order
+  differently from R's locale collation. Enable `formula` to restore
+  locale collation. The R package enables it.
+
 ### Removed
 
 - The `RLinuxX86` and `RLinuxArm64` numeric profiles (`r-linux-x86_64`,

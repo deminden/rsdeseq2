@@ -33,6 +33,8 @@ jobs:
         run: cargo doc --locked -p rcompat-numeric -p rcompat-formula -p rcompat-shrinkage -p rsdeseq2 --no-deps
       - name: Test
         run: cargo test --locked --workspace
+      - name: Tests with all features (ICU collation)
+        run: cargo test --locked --workspace --all-features
       - name: Fuzz targets build (stable; fuzzing itself runs weekly on nightly)
         run: cargo check --locked --manifest-path fuzz/Cargo.toml
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5

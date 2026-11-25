@@ -194,12 +194,14 @@ pub struct Argument {
 pub struct EvaluationOptions {
     /// ICU locale. "root" and "und" select Unicode root collation; "C" uses
     /// byte order. Other locale identifiers are parsed as Unicode locales.
+    /// Without the `icu` feature only "C" is available.
     pub collation: String,
 }
 impl Default for EvaluationOptions {
+    /// Unicode root collation with the `icu` feature, otherwise "C".
     fn default() -> Self {
         Self {
-            collation: "root".into(),
+            collation: if cfg!(feature = "icu") { "root" } else { "C" }.into(),
         }
     }
 }

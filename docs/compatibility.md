@@ -53,6 +53,11 @@ Raw all-zero flags and weighted failure flags retain their separate meanings
 after replacement. The low-count Cook's rule requires matching formula/factor
 and design context, including first-tied maximum handling.
 
+Factor levels and string comparisons in formulas sort with locale collation
+only when the `formula` feature is enabled (the R package enables it). The
+default Rust build uses R's "C" collation, so non-ASCII levels can order
+differently from R in a locale such as `en_US`.
+
 ## Numerical expectations
 
 Accuracy uses independent original-R/DESeq2/ashr/apeglm references and

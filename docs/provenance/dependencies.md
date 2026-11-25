@@ -54,31 +54,7 @@ None.
 
 ## rsdeseq2, default features
 
-| Crate | Version | Licence |
-|---|---|---|
-| icu_collator | 2.4.0 | Unicode-3.0 |
-| icu_collator_data | 2.4.0 | Unicode-3.0 |
-| icu_collections | 2.4.0 | Unicode-3.0 |
-| icu_locale | 2.4.0 | Unicode-3.0 |
-| icu_locale_core | 2.4.0 | Unicode-3.0 |
-| icu_locale_data | 2.4.0 | Unicode-3.0 |
-| icu_locale_fallback | 2.4.0 | Unicode-3.0 |
-| icu_locale_fallback_data | 2.4.0 | Unicode-3.0 |
-| icu_normalizer | 2.4.0 | Unicode-3.0 |
-| icu_normalizer_data | 2.4.0 | Unicode-3.0 |
-| icu_properties | 2.4.0 | Unicode-3.0 |
-| icu_provider | 2.4.0 | Unicode-3.0 |
-| litemap | 0.8.3 | Unicode-3.0 |
-| potential_utf | 0.1.6 | Unicode-3.0 |
-| tinystr | 0.8.5 | Unicode-3.0 |
-| writeable | 0.6.4 | Unicode-3.0 |
-| yoke | 0.8.4 | Unicode-3.0 |
-| yoke-derive | 0.8.4 | Unicode-3.0 |
-| zerofrom | 0.1.8 | Unicode-3.0 |
-| zerofrom-derive | 0.1.8 | Unicode-3.0 |
-| zerotrie | 0.2.5 | Unicode-3.0 |
-| zerovec | 0.11.9 | Unicode-3.0 |
-| zerovec-derive | 0.11.7 | Unicode-3.0 |
+None.
 
 ## rsdeseq2, all features
 

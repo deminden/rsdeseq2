@@ -43,7 +43,7 @@ name = "dispersion_bench"
 harness = false
 
 [features]
-default = ["cli", "formula", "shrinkage"]
+default = ["cli", "shrinkage"]
 # Command-line interface: the `rsdeseq2` binary and `rsdeseq2::cli`.
 cli = ["dep:clap", "dep:sha2", "dep:same-file"]
 # Internal target hooks for the separate cargo-fuzz workspace.
