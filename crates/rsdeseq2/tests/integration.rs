@@ -22,6 +22,8 @@ mod ashr_mode;
 mod ashr_optimizers;
 #[path = "ashr_output.rs"]
 mod ashr_output;
+#[path = "ashr_singular_direction.rs"]
+mod ashr_singular_direction;
 #[path = "auto_dispersion.rs"]
 mod auto_dispersion;
 #[path = "base_mean.rs"]

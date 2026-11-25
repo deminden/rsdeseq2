@@ -209,74 +209,87 @@ pub(super) fn quadratic(
 }
 
 /// Solves the reduced system `A p = r` for a symmetric positive
-/// semidefinite `A`. A Cholesky factor is accepted when its reciprocal
-/// condition estimate exceeds machine precision; otherwise a multiple of the
-/// identity, growing by `ridge_multiplier`, is added. If no ridge gives a
-/// well-conditioned factor, the directions of eigenvalues that are
-/// numerically zero are dropped (a truncated eigen-solve), and any remaining
-/// nonfinite entry is set to zero.
+/// semidefinite `A`.
+///
+/// A Cholesky factor is used when its reciprocal condition estimate exceeds
+/// machine precision. A numerically singular system instead gets the
+/// minimum-norm solution restricted to the eigen-directions whose eigenvalues
+/// exceed `n * eps * max|lambda|`; the others (including tiny negative ones
+/// from rounding) are dropped. Black-box runs of mixsqp on an ill-conditioned
+/// ashr problem (`scripts/provenance/probe_mixsqp_singular_direction.R`)
+/// agree with this minimum-norm direction and not with a ridge-regularised
+/// one, whose huge components send the active set to a different vertex.
+/// Only if the eigen-decomposition fails is a ridge, growing by
+/// `ridge_multiplier`, added until a well-conditioned factor exists. Any
+/// remaining nonfinite entry is set to zero.
 fn reduced_solve(
     a: DMatrix<f64>,
     rhs: DVector<f64>,
     ridge_multiplier: f64,
 ) -> Result<DVector<f64>, Error> {
     let n = a.nrows();
-    let scale = (0..n).map(|i| a[(i, i)].abs()).fold(0.0, f64::max);
     let norm = one_norm(&a);
-    if norm.is_finite() && norm > 0.0 {
-        let mut ridge = 0.0;
-        for _ in 0..40 {
-            let mut shifted = a.clone();
-            for i in 0..n {
-                shifted[(i, i)] += ridge;
-            }
-            if let Some(factor) = shifted.clone().cholesky() {
-                let shifted_norm = norm + ridge;
-                let inverse_norm = inverse_one_norm(|v| factor.solve(v), n);
-                let rcond = 1.0 / (shifted_norm * inverse_norm);
-                if rcond.is_finite() && rcond > f64::EPSILON {
-                    let p = factor.solve(&rhs);
-                    if p.iter().all(|v| v.is_finite()) {
-                        return Ok(p);
-                    }
-                }
-            }
-            ridge = if ridge == 0.0 {
-                f64::EPSILON * scale.max(f64::MIN_POSITIVE)
-            } else {
-                ridge * ridge_multiplier
-            };
-            if !ridge.is_finite() || ridge <= 0.0 {
-                break;
+    if !norm.is_finite() || norm <= 0.0 {
+        return Ok(DVector::zeros(n));
+    }
+    if let Some(p) = conditioned_cholesky_solve(&a, &rhs, norm, 0.0) {
+        return Ok(p);
+    }
+    if let Some(eigen) = nalgebra::SymmetricEigen::try_new(a.clone(), f64::EPSILON, 0) {
+        let largest = eigen
+            .eigenvalues
+            .iter()
+            .copied()
+            .fold(0.0_f64, |m, v| m.max(v.abs()));
+        let cutoff = largest * n as f64 * f64::EPSILON;
+        let projected = eigen.eigenvectors.transpose() * &rhs;
+        let mut p = DVector::zeros(n);
+        for (j, &lambda) in eigen.eigenvalues.iter().enumerate() {
+            if lambda > cutoff && lambda.is_finite() {
+                p.axpy(projected[j] / lambda, &eigen.eigenvectors.column(j), 1.0);
             }
         }
-    }
-    let eigen = nalgebra::SymmetricEigen::try_new(a, f64::EPSILON, 0).ok_or_else(|| {
-        scoped_invalid_options(
-            ERROR_SCOPE,
-            "quadratic subproblem eigen-decomposition failed",
-        )
-    })?;
-    let largest = eigen
-        .eigenvalues
-        .iter()
-        .copied()
-        .fold(0.0_f64, |m, v| m.max(v.abs()));
-    let cutoff = largest * n.max(1) as f64 * f64::EPSILON;
-    let projected = eigen.eigenvectors.transpose() * &rhs;
-    let mut p = DVector::zeros(n);
-    for (j, &lambda) in eigen.eigenvalues.iter().enumerate() {
-        if lambda > cutoff && lambda.is_finite() {
-            let coefficient = projected[j] / lambda;
-            p.axpy(coefficient, &eigen.eigenvectors.column(j), 1.0);
+        if p.iter().all(|v| v.is_finite()) {
+            return Ok(p);
         }
     }
-    for v in p.iter_mut() {
-        if !v.is_finite() {
-            *v = 0.0;
+    let scale = (0..n).map(|i| a[(i, i)].abs()).fold(0.0, f64::max);
+    let mut ridge = f64::EPSILON * scale.max(f64::MIN_POSITIVE);
+    for _ in 0..40 {
+        if let Some(p) = conditioned_cholesky_solve(&a, &rhs, norm, ridge) {
+            return Ok(p);
+        }
+        ridge *= ridge_multiplier;
+        if !ridge.is_finite() {
+            break;
         }
     }
-    Ok(p)
+    Err(scoped_invalid_options(
+        ERROR_SCOPE,
+        "quadratic subproblem is not numerically positive semidefinite",
+    ))
+}
+
+/// Cholesky solve of `(A + ridge I) p = r`, accepted only when the
+/// reciprocal condition estimate exceeds machine precision.
+fn conditioned_cholesky_solve(
+    a: &DMatrix<f64>,
+    rhs: &DVector<f64>,
+    norm: f64,
+    ridge: f64,
+) -> Option<DVector<f64>> {
+    let mut shifted = a.clone();
+    for i in 0..shifted.nrows() {
+        shifted[(i, i)] += ridge;
+    }
+    let factor = shifted.cholesky()?;
+    let inverse_norm = inverse_one_norm(|v| factor.solve(v), a.nrows());
+    let rcond = 1.0 / ((norm + ridge) * inverse_norm);
+    if !rcond.is_finite() || rcond <= f64::EPSILON {
+        return None;
+    }
+    let p = factor.solve(rhs);
+    p.iter().all(|v| v.is_finite()).then_some(p)
 }
 
 fn one_norm(a: &DMatrix<f64>) -> f64 {

@@ -35,6 +35,7 @@ crates/rsdeseq2/tests/data/ashr_advanced_optimizer_r462*.json	scripts/references
 crates/rsdeseq2/tests/data/ashr_mode_r462*.json	scripts/references/generate_ashr_mode_reference.R	cargo test --locked -p rsdeseq2 --test integration ashr_mode::	-
 crates/rsdeseq2/tests/data/ashr_optimizer_r462*.json	scripts/references/generate_ashr_optimizer_reference.R	cargo test --locked -p rsdeseq2 --test integration ashr_optimizers::	-
 crates/rsdeseq2/tests/data/ashr_output_r462*.json	scripts/references/generate_ashr_output_reference.R	cargo test --locked -p rsdeseq2 --test integration ashr_output::	-
+crates/rsdeseq2/tests/data/ashr_singular_direction_r462.json	scripts/references/generate_ashr_singular_direction_reference.R	cargo test --locked -p rsdeseq2 --test integration ashr_singular_direction::	-
 crates/rsdeseq2/tests/data/beta_binomial_posterior_r462*.json	scripts/references/generate_beta_binomial_posterior_reference.R	cargo test --locked -p rsdeseq2 --test integration regression_posterior::	-
 crates/rsdeseq2/tests/data/cauchy_posterior_r462*.json	scripts/references/generate_cauchy_posterior_reference.R	cargo test --locked -p rsdeseq2 --test integration heavy_tail::	-
 crates/rsdeseq2/tests/data/compiled_method_policy_r462*.json	scripts/references/generate_compiled_method_policy_reference.R	cargo test --locked -p rsdeseq2 --test integration compiled_method_policy::	-
