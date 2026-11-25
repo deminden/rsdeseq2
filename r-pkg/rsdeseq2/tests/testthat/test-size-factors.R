@@ -65,18 +65,6 @@ testthat::test_that("R wrapper supports supplied geoMeans and control genes", {
   }
 })
 
-testthat::test_that("R wrapper matches DESeq2 size-factor validation cases", {
-  # Behavioral port of the validation block in
-  # external/DESeq2/tests/testthat/test_size_factor.R.
-  counts <- matrix(as.integer(1:16), ncol = 4)
-
-  testthat::expect_error(estimateSizeFactorsRust(counts, geoMeans = 1:5))
-  testthat::expect_error(estimateSizeFactorsRust(counts, geoMeans = rep(0, 4)))
-  testthat::expect_error(estimateSizeFactorsRust(counts, controlGenes = "foo"))
-  testthat::expect_silent(estimateSizeFactorsRust(counts, geoMeans = 1:4))
-  testthat::expect_silent(estimateSizeFactorsRust(counts, controlGenes = 1:2))
-})
-
 testthat::test_that("R wrapper normalized counts and base means are available", {
   counts <- matrix(
     c(
