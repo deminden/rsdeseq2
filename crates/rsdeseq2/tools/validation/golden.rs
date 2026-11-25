@@ -8,7 +8,12 @@
 //! cargo run --release --locked -p rsdeseq2 --example golden -- --check
 //! cargo run --release --locked -p rsdeseq2 --example golden -- --write
 //! cargo run --release --locked -p rsdeseq2 --example golden -- --check --case pasilla
+//! GOLDEN_DUMP=1 cargo golden --write --manifest /tmp/values.tsv
 //! ```
+//!
+//! With `GOLDEN_DUMP` set, `--write` appends `|` and the hexadecimal bits of
+//! every hashed `f64` to each field, so two such files can be compared value
+//! by value with `scripts/validation/compare_golden_values.py`.
 //!
 //! Hashing rules:
 //!
@@ -78,7 +83,22 @@ trait Golden {
 impl Golden for f64 {
     fn feed(&self, hasher: &mut Sha256) {
         hasher.update(self.to_bits().to_le_bytes());
+        CAPTURE.with(|capture| {
+            if let Some(values) = capture.borrow_mut().as_mut() {
+                values.push(*self);
+            }
+        });
     }
+}
+
+thread_local! {
+    // With GOLDEN_DUMP set, `Fields::put` collects every f64 it hashes so that
+    // `--write` can record the values next to the hash for later comparison.
+    static CAPTURE: std::cell::RefCell<Option<Vec<f64>>> = const { std::cell::RefCell::new(None) };
+}
+
+fn dump_values() -> bool {
+    std::env::var_os("GOLDEN_DUMP").is_some()
 }
 
 impl Golden for bool {
@@ -184,9 +204,21 @@ struct Fields {
 impl Fields {
     fn put<T: Golden + ?Sized>(&mut self, name: &str, value: &T) {
         let mut hasher = Sha256::new();
+        let dump = dump_values();
+        if dump {
+            CAPTURE.with(|capture| *capture.borrow_mut() = Some(Vec::new()));
+        }
         value.feed(&mut hasher);
-        self.entries
-            .push((name.to_string(), hex(&hasher.finalize())));
+        let mut text = hex(&hasher.finalize());
+        if dump && let Some(values) = CAPTURE.with(|capture| capture.borrow_mut().take()) {
+            let bits: Vec<String> = values
+                .iter()
+                .map(|value| format!("{:016x}", value.to_bits()))
+                .collect();
+            text.push('|');
+            text.push_str(&bits.join(","));
+        }
+        self.entries.push((name.to_string(), text));
     }
 
     fn put_debug<T: Debug + ?Sized>(&mut self, name: &str, value: &T) {
