@@ -47,7 +47,6 @@ without upstream source code open.
 | `crates/rcompat-shrinkage/src/shrinkage/mixture_fit/squarem.rs` | SQUAREM extrapolation | paper | Varadhan and Roland (2008) | clean |
 | `crates/rcompat-shrinkage/src/shrinkage/log_f_quadrature.rs` | 15-point Gauss-Kronrod integration on infinite intervals | public-domain code | QUADPACK `dqk15i.f` (netlib) nodes and weights, cited | clean |
 | `crates/rcompat-shrinkage/src/shrinkage/location_fit.rs` | Location preprocessing; reproduces the mixture solver's warning text | black-box | Warning text as emitted by R; owner statement | clean |
-| `crates/rcompat-numeric/src/lib.rs` | Crate documentation; mentions the statrs ports | own design | Follows the `special.rs` row | to replace |
 | `r-pkg/rsdeseq2/tests/testthat/test-size-factors.R` | Size-factor tests; one block is a port of an upstream DESeq2 test file | upstream source | Comment names `external/DESeq2/tests/testthat/test_size_factor.R` (LGPL) | to replace |
 | `THIRD_PARTY_NOTICES.md` | Third-party notices of the workspace | MIT code | statrs, LBFGSpp and mixsqp sections | to replace |
 | `crates/*/THIRD_PARTY_NOTICES.md` | Per-crate third-party notices | MIT code | Copies of the workspace sections | to replace |

@@ -21,4 +21,3 @@ thiserror.workspace = true
 
 [dev-dependencies]
 approx.workspace = true
-statrs.workspace = true

@@ -6,8 +6,8 @@
 //!
 //! - [`numeric`]: the process-wide [`NumericProfile`] (`portable` pure-Rust
 //!   maths, identical on every OS, or the host R build's libm and reductions),
-//!   profile-aware elementary functions, ports of the `statrs` special
-//!   functions and distributions, and checked arithmetic.
+//!   profile-aware elementary functions, special functions and the gamma
+//!   distribution, and checked arithmetic.
 //! - [`probability`]: R's `pnorm`/`pt`/`pgamma`-style tails and quantiles.
 //! - [`math`]: medians, rank tests, a bounded optimizer and trigamma.
 //! - [`matrix`]: a dense row-major matrix and borrowed views.
