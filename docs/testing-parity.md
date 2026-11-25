@@ -54,8 +54,7 @@ Refactoring that must not change results is checked with the
 one SHA-256 per output field over raw `f64` bits, for four inputs and the main
 workflows at 1 and 4 threads. Rust CI runs both the host R and portable profiles on Linux x86_64.
 Each release target runs the portable hash and bounded-posterior checks
-alongside the host R numerical and CLI panels. Linux arm64 also runs the
-exact formula panels and checks its host R output hashes.
+alongside the host R numerical and CLI panels.
 
 ```sh
 python3 scripts/references/fetch_pasilla_validation.py
@@ -132,11 +131,10 @@ active rows.
 
 ## Platform arithmetic and native safety
 
-The pinned Linux lane independently regenerates seven formula panels under
-R 4.6.2/OpenBLAS Haswell and compares every non-provenance field. Fresh SQP and
-uniform-posterior outputs remain separate from committed fixtures. Windows and
+Exact formula panels are compared under the macOS R profile and the portable
+profile. Fresh SQP and uniform-posterior outputs remain separate from committed fixtures. Windows and
 Intel macOS generate independent uniform CDFs at the existing bounds; other
-posterior fields still use their original fixtures. See [platform arithmetic](linux_numerical_parity.md).
+posterior fields still use their original fixtures. See [platform arithmetic](platform_arithmetic.md).
 
 ```sh
 python3 scripts/validation/check_posterior_interruption.py \

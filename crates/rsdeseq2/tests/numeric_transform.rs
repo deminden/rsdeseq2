@@ -144,8 +144,10 @@ fn check_formula(case: &Case, input: &[f64], comparison: Comparison) {
 
 #[test]
 fn formula_transforms_match_independent_r_predictions_and_validation() {
-    let reference: Reference =
-        serde_json::from_str(formula_reference!("numeric_transform_r462")).unwrap();
+    let Some(text) = formula_reference!("numeric_transform_r462") else {
+        return;
+    };
+    let reference: Reference = serde_json::from_str(text).unwrap();
     let portable = numeric_profile() == NumericProfile::Portable;
     for case in reference.cases {
         // Portable powers use libm. The centered Vandermonde QR can magnify

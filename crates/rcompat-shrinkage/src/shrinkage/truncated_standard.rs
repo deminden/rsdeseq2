@@ -7,13 +7,9 @@ use crate::numeric::math::ProfileMath;
 use crate::{math::elementary::language_exp, math::normal_log_cdf};
 
 pub(super) fn log_phi(x: f64) -> f64 {
-    // Match the pinned platform's original dnorm rounding. A one-ulp density
-    // change is amplified when far-tail posterior variances subtract moments.
-    if crate::numeric::profile::r_linux_x86() {
-        -(0.918_938_533_204_672_8 + 0.5 * x * x)
-    } else {
-        -(0.5 * x).mul_add(x, 0.918_938_533_204_672_8)
-    }
+    // A one-ulp density change is amplified when far-tail posterior
+    // variances subtract moments, so the rounding is fixed here.
+    -(0.5 * x).mul_add(x, 0.918_938_533_204_672_8)
 }
 
 pub(super) fn log_interval_mass(a: f64, b: f64) -> f64 {

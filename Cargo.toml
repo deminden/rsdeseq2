@@ -31,8 +31,7 @@ codegen-units = 16
 lto = false
 
 # Library lint policy lives in crates/rsdeseq2/src/lib.rs: unwrap/expect are
-# denied outside tests and unsafe code is denied except for the documented x87
-# kernels. Every public item is documented, and missing_docs keeps it so.
+# denied outside tests and unsafe code is denied. Every public item is documented, and missing_docs keeps it so.
 [workspace.lints.rust]
 missing_docs = "deny"
 

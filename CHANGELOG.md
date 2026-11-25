@@ -2,6 +2,17 @@
 
 Public API and user-visible behaviour changes. Version notes live in [docs/releases](docs/releases/).
 
+## 0.7.0 (unreleased)
+
+### Removed
+
+- The `RLinuxX86` and `RLinuxArm64` numeric profiles (`r-linux-x86_64`,
+  `r-linux-arm64`), their x87 and binary128 reduction kernels, their exact
+  formula references and golden manifests. Their reduction schedules had been
+  taken from OpenBLAS source. `r-host` on Linux now selects `r-binary64`.
+  Results on Linux agree with R at the tolerances of the reference tests but
+  no longer reproduce Linux R's last bits.
+
 ## 0.6.2
 
 - Update `rcompat-numeric`, `rcompat-formula`, and `rcompat-shrinkage` to

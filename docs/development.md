@@ -81,8 +81,7 @@ publication. Stable tests exercise the same target bodies.
 [Contributing](../CONTRIBUTING.md) summarises the IDENTICAL/NUMERIC rules and
 the pull-request template.
 
-The library denies `unwrap`/`expect` outside tests, `unsafe` code outside the
-documented x87 kernels and unsafe blocks without `SAFETY:` comments; impossible
+The library denies `unwrap`/`expect` outside tests, `unsafe` code and unsafe blocks without `SAFETY:` comments; impossible
 states return `errors::invariant(...)` instead of panicking. `missing_docs`
 is denied (workspace `[lints]`): every public item, including examples and
 benches, carries documentation. Track the counts with `python3 scripts/validation/hardening_metrics.py`

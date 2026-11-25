@@ -1,7 +1,6 @@
 use super::{Data, Evaluator, NA_REAL, Value, arguments, invalid_options, is_na};
 use crate::errors::invalid_formula;
 use crate::errors::{ErrorKind, missing_prerequisite};
-use crate::numeric::profile::{r_linux_arm64, r_linux_x86};
 use crate::{design::numeric_transform::scalar_mean, errors::Error};
 impl Evaluator<'_> {
     pub(super) fn summary(
@@ -22,8 +21,6 @@ impl Evaluator<'_> {
                 .map(|(_, v)| v.bool_scalar())
                 .transpose()?
                 .unwrap_or(false);
-            let linux_arm64 = r_linux_arm64();
-            let linux_x86 = r_linux_x86();
             let mut integer = true;
             let mut total = 0.0_f64;
             let mut missing = false;
@@ -51,28 +48,8 @@ impl Evaluator<'_> {
                 if integer_missing {
                     continue;
                 }
-                let input = if linux_arm64 {
-                    // R rounds each variadic argument's binary128 subtotal
-                    // before adding it to the final binary64 result.
-                    vec![crate::design::numeric_transform::binary128::sum_argument(
-                        input.into_iter().filter(|value| !remove || !value.is_nan()),
-                    )]
-                } else if linux_x86
-                    && input
-                        .iter()
-                        .filter(|value| !remove || !value.is_nan())
-                        .all(|value| value.is_finite())
-                {
-                    // R rounds each argument's extended reduction before the
-                    // binary64 accumulation across variadic arguments.
-                    vec![crate::design::numeric_transform::column_sum(
-                        input.into_iter().filter(|value| !remove || !value.is_nan()),
-                    )]
-                } else {
-                    input
-                };
                 for v in input {
-                    if linux_arm64 || !remove || !v.is_nan() {
+                    if !remove || !v.is_nan() {
                         missing |= is_na(v);
                         if !total.is_nan() {
                             if v.is_nan() {
@@ -82,13 +59,7 @@ impl Evaluator<'_> {
                             } else {
                                 total += v;
                                 if total.is_nan() {
-                                    // R's accumulator yields a negative NaN
-                                    // for Inf + -Inf on x86 Linux.
-                                    total = if linux_x86 {
-                                        f64::from_bits(0xfff8_0000_0000_0000)
-                                    } else {
-                                        f64::NAN
-                                    };
+                                    total = f64::NAN;
                                 }
                             }
                         }
@@ -100,9 +71,8 @@ impl Evaluator<'_> {
             }
             if integer_missing {
                 total = NA_REAL;
-            } else if missing && !(linux_x86 || linux_arm64) {
-                // Apple's R gives NA precedence over an earlier NaN. The Linux
-                // R profiles preserve the accumulator's first NaN.
+            } else if missing {
+                // R on macOS gives NA precedence over an earlier NaN.
                 total = f64::from_bits(0x7ff8_0000_0000_07a2);
             }
             return Ok(Value::new(Data::Number {
@@ -157,14 +127,6 @@ impl Evaluator<'_> {
             };
             if trim.is_nan() {
                 return Err(invalid_options("mean trim must not be missing"));
-            }
-            if crate::numeric::profile::r_linux_x86()
-                && trim <= 0.0
-                && x.iter().any(|value| is_na(*value))
-            {
-                // The Linux R scalar mean retains NA when both NA and NaN
-                // occur, independent of the native floating-point operand order.
-                return Ok(Value::scalar(f64::from_bits(0x7ff8_0000_0000_07a2)));
             }
             if trim > 0.0 && !x.is_empty() {
                 if x.iter().any(|v| v.is_nan()) {

@@ -62,7 +62,7 @@ equality to original DESeq2 for every dataset.
 
 The CLI and Rust library default to the portable profile. The R package
 selects the host R profile. Worker-count invariance is tested.
-See [numerical parity](linux_numerical_parity.md) for platform-specific
+See [platform arithmetic](platform_arithmetic.md) for platform-specific
 reference arithmetic.
 
 Portable Gaussian and Student-t uniform mixtures evaluate interval

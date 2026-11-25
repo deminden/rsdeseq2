@@ -31,9 +31,9 @@
 //! until the harness hashes it.
 //!
 //! The `portable` profile has one manifest for every target, because its
-//! arithmetic does not depend on the host. The R profiles reproduce the host's
-//! R build, so their manifests are committed per target
-//! (see docs/linux_numerical_parity.md).
+//! arithmetic does not depend on the host. The R profiles follow the host's
+//! C maths library, so their manifests are committed per target; only the
+//! macOS arm64 manifest is recorded.
 
 use rsdeseq2::cooks::{CooksRefitPlan, CooksReplacementOptions, CooksReplacementOutput};
 use rsdeseq2::core::{

@@ -40,8 +40,6 @@ jobs:
           python-version: '3.12'
       - name: Fetch validation data
         run: python scripts/references/fetch_pasilla_validation.py
-      - name: Golden output hashes
-        run: cargo run --release --locked -p rsdeseq2 --example golden -- --check
       - name: Portable golden output hashes
         env:
           RSDESEQ2_NUMERIC_PROFILE: portable

@@ -161,8 +161,9 @@ fixed genes fail; the scorer does not infer them from a truncated output.
 
 ## Platform references and records
 
-[Platform arithmetic](linux_numerical_parity.md) specifies Linux extended
-reductions, the pinned BLAS kernel and independent Windows/Intel-macOS CDFs.
+[Platform arithmetic](platform_arithmetic.md) describes the numeric profiles,
+where exact formula references apply and the independent Windows/Intel-macOS
+CDFs.
 The [testing guide](testing-parity.md) lists actual interface and safety checks.
 
 For every new observation, record source commit, executable/package hashes,

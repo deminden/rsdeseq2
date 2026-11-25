@@ -67,11 +67,7 @@ pub(in crate::design) fn visit_basis(
             }
             if tails[other] != 0.0 {
                 let fraction = columns[other][step].abs() / tails[other];
-                let remaining = if crate::numeric::profile::r_linux_x86() {
-                    (1.0 - fraction * fraction).max(0.0)
-                } else {
-                    (-fraction).mul_add(fraction, 1.0).max(0.0)
-                };
+                let remaining = (-fraction).mul_add(fraction, 1.0).max(0.0);
                 tails[other] = if remaining >= 1e-6 {
                     tails[other] * remaining.sqrt()
                 } else {

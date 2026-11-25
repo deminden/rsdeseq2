@@ -6,19 +6,8 @@ use crate::errors::Error;
 use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::errors::{invalid_dimensions, invalid_options};
 use crate::matrix::{MatrixView, RowMajorMatrix, try_alloc_matrix};
-use crate::numeric::profile::{NumericProfile, numeric_profile, r_linux_arm64, r_linux_x86};
+use crate::numeric::profile::{NumericProfile, numeric_profile};
 
-pub(in crate::design) mod binary128;
-
-// The x87 extended-precision kernels are the only unsafe code in the core.
-// Elsewhere a binary64 stand-in keeps the R-profile branches compiling; that
-// profile cannot be selected on those hosts.
-#[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
-mod extended;
-#[cfg(not(target_arch = "x86_64"))]
-#[path = "numeric_transform/extended_unavailable.rs"]
-mod extended;
 mod polynomial;
 pub(super) mod polynomial_qr;
 mod reduction;
@@ -136,20 +125,10 @@ pub(super) fn scale_expression(
                 let present = (0..rows)
                     .map(|row| *input.at(row, column))
                     .filter(|v| !v.is_nan());
-                if r_linux_arm64() {
-                    let count = present.clone().count();
-                    binary128::column_mean(present, count)
-                } else if r_linux_x86() {
-                    let count = present.clone().count();
-                    let mut total = extended::sum(present);
-                    total.divide(count as f64);
-                    total.value()
-                } else {
-                    let (total, count) = present.fold((0.0, 0usize), |(sum, count), value| {
-                        (sum + value, count + 1)
-                    });
-                    total / count as f64
-                }
+                let (total, count) = present.fold((0.0, 0usize), |(sum, count), value| {
+                    (sum + value, count + 1)
+                });
+                total / count as f64
             }
             ScalePolicy::Disabled => 0.0,
             ScalePolicy::Supplied(v) => v[column],
@@ -178,15 +157,9 @@ pub(super) fn scale_expression(
                 let present = (0..rows)
                     .map(|r| values[r * columns + column])
                     .filter(|v| !v.is_nan());
-                if r_linux_arm64() || r_linux_x86() {
-                    (column_sum(present.clone().map(|x| x * x))
-                        / present.count().saturating_sub(1).max(1) as f64)
-                        .sqrt()
-                } else {
-                    let (squares, count) =
-                        present.fold((0.0, 0usize), |(sum, count), x| (sum + x * x, count + 1));
-                    (squares / count.saturating_sub(1).max(1) as f64).sqrt()
-                }
+                let (squares, count) =
+                    present.fold((0.0, 0usize), |(sum, count), x| (sum + x * x, count + 1));
+                (squares / count.saturating_sub(1).max(1) as f64).sqrt()
             }
             ScalePolicy::Disabled => 1.0,
             ScalePolicy::Supplied(v) => v[column],
@@ -229,21 +202,14 @@ pub fn integer_covariate(value: f64) -> Result<f64, Error> {
     Ok((integer as i32) as f64)
 }
 
-/// R's `mean()` for doubles under the active numeric profile (two-pass,
-/// extended precision under the Linux R profiles).
+/// R's `mean()` for doubles: a binary64 mean with one correction pass.
 #[doc(hidden)]
 pub fn scalar_mean(values: &[f64]) -> f64 {
-    if r_linux_arm64() {
-        binary128::mean(values)
-    } else if r_linux_x86() {
-        extended::mean(values)
+    let mean = scalar_mean_binary64(values);
+    if mean.is_nan() && numeric_profile() == NumericProfile::Portable {
+        first_nan(values.iter().copied())
     } else {
-        let mean = scalar_mean_binary64(values);
-        if mean.is_nan() && numeric_profile() == NumericProfile::Portable {
-            first_nan(values.iter().copied())
-        } else {
-            mean
-        }
+        mean
     }
 }
 
@@ -276,13 +242,7 @@ fn scalar_mean_binary64(values: &[f64]) -> f64 {
 }
 
 pub(super) fn column_sum(values: impl Iterator<Item = f64>) -> f64 {
-    if r_linux_arm64() {
-        binary128::sum_as_double(values)
-    } else if r_linux_x86() {
-        extended::sum(values).value()
-    } else {
-        values.sum()
-    }
+    values.sum()
 }
 
 #[cfg(test)]

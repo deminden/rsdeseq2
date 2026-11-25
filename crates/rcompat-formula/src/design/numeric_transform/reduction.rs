@@ -3,16 +3,8 @@
 //! These reductions express the rounding observed in the R reference
 //! profiles. The block size determines where the sequential tail starts.
 
-use crate::numeric::profile::{r_linux_arm64, r_linux_x86};
-
 pub(super) fn dot(x: &[f64], y: &[f64]) -> f64 {
-    if r_linux_x86() {
-        lane_dot::<16>(x, y, false)
-    } else if r_linux_arm64() {
-        two_lane_dot(x, y)
-    } else {
-        lane_dot::<32>(x, y, true)
-    }
+    lane_dot::<32>(x, y, true)
 }
 
 fn lane_dot<const BLOCK: usize>(x: &[f64], y: &[f64], fused_tail: bool) -> f64 {
@@ -46,29 +38,7 @@ fn lane_dot<const BLOCK: usize>(x: &[f64], y: &[f64], fused_tail: bool) -> f64 {
     })
 }
 
-fn two_lane_dot(x: &[f64], y: &[f64]) -> f64 {
-    let end = x.len() - x.len() % 4;
-    let pairs = x[..end]
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .zip(y[..end].as_chunks::<2>().0);
-    let totals = pairs.fold([0.0; 2], |mut totals, (left, right)| {
-        for (sum, (&a, &b)) in totals.iter_mut().zip(left.iter().zip(right)) {
-            *sum += a * b;
-        }
-        totals
-    });
-    x[end..]
-        .iter()
-        .zip(&y[end..])
-        .fold(totals[0] + totals[1], |total, (&a, &b)| a.mul_add(b, total))
-}
-
 pub(super) fn norm(x: &[f64]) -> f64 {
-    if r_linux_x86() {
-        return super::extended::norm(x);
-    }
     // Keep the accumulated sum of squares in units of the largest magnitude
     // seen so far. Rescale it when a larger magnitude arrives.
     let (scale, squares) = x

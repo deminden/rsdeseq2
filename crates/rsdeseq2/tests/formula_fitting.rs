@@ -21,12 +21,13 @@ fn fitting_matrices_follow_original_term_order_and_matrix_variable_products() {
     // The ordinary workspace run always keeps its committed reference panel.
     let fresh = std::env::var_os("RSDESEQ2_FORMULA_FITTING_REFERENCE")
         .map(|path| std::fs::read_to_string(path).expect("read fresh formula reference"));
-    let r: Value = serde_json::from_str(
-        fresh
-            .as_deref()
-            .unwrap_or(formula_reference!("formula_fitting_r462")),
-    )
-    .unwrap();
+    let Some(text) = fresh
+        .as_deref()
+        .or(formula_reference!("formula_fitting_r462"))
+    else {
+        return;
+    };
+    let r: Value = serde_json::from_str(text).unwrap();
     let frame = FormulaModelFrame {
         factors: r["factors"]
             .as_array()

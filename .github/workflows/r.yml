@@ -83,29 +83,23 @@ jobs:
           name: r-previous-bioc-environment-${{ github.sha }}
           path: R-reference-session.txt
           if-no-files-found: error
-      - name: Independently regenerate Linux formula references
-        if: matrix.lane == 'reference'
-        run: python scripts/validation/check_linux_formula_references.py --output-dir regenerated-formula-references
       - name: Independently generate sparse SQP references
         if: matrix.lane == 'reference'
         run: Rscript --vanilla scripts/references/generate_sparse_sqp_reference.R sparse-sqp-reference.json
-      - name: Save independently generated platform references
-        if: always() && matrix.lane == 'reference' && hashFiles('regenerated-formula-references/*.json', 'sparse-sqp-reference.json') != ''
+      - name: Save independently generated SQP references
+        if: always() && matrix.lane == 'reference' && hashFiles('sparse-sqp-reference.json') != ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: formula-sqp-reference-${{ github.sha }}
-          path: |
-            regenerated-formula-references/*.json
-            sparse-sqp-reference.json
+          name: sqp-reference-${{ github.sha }}
+          path: sparse-sqp-reference.json
           if-no-files-found: error
       - name: Check fresh platform oracles without changing saved references
         if: matrix.lane == 'reference'
         env:
-          RSDESEQ2_FORMULA_FITTING_REFERENCE: ${{ github.workspace }}/regenerated-formula-references/formula_fitting_r462.json
           RSDESEQ2_SPARSE_SQP_REFERENCE: ${{ github.workspace }}/sparse-sqp-reference.json
         run: >-
           cargo test --locked -p rsdeseq2 --test integration --
-          formula_fitting:: sqp_controls::
+          sqp_controls::
       - name: Independently record uniform posterior references
         if: matrix.lane == 'reference'
         run: Rscript --vanilla scripts/references/generate_uniform_posterior_reference.R uniform-posterior-reference.json

@@ -46,7 +46,7 @@ offline).
 - No `unwrap`/`expect` in library code (denied outside tests); return
   `DeseqError`, using `errors::invariant` for states earlier validation rules
   out.
-- No `unsafe` outside the x87 kernels and the R bridge; every unsafe block has
+- No `unsafe` outside the R bridge; every unsafe block has
   a `SAFETY:` comment.
 - New dependencies need a stated reason in the pull request.
 - Record public API changes and replacement calls in [CHANGELOG.md](CHANGELOG.md).

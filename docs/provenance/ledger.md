@@ -30,13 +30,9 @@ without upstream source code open.
 | `r-pkg/rsdeseq2/**` | R bridge, R wrapper functions and their tests | manual, black-box | Owner statement (2026-11-25) | clean |
 | `crates/rcompat-numeric/src/math/rank.rs` | `matrix_rank_r_qr`: rank by Householder QR with R's column-deferral rule | upstream source | Doc comment states it follows R's `src/appl/dqrdc2.f` (GPL) | to replace |
 | `crates/rcompat-formula/src/design/implementation/basics.rs` | Calls the R-style rank rule; doc comment names LINPACK `dqrdc2` | paper, manual, black-box | Owner statement; the rank rule itself is the `rank.rs` row | clean |
-| `crates/rcompat-formula/src/design/numeric_transform/extended.rs` | x87 extended reductions and norm for the `RLinuxX86` profile | upstream source | OpenBLAS 0.3.26 Haswell schedules; BSD notice removed in 0.6.2 while the code was reshaped | to remove |
-| `crates/rcompat-formula/src/design/numeric_transform/extended_unavailable.rs` | Binary64 stand-in for the x87 kernels | own design | Exists only to serve the `extended.rs` row | to remove |
-| `crates/rcompat-formula/src/design/numeric_transform/binary128.rs` | Binary128 reductions for the `RLinuxArm64` profile | upstream source | OpenBLAS ARMV8 schedules; BSD notice removed in 0.6.2 | to remove |
-| `crates/rcompat-formula/src/design/numeric_transform/binary128/wide.rs` | Binary128 round-to-nearest arithmetic replacing `rustc_apfloat` | unknown | Owner to confirm it was written from the IEEE 754 definition; removed with the `RLinuxArm64` profile | to remove |
 | `crates/rcompat-formula/src/design/numeric_transform/reduction.rs` | Dot product, norm and axpy order used by polynomial QR on every profile | upstream source | 0.6.1 header: "Arithmetic schedules adapted from OpenBLAS 0.3.26"; reshaped in 0.6.2 | to replace |
 | `crates/rcompat-formula/src/design/numeric_transform/polynomial_qr.rs` | Householder QR with column deferral for `poly()` and `contr.poly()` | unknown | Mirrors the rank rule of the `rank.rs` row and uses `reduction.rs` | to replace |
-| `crates/rcompat-numeric/src/numeric/profile.rs` | Numeric profile selection; describes the OpenBLAS Haswell and ARMV8 schedules | own design | The two Linux R profiles are being removed | to replace |
+| `crates/rcompat-numeric/src/numeric/profile.rs` | Numeric profile selection: portable, macOS R and generic binary64 R | own design | The Linux R profiles, whose kernels followed OpenBLAS schedules, were removed in 0.7.0 | clean |
 | `crates/rcompat-numeric/src/probability/f_quantile.rs` | 0.99 F quantile for the Cook's cutoff, by inverting the upper tail of the beta-logistic density; F from the beta relation | paper, black-box | The large degrees-of-freedom branch that cited R's `qf.c` is removed; `f_quantile_r462.tsv` from `qf()` checks df1 up to 200 and df2 up to 100,000 | clean |
 | `crates/rcompat-numeric/src/numeric/special.rs` | Gamma, digamma, incomplete gamma, beta, normal and gamma quantiles | MIT code | Port of `statrs` 0.19.1 (MIT); `erf_inv` uses Boost rational approximations by way of statrs | to replace |
 | `crates/rcompat-shrinkage/src/shrinkage/heavy_tail/unbounded_lbfgs.rs` | Unbounded L-BFGS with strong-Wolfe line search | MIT code | Adaptation of LBFGSpp (MIT); notice in `LBFGSPP-LICENSE` | to replace |
@@ -57,3 +53,16 @@ without upstream source code open.
 | `r-pkg/rsdeseq2/inst/COPYRIGHTS` | Third-party notices of the R package | MIT code | Copies of the workspace sections | to replace |
 | `rcompat-locfit 0.2.0` (crates.io) | Local likelihood dispersion trend | unknown | Separate repository, declared MIT; upstream locfit is GPL | owner to confirm |
 | `rcompat-lbfgsb 0.3.0` (crates.io) | Bounded L-BFGS-B for `optim` | unknown | Separate repository, declared MIT | owner to confirm |
+
+## Removed
+
+Files removed because their origin could not be made MIT-clean. They are
+listed so that the record stays complete; the check ignores this section.
+
+| Path | Computes | Knowledge source | Evidence | Removed in |
+|---|---|---|---|---|
+| `crates/rcompat-formula/src/design/numeric_transform/extended.rs` | x87 extended reductions and norm for `RLinuxX86` | upstream source | OpenBLAS 0.3.26 Haswell schedules (BSD); notice dropped in 0.6.2 while the code stayed | 0.7.0 |
+| `crates/rcompat-formula/src/design/numeric_transform/extended_unavailable.rs` | Binary64 stand-in for the x87 kernels | own design | Served only `extended.rs` | 0.7.0 |
+| `crates/rcompat-formula/src/design/numeric_transform/binary128.rs` | Binary128 reductions for `RLinuxArm64` | upstream source | OpenBLAS ARMV8 schedules (BSD); notice dropped in 0.6.2 while the code stayed | 0.7.0 |
+| `crates/rcompat-formula/src/design/numeric_transform/binary128/wide.rs` | Binary128 round-to-nearest arithmetic | unknown | Written for 0.6.2 to replace `rustc_apfloat`; how it was written was not recorded | 0.7.0 |
+| Linux formula references and golden manifests | Exact R 4.6.2 outputs on Linux | black-box | Data, not code; removed with the profiles | 0.7.0 |

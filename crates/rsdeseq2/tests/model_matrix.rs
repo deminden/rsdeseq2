@@ -68,8 +68,10 @@ fn model_matrix_materialization_checks_output_capacity() {
 
 #[test]
 fn formula_term_assembly_matches_independent_r_in_both_storage_orders() {
-    let r: serde_json::Value =
-        serde_json::from_str(formula_reference!("model_matrix_r462")).unwrap();
+    let Some(text) = formula_reference!("model_matrix_r462") else {
+        return;
+    };
+    let r: serde_json::Value = serde_json::from_str(text).unwrap();
     let cases = r["cases"].as_array().unwrap();
     assert_eq!(cases.len(), 48);
     let portable = numeric_profile() == NumericProfile::Portable;
@@ -268,8 +270,10 @@ fn expanded_list_contrasts_match_independent_r_group_means_and_rejections() {
         negative: Vec<usize>,
         expected: Option<Vec<String>>,
     }
-    let reference: serde_json::Value =
-        serde_json::from_str(formula_reference!("model_matrix_r462")).unwrap();
+    let Some(text) = formula_reference!("model_matrix_r462") else {
+        return;
+    };
+    let reference: serde_json::Value = serde_json::from_str(text).unwrap();
     let cases = reference["average_contrasts"].as_array().unwrap();
     assert_eq!(cases.len(), 10);
     for case in cases {

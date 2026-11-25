@@ -7,7 +7,7 @@ These guides describe the 0.6.2 source and its supported behavior.
 | Run file-based analysis | [CLI](cli.md) |
 | Use R fits, results, transforms and shrinkage | [R wrapper](r-wrapper.md) |
 | Check supported methods and limits | [Compatibility](compatibility.md), [numerical ownership contract](native-supported-contract.md) |
-| Understand statistical implementation | [Algorithms](algorithms.md), [platform arithmetic](linux_numerical_parity.md), [summation rules](summation-rules.md), [DESeq2 quirks](deseq2-quirks.md) |
+| Understand statistical implementation | [Algorithms](algorithms.md), [platform arithmetic](platform_arithmetic.md), [summation rules](summation-rules.md), [DESeq2 quirks](deseq2-quirks.md) |
 | Review precision, speed and memory | [Current validation](testing-parity.md#ci-status), [benchmark procedure](benchmarks.md) |
 | Reproduce data and independent references | [Reproducibility](reproducibility.md) |
 | Run tests or review validation | [Testing and parity](testing-parity.md) |
