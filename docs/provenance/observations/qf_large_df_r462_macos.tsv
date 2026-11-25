@@ -1,0 +1,16 @@
+# R version 4.6.2 (2026-10-29) on aarch64-apple-darwin27.2.0
+case	df1	threshold_df_other	note
+df2_limit	1	400001	smallest integer df2 with qf == qchisq(p, df1)/df1
+df2_limit	2	400001	smallest integer df2 with qf == qchisq(p, df1)/df1
+df2_limit	5	400001	smallest integer df2 with qf == qchisq(p, df1)/df1
+df2_limit	20	400001	smallest integer df2 with qf == qchisq(p, df1)/df1
+df2_limit	200	400001	smallest integer df2 with qf == qchisq(p, df1)/df1
+df1_limit	1	400001	smallest integer df1 with qf == df2/qchisq(p, df2, lower.tail=FALSE)
+df1_limit	2	400001	smallest integer df1 with qf == df2/qchisq(p, df2, lower.tail=FALSE)
+df1_limit	5	400001	smallest integer df1 with qf == df2/qchisq(p, df2, lower.tail=FALSE)
+df1_limit	20	400001	smallest integer df1 with qf == df2/qchisq(p, df2, lower.tail=FALSE)
+df1_limit	200	400001	smallest integer df1 with qf == df2/qchisq(p, df2, lower.tail=FALSE)
+both	5e+05	6e+05	qf=3ff01314df5cc147 df2_limit=TRUE df1_limit=FALSE
+both	6e+05	5e+05	qf=3ff0131f488ea1dc df2_limit=FALSE df1_limit=TRUE
+both	5e+05	5e+05	qf=3ff01314df5cc147 df2_limit=TRUE df1_limit=FALSE
+both	4e+05	400001	qf=3ff01556446af36c df2_limit=TRUE df1_limit=FALSE

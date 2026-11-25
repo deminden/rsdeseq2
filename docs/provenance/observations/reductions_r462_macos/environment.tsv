@@ -1,0 +1,3 @@
+R	R version 4.6.2 (2026-10-29)
+platform	aarch64-apple-darwin27.2.0
+BLAS	/Users/dendem/miniforge3/envs/deseq2-r462-native/lib/libopenblas.0.dylib
