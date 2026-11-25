@@ -14,12 +14,13 @@ from scripts.references.list_generators import DIRECTORY, MANIFEST, generator_ro
 from scripts.references.stage_shrinkage_unit_fixtures import UNIT_DATA, fixture_contents
 
 DATA = ROOT / "crates/rsdeseq2/tests/data"
+NUMERIC_DATA = ROOT / "crates/rcompat-numeric/tests/data"
 
 
 def data_files():
     return sorted(
         p.relative_to(ROOT).as_posix()
-        for directory in (DATA, UNIT_DATA)
+        for directory in (DATA, NUMERIC_DATA, UNIT_DATA)
         for p in directory.rglob("*")
         if p.is_file()
     )

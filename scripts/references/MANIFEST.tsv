@@ -17,6 +17,7 @@ crates/rsdeseq2/tests/data/gtex_v8_real_wald/compact/*	scripts/references/genera
 crates/rsdeseq2/tests/data/gtex_v8_real_wald/*	scripts/references/generate_gtex_real_wald_fixture.py	cargo test --locked -p rsdeseq2 --test integration gtex_real_wald_parity::full_gtex_ -- --ignored	calls generate_gtex_real_wald_reference.R
 crates/rsdeseq2/tests/data/pasilla_holdout/*	scripts/references/generate_pasilla_validation.py	python3 scripts/validation/check_pasilla_holdout.py --binary CANDIDATE --baseline-binary BASELINE --output-dir OUTPUT	calls generate_pasilla_reference.R
 crates/rcompat-numeric/tests/data/f_quantile_r462.tsv	scripts/references/generate_f_quantile_reference.R	cargo test --locked -p rcompat-numeric --lib f_quantile	R 4.6.2 qf(0.99, df1, df2)
+crates/rcompat-numeric/tests/data/f_quantile_large_df_r462.tsv	scripts/references/generate_f_quantile_large_df_reference.R	cargo test --locked -p rcompat-numeric --lib f_quantile	R 4.6.2 qf(0.99, df1, df2) with one df above 400000
 crates/rsdeseq2/tests/data/rank_r462.tsv	scripts/references/generate_scaled_rank_reference.R	cargo test --locked -p rsdeseq2 --test integration model_validity::	R 4.6.2 qr() decisions in original and scaled units
 crates/rsdeseq2/tests/data/rank_reference_r462.json	scripts/references/generate_rank_reference.R	cargo test --locked -p rsdeseq2 --test integration design_rank::	-
 crates/rsdeseq2/tests/data/formula_elementary_boundaries_r462.json	scripts/references/generate_elementary_expression_reference.R	cargo test --locked -p rsdeseq2 --test integration formula_expression::	-
