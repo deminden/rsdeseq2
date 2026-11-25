@@ -1,19 +1,21 @@
-# cargo-deny policy, checked in CI (`cargo deny check`).
+# cargo-deny policy for the default feature set, checked in CI
+# (`cargo deny check`). Every normal dependency must be available under MIT,
+# the Unlicense or Zlib. Optional features are checked separately with
+# deny-all-features.toml. Dev-dependencies do not ship and are excluded.
 
 [graph]
-all-features = true
+all-features = false
+exclude-dev = true
 
 [licenses]
-# Workspace and dependency licenses.
-allow = [
-    "Apache-2.0",
-    "BSL-1.0",
-    "MIT",
-    "Unicode-3.0",
-    "Unlicense",
-    "Zlib",
-]
+allow = ["MIT", "Unlicense", "Zlib"]
 confidence-threshold = 0.9
+# unicode-ident is a compile-time dependency of the proc-macro crates
+# (serde_derive, thiserror-impl, clap_derive). It runs inside the compiler
+# and is not linked into any library or binary built from this workspace.
+exceptions = [
+    { crate = "unicode-ident", allow = ["Unicode-3.0"] },
+]
 
 [advisories]
 # Default policy: known vulnerabilities and yanked crates fail the check.

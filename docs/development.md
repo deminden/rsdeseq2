@@ -60,7 +60,8 @@ cargo test --locked --workspace
 python3 scripts/validation/check_docs.py
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 python3 scripts/validation/check_module_cycles.py
-cargo deny --all-features check   # licences, advisories, bans, sources
+cargo deny check                  # licences (default features: MIT only), advisories, bans, sources
+cargo deny --config deny-all-features.toml check   # optional features
 ```
 
 Use the default test profile for routine checks. For optimized local

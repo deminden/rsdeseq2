@@ -1,0 +1,31 @@
+# cargo-deny policy with every optional feature enabled (`cargo deny --config
+# deny-all-features.toml check`). The optional `formula` feature adds the ICU
+# crates (Unicode-3.0); enabling it changes the licence terms of the build.
+# Dev-dependencies do not ship and are excluded.
+
+[graph]
+all-features = true
+exclude-dev = true
+
+[licenses]
+allow = ["MIT", "Unlicense", "Zlib", "Unicode-3.0"]
+confidence-threshold = 0.9
+# unicode-ident is a compile-time dependency of the proc-macro crates
+# (serde_derive, thiserror-impl, clap_derive). It runs inside the compiler
+# and is not linked into any library or binary built from this workspace.
+exceptions = [
+    { crate = "unicode-ident", allow = ["Unicode-3.0"] },
+]
+
+[advisories]
+# Default policy: known vulnerabilities and yanked crates fail the check.
+yanked = "deny"
+
+[bans]
+# Duplicate versions are reported but do not fail yet; wildcards do.
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

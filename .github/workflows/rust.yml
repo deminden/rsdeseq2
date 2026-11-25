@@ -68,14 +68,18 @@ jobs:
           cargo test --locked -p rcompat-numeric -p rcompat-formula -p rcompat-shrinkage -p rsdeseq2 --lib
 
   deny:
-    # Licences, advisories, bans and sources (deny.toml).
+    # Licences, advisories, bans and sources: deny.toml for the default
+    # features (MIT, Unlicense, Zlib), deny-all-features.toml for the rest.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: EmbarkStudios/cargo-deny-action@70f81531115945ba6eb6b941ec9d39d063438eb9 # v2
         with:
           command: check
-          arguments: --all-features
+      - uses: EmbarkStudios/cargo-deny-action@70f81531115945ba6eb6b941ec9d39d063438eb9 # v2
+        with:
+          command: check
+          arguments: --config deny-all-features.toml
 
   semver:
     # Public API changes must match the version bump.
