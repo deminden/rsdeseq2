@@ -1,3 +1,13 @@
+# rsdeseq2 0.7.0
+
+* Bundle version 0.2.0 of the Rust numerical, formula, and shrinkage crates,
+  now written entirely as an independent MIT implementation.
+* Linux uses the generic binary64 R profile; the Linux-specific reduction
+  kernels were removed. Exact formula references apply on macOS.
+* Special functions, the apeglm-style L-BFGS, the ashr-compatible SQP policy
+  and the dense linear algebra were reimplemented; results move in the last
+  digits (see the package changelog).
+
 # rsdeseq2 0.6.2
 
 * Bundle version 0.1.2 of the Rust numerical, formula, and shrinkage crates.

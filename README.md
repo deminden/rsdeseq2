@@ -13,7 +13,7 @@ differential expression analysis of 56,200 genes across 61 GTEx samples.
 
 ## Installation
 
-The steps below build **0.6.2** from this repository. You’ll need
+The steps below build **0.7.0** from this repository. You’ll need
 **Rust 1.96.0 or newer** with Cargo. For published versions, see
 [crates.io](https://crates.io/crates/rsdeseq2) and
 [GitHub Releases](https://github.com/deminden/rsdeseq2/releases).
@@ -188,7 +188,7 @@ disabled. They agreed on significant genes at adjusted p-value cutoffs of
 
 ## Documentation
 
-- [0.6.2 release notes](docs/releases/0.6.2.md)
+- [0.7.0 release notes](docs/releases/0.7.0.md)
 - [Algorithms](docs/algorithms.md)
 - [Benchmarks](docs/benchmarks.md) and [reproducibility](docs/reproducibility.md)
 - [Development guide](docs/development.md) and [release checklist](docs/release.md)
@@ -205,6 +205,12 @@ Love, Huber, and Anders (2014).
 
 ## License
 
-The project’s source code is [MIT-licensed](LICENSE). See the
-[third-party notices](THIRD_PARTY_NOTICES.md) for incorporated code.
-Dependencies and external validation datasets retain their own terms.
+The project’s source code is [MIT-licensed](LICENSE). It is an independent
+implementation: the [provenance ledger](docs/provenance/ledger.md) records,
+file by file, the papers, documentation and black-box R runs each part was
+written from. The [third-party notices](THIRD_PARTY_NOTICES.md) name the
+published coefficients and public-domain tables it uses. With default
+features every Rust dependency is available under MIT, the Unlicense or Zlib
+([dependency report](docs/provenance/dependencies.md)); the optional
+`formula` feature and the R package add the Unicode-3.0 ICU crates.
+External validation datasets retain their own terms.

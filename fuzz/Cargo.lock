@@ -523,7 +523,7 @@ dependencies = [
 
 [[package]]
 name = "rcompat-formula"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "icu_collator",
  "icu_locale",
@@ -544,7 +544,7 @@ checksum = "242a0ea0fc186cafd47b36676c3f6393a81683463174decd0163a9ceefa4d94b"
 
 [[package]]
 name = "rcompat-numeric"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "libm",
  "thiserror",
@@ -552,7 +552,7 @@ dependencies = [
 
 [[package]]
 name = "rcompat-shrinkage"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "libm",
  "rcompat-formula",
@@ -562,7 +562,7 @@ dependencies = [
 
 [[package]]
 name = "rsdeseq2"
-version = "0.6.2"
+version = "0.7.0"
 dependencies = [
  "clap",
  "csv-core",

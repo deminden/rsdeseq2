@@ -9,7 +9,7 @@ functions, or share checked arithmetic and dense matrices across an analysis.
 Requires Rust 1.96 or newer.
 
 ```sh
-cargo add rcompat-numeric@0.1.2
+cargo add rcompat-numeric@0.2.0
 ```
 
 ## Example

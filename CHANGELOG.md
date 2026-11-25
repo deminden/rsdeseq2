@@ -2,9 +2,22 @@
 
 Public API and user-visible behaviour changes. Version notes live in [docs/releases](docs/releases/).
 
-## 0.7.0 (unreleased)
+## 0.7.0
+
+Licensing: 0.6.2 declared MIT while some code still traced to BSD (OpenBLAS
+reduction schedules), GPL (R's QR rank rule and `qf` limit branch) and
+third-party MIT sources. That code is removed or rewritten from written
+specifications, published papers and black-box runs of R; see
+[the provenance ledger](docs/provenance/ledger.md). Default-feature
+dependencies are all MIT, Unlicense or Zlib.
 
 ### Added
+
+- `docs/provenance/`: the provenance ledger, specifications and black-box
+  observations, with `scripts/validation/check_provenance.py` and
+  `scripts/provenance/dependency_licences.py`.
+- qf references for the Cook's cutoff F quantile (df1 up to 200, df2 up to
+  1e5 and beyond 4e5).
 
 - `rcompat_numeric::math::dense`: a column-major `DenseMatrix` with matrix
   products, LU with partial pivoting, inverses and determinants, Cholesky,
@@ -13,6 +26,17 @@ Public API and user-visible behaviour changes. Version notes live in [docs/relea
 
 ### Changed
 
+- Rewritten from specifications, without the earlier code: the R `qr()`
+  rank rule and the `poly()`/`contr.poly()` Householder QR with their
+  reductions (`rcompat_numeric::math::{householder, reduction}`), the F
+  quantile limits beyond 400,000 degrees of freedom, the special functions
+  and gamma distribution, the apeglm-style unbounded L-BFGS and the
+  ashr-compatible mixture SQP policy. Results change in the last digits
+  (DESeq2 fields at most 3e-7 relative on the golden panel; no adjusted
+  p-value crosses 0.05 or 0.1); a few apeglm-style modes on GTEx genes with
+  sensitive refinement move by up to 0.02.
+- `rcompat-numeric`, `rcompat-formula` and `rcompat-shrinkage` move to
+  0.2.0.
 - `rsdeseq2` and `rcompat-shrinkage` no longer depend on `nalgebra` (and
   through it `simba` and `approx`); their linear algebra uses
   `rcompat_numeric::math::dense`. Every normal dependency of the shrinkage

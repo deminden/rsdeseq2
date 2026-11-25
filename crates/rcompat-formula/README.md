@@ -9,7 +9,7 @@ contrasts, interactions, numeric transforms, and offsets.
 Requires Rust 1.96 or newer.
 
 ```sh
-cargo add rcompat-formula@0.1.2
+cargo add rcompat-formula@0.2.0
 ```
 
 ## Example

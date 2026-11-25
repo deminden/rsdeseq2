@@ -9,7 +9,7 @@ priors for supported regression likelihoods.
 Requires Rust 1.96 or newer.
 
 ```sh
-cargo add rcompat-shrinkage@0.1.2
+cargo add rcompat-shrinkage@0.2.0
 ```
 
 ## Example
