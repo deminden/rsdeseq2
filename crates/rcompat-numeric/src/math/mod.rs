@@ -1,5 +1,6 @@
 //! Small numerical helpers following R's arithmetic.
 
+pub mod dense;
 #[doc(hidden)]
 pub mod elementary;
 #[doc(hidden)]

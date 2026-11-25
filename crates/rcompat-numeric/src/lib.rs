@@ -9,7 +9,8 @@
 //!   profile-aware elementary functions, special functions and the gamma
 //!   distribution, and checked arithmetic.
 //! - [`probability`]: R's `pnorm`/`pt`/`pgamma`-style tails and quantiles.
-//! - [`math`]: medians, rank tests, a bounded optimizer and trigamma.
+//! - [`math`]: medians, rank tests, a bounded optimizer, trigamma and small
+//!   dense linear algebra ([`math::dense`]).
 //! - [`matrix`]: a dense row-major matrix and borrowed views.
 //! - [`errors`]: the shared [`Error`] type and its coarse [`ErrorKind`].
 
