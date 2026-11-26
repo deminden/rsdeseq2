@@ -13,8 +13,8 @@ path = "src/lib.rs"
 
 [dependencies]
 rcompat-numeric = { path = "vendor/rcompat-numeric" }
-# The R package needs formula collation and the shrinkage engines, not the CLI.
-rsdeseq2 = { path = "vendor/rsdeseq2", default-features = false, features = ["formula", "shrinkage"] }
+# The R package needs the shrinkage engines, not the CLI.
+rsdeseq2 = { path = "vendor/rsdeseq2", default-features = false, features = ["shrinkage"] }
 
 [workspace]
 

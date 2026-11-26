@@ -49,8 +49,9 @@ fn main() -> Result<(), rcompat_formula::Error> {
 - Formula terms and interactions, with built-in transforms such as
   `log()`, `scale()`, and `poly()`.
 - Separate per-sample offsets and model-frame metadata for downstream fitting.
-- C-locale collation by default and locale-aware collation with the optional
-  `icu` feature.
+- R's collation for factor levels and string comparisons: byte order for
+  `C` and the Unicode root collation (the default) through
+  `rcompat-collate`.
 
 Formula expressions use supported built-ins and caller-supplied values. The
 crate runs without an R interpreter.

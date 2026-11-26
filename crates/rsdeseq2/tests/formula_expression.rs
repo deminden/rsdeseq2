@@ -4,7 +4,6 @@ use rsdeseq2::design::expression::{
     Argument, Data, EvaluationOptions, Expression, Value, evaluate,
 };
 use rsdeseq2::errors::FormulaResource;
-#[cfg(feature = "formula")]
 use rsdeseq2::{NumericProfile, numeric_profile};
 use serde_json::Value as Json;
 use std::assert_matches;
@@ -12,7 +11,6 @@ use std::assert_matches;
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/formula.rs"]
 mod formula;
-#[cfg(feature = "formula")]
 use formula::expression;
 use formula::value;
 
@@ -72,16 +70,12 @@ fn equal_value(actual: &Value, expected: &Value, path: &str, ulps: u64) {
         )
     }
 }
-// The references use locale collation, which needs the `formula` feature.
-#[cfg(feature = "formula")]
 #[test]
 fn built_in_expressions_match_independent_r_values_and_metadata() {
     if let Some(text) = formula_reference!("formula_expression_r462") {
         compare_reference(text);
     }
 }
-// The references use locale collation, which needs the `formula` feature.
-#[cfg(feature = "formula")]
 #[test]
 fn extended_builtin_arguments_and_matrix_polynomials_match_r() {
     if let Some(text) = formula_reference!("formula_expression_extended_r462") {
@@ -194,7 +188,6 @@ fn mean_preserves_r_missing_and_nan_order() {
         assert_eq!(values[0].to_bits(), expected);
     }
 }
-#[cfg(feature = "formula")]
 fn compare_reference(contents: &str) {
     let reference: Json = serde_json::from_str(contents).unwrap();
     let variables = reference["variables"]

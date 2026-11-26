@@ -53,10 +53,16 @@ Raw all-zero flags and weighted failure flags retain their separate meanings
 after replacement. The low-count Cook's rule requires matching formula/factor
 and design context, including first-tied maximum handling.
 
-Factor levels and string comparisons in formulas sort with locale collation
-only when the `formula` feature is enabled (the R package enables it). The
-default Rust build uses R's "C" collation, so non-ASCII levels can order
-differently from R in a locale such as `en_US`.
+Factor levels and string comparisons in formulas sort as R sorts them: by
+bytes under the `C` collation, and with the Unicode root collation when R
+reports `root`, as it does for English and most western European locales.
+The R package passes the collation R reports. Locales with their own
+collation rules (Swedish, Danish, Spanish, Polish, Russian and others) are
+rejected with an error rather than sorted differently from R. Root
+collation covers Latin, Greek, Cyrillic, Hebrew, Arabic, Devanagari,
+Hangul, kana, punctuation, symbols and emoji as R orders them; CJK
+ideographs sort in code point order, which can differ from R
+([specification](provenance/specs/collation.md)).
 
 ## Numerical expectations
 

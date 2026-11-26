@@ -15,11 +15,6 @@ exclude = [".DS_Store", "**/.DS_Store"]
 [lints]
 workspace = true
 
-[features]
-# Locale-aware (ICU) collation for factor levels and string comparisons.
-icu = ["dep:icu_collator", "dep:icu_locale"]
-
 [dependencies]
-icu_collator = { workspace = true, optional = true }
-icu_locale = { workspace = true, optional = true }
+rcompat-collate.workspace = true
 rcompat-numeric.workspace = true

@@ -46,8 +46,6 @@ clap = { version = "4.6.7", features = ["derive"] }
 criterion = { version = "0.8.2", features = ["html_reports"] }
 csv = "1.4.0"
 csv-core = "0.1.13"
-icu_collator = "2.4.0"
-icu_locale = "2.4.0"
 libm = "0.2.16"
 proptest = { version = "1", default-features = false, features = ["std"] }
 rayon = "1.12.0"

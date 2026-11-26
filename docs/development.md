@@ -9,7 +9,7 @@ Use Rust 1.96.0 or newer (Rust 2024 edition), Python 3.10 or newer, and
 | Directory | Responsibility |
 | --- | --- |
 | `crates/rsdeseq2/` | DESeq2 workflows, CLI, integration tests and benchmarks |
-| `crates/rcompat-numeric/`, `crates/rcompat-formula/`, `crates/rcompat-shrinkage/` | Shared numerical primitives, formula evaluation and shrinkage |
+| `crates/rcompat-collate/`, `crates/rcompat-numeric/`, `crates/rcompat-formula/`, `crates/rcompat-shrinkage/` | String collation, shared numerical primitives, formula evaluation and shrinkage |
 | `crates/rsdeseq2/tools/validation/` | Standalone protocol and fixture tools; explicit Cargo example targets |
 | `r-pkg/rsdeseq2/` | R access package, native bridge and generated vendored core |
 | `scripts/` | [Reference, validation, benchmark, environment and release tooling](../scripts/README.md) |

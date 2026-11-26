@@ -209,8 +209,9 @@ The project’s source code is [MIT-licensed](LICENSE). It is an independent
 implementation: the [provenance ledger](docs/provenance/ledger.md) records,
 file by file, the papers, documentation and black-box R runs each part was
 written from. The [third-party notices](THIRD_PARTY_NOTICES.md) name the
-published coefficients and public-domain tables it uses. With default
-features every Rust dependency is available under MIT, the Unlicense or Zlib
-([dependency report](docs/provenance/dependencies.md)); the optional
-`formula` feature and the R package add the Unicode-3.0 ICU crates.
+published coefficients and public-domain tables it uses. Every Rust
+dependency of the crates, the CLI and the R package, with any features, is
+available under MIT, the Unlicense or Zlib
+([dependency report](docs/provenance/dependencies.md)); locale collation
+comes from the project's own `rcompat-collate` crate.
 External validation datasets retain their own terms.

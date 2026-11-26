@@ -27,25 +27,30 @@ jobs:
           cargo metadata --locked --no-deps --format-version 1 | python3 -c '
           import json, os, sys
           target = os.environ["GITHUB_REF_NAME"].removeprefix("rcompat-v")
+          # rcompat-collate keeps its own version; the others follow the tag.
           names = {"rcompat-numeric", "rcompat-formula", "rcompat-shrinkage"}
           versions = {p["name"]: p["version"] for p in json.load(sys.stdin)["packages"] if p["name"] in names}
           if versions != dict.fromkeys(names, target):
               sys.exit(f"Tag version {target} does not match rcompat packages: {versions}")
           '
-          cargo package --locked --no-verify -p rcompat-numeric -p rcompat-formula -p rcompat-shrinkage
+          cargo package --locked --no-verify -p rcompat-collate -p rcompat-numeric -p rcompat-formula -p rcompat-shrinkage
           python3 scripts/release/verify_release_crates.py
 
       - name: Publish in dependency order
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
-          for crate in rcompat-numeric rcompat-formula rcompat-shrinkage; do
+          for crate in rcompat-collate rcompat-numeric rcompat-formula rcompat-shrinkage; do
+            version=$(cargo metadata --locked --no-deps --format-version 1 | python3 -c '
+          import json, sys
+          print(next(p["version"] for p in json.load(sys.stdin)["packages"] if p["name"] == sys.argv[1]))
+          ' "$crate")
             if cargo publish --locked -p "$crate"; then
               continue
             fi
             # A retry can reuse a package published in an earlier attempt only
             # if the registry has the same archive from this tag.
-            python3 - "$crate" "${GITHUB_REF_NAME#rcompat-v}" <<'PY'
+            python3 - "$crate" "$version" <<'PY'
           import hashlib, json, pathlib, sys, urllib.request
           crate, version = sys.argv[1:]
           archive = pathlib.Path("target/package") / f"{crate}-{version}.crate"

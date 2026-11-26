@@ -48,9 +48,6 @@ default = ["cli", "shrinkage"]
 cli = ["dep:clap", "dep:sha2", "dep:same-file"]
 # Internal target hooks for the separate cargo-fuzz workspace.
 fuzzing = ["cli"]
-# Locale-aware (ICU) collation for formula factor levels and string
-# comparisons. Without it, formula evaluation supports only "C" collation.
-formula = ["rcompat-formula/icu"]
 # Empirical-Bayes shrinkage engines (`rsdeseq2::shrinkage`: ashr- and
 # apeglm-style posteriors). Normal (beta-prior) shrinkage is always available.
 shrinkage = ["dep:rcompat-shrinkage"]
@@ -95,7 +92,7 @@ required-features = ["shrinkage"]
 [[example]]
 name = "evaluate_r_interface"
 path = "tools/validation/evaluate_r_interface.rs"
-required-features = ["formula", "shrinkage"]
+required-features = ["shrinkage"]
 
 [[example]]
 name = "benchmark_replacement_rlog"

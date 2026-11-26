@@ -118,7 +118,9 @@ and registry packages remain immutable.
 ## Publish the rcompat crates
 
 The `rcompat-vX.Y.Z` tag runs the [rcompat release workflow](../.github/workflows/release-rcompat.yml).
-It checks the three package versions, tests their packaged archives, and
-publishes `rcompat-numeric`, `rcompat-formula`, then `rcompat-shrinkage` to
-crates.io. Give each package the tag's version and update the workspace,
-fuzz and R backend lockfiles before pushing the tag.
+It checks the package versions, tests their packaged archives, and
+publishes `rcompat-collate`, `rcompat-numeric`, `rcompat-formula`, then
+`rcompat-shrinkage` to crates.io. Give `rcompat-numeric`, `rcompat-formula`
+and `rcompat-shrinkage` the tag's version; `rcompat-collate` keeps its own
+version, and an unchanged archive already on crates.io is accepted. Update
+the workspace, fuzz and R backend lockfiles before pushing the tag.

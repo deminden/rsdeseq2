@@ -23,17 +23,17 @@ jobs:
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: Library feature combinations
         run: |
-          for features in "" "formula" "shrinkage" "formula,shrinkage"; do
+          for features in "" "shrinkage"; do
             cargo clippy --locked -p rsdeseq2 --lib --no-default-features --features "$features" -- \
               -D warnings
           done
       - name: API documentation
         env:
           RUSTDOCFLAGS: -D warnings
-        run: cargo doc --locked -p rcompat-numeric -p rcompat-formula -p rcompat-shrinkage -p rsdeseq2 --no-deps
+        run: cargo doc --locked -p rcompat-collate -p rcompat-numeric -p rcompat-formula -p rcompat-shrinkage -p rsdeseq2 --no-deps
       - name: Test
         run: cargo test --locked --workspace
-      - name: Tests with all features (ICU collation)
+      - name: Tests with all features
         run: cargo test --locked --workspace --all-features
       - name: Fuzz targets build (stable; fuzzing itself runs weekly on nightly)
         run: cargo check --locked --manifest-path fuzz/Cargo.toml
@@ -66,8 +66,8 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - name: Build and test at the MSRV
         run: |
-          cargo build --locked -p rcompat-numeric -p rcompat-formula -p rcompat-shrinkage -p rsdeseq2 --all-features
-          cargo test --locked -p rcompat-numeric -p rcompat-formula -p rcompat-shrinkage -p rsdeseq2 --lib
+          cargo build --locked -p rcompat-collate -p rcompat-numeric -p rcompat-formula -p rcompat-shrinkage -p rsdeseq2 --all-features
+          cargo test --locked -p rcompat-collate -p rcompat-numeric -p rcompat-formula -p rcompat-shrinkage -p rsdeseq2 --lib
 
   deny:
     # Licences, advisories, bans and sources: deny.toml for the default

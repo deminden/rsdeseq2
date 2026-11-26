@@ -8,14 +8,20 @@ Licensing: 0.6.2 declared MIT while some code still traced to BSD (OpenBLAS
 reduction schedules), GPL (R's QR rank rule and `qf` limit branch) and
 third-party MIT sources. That code is removed or rewritten from written
 specifications, published papers and black-box runs of R; see
-[the provenance ledger](docs/provenance/ledger.md). Default-feature
-dependencies are all MIT, Unlicense or Zlib.
+[the provenance ledger](docs/provenance/ledger.md). With every feature
+enabled, all normal dependencies are MIT, Unlicense or Zlib.
 
 ### Added
 
 - `docs/provenance/`: the provenance ledger, specifications and black-box
   observations, with `scripts/validation/check_provenance.py` and
   `scripts/provenance/dependency_licences.py`.
+- `rcompat-collate` 0.1.0: string comparison in R's order, byte order for
+  the `C` collation and the ICU root collation for `"root"` and the locales
+  that use it (`en`, `de`, `fr`, `it`, `nl`, `pt` and others). Its weights
+  were derived from black-box runs of R
+  ([specification](docs/provenance/specs/collation.md)); `Collator::new`
+  rejects locales with their own rules (Swedish, Spanish, Polish, ...).
 - qf references for the Cook's cutoff F quantile (df1 up to 200, df2 up to
   1e5 and beyond 4e5).
 
@@ -42,15 +48,17 @@ dependencies are all MIT, Unlicense or Zlib.
   `rcompat_numeric::math::dense`. Every normal dependency of the shrinkage
   crate is now MIT-compatible.
 
-- The `formula` feature (ICU locale collation, Unicode-3.0 licensed
-  dependencies) is no longer enabled by default. Without it,
-  `EvaluationOptions::default()` uses "C" collation, so formula factor
-  levels and string comparisons sort by bytes; non-ASCII levels can order
-  differently from R's locale collation. Enable `formula` to restore
-  locale collation. The R package enables it.
+- Formula factor levels and string comparisons use `rcompat-collate`
+  instead of the ICU4X crates (Unicode-3.0). `EvaluationOptions::default()`
+  stays the root collation, and every build supports it.
+  `EvaluationOptions::collation` accepts `"C"`, `"POSIX"`, `"root"`, `"und"`,
+  `""` and the locales that use the root collation; other locales, which
+  ICU accepted, are now an error.
 
 ### Removed
 
+- The `formula` feature of `rsdeseq2` and the `icu` feature of
+  `rcompat-formula`: locale collation is always available.
 - The `RLinuxX86` and `RLinuxArm64` numeric profiles (`r-linux-x86_64`,
   `r-linux-arm64`), their x87 and binary128 reduction kernels, their exact
   formula references and golden manifests. Their reduction schedules had been

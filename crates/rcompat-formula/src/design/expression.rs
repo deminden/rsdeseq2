@@ -3,10 +3,7 @@
 use crate::errors::Error;
 use crate::errors::invalid_formula;
 use crate::errors::invalid_options;
-#[cfg(feature = "icu")]
-use icu_collator::{Collator, CollatorBorrowed};
-#[cfg(feature = "icu")]
-use icu_locale::Locale;
+use rcompat_collate::Collator;
 use std::cmp::Ordering;
 
 mod arithmetic;
@@ -192,16 +189,17 @@ pub struct Argument {
 /// the calling frontend or host R runtime.
 #[derive(Clone, Debug, PartialEq)]
 pub struct EvaluationOptions {
-    /// ICU locale. "root" and "und" select Unicode root collation; "C" uses
-    /// byte order. Other locale identifiers are parsed as Unicode locales.
-    /// Without the `icu` feature only "C" is available.
+    /// Collation name as R reports it: "C" (or "POSIX") uses byte order;
+    /// "root", "und" and "" select the Unicode root collation, as do the
+    /// locales that use it (see [`rcompat_collate::Collator::new`]). Other
+    /// locales are rejected.
     pub collation: String,
 }
 impl Default for EvaluationOptions {
-    /// Unicode root collation with the `icu` feature, otherwise "C".
+    /// The Unicode root collation.
     fn default() -> Self {
         Self {
-            collation: if cfg!(feature = "icu") { "root" } else { "C" }.into(),
+            collation: "root".into(),
         }
     }
 }
@@ -237,48 +235,19 @@ pub(super) struct Evaluator<'a> {
     collator: StringOrder,
 }
 
-/// String order for factor levels and comparisons: ICU collation for a locale,
-/// or byte order for R's "C" collation.
-pub(super) enum StringOrder {
-    Bytes,
-    #[cfg(feature = "icu")]
-    Collator(Box<CollatorBorrowed<'static>>),
-}
+/// String order for factor levels and comparisons: R's root collation for a
+/// locale, or byte order for R's "C" collation.
+pub(super) struct StringOrder(Collator);
 
 impl StringOrder {
     fn for_collation(collation: &str) -> Result<Self, Error> {
-        if collation == "C" {
-            return Ok(Self::Bytes);
-        }
-        #[cfg(feature = "icu")]
-        {
-            Ok(Self::Collator(Box::new(
-                Collator::try_new(
-                    collation
-                        .parse::<Locale>()
-                        .map_err(|e| invalid_options(e.to_string()))?
-                        .into(),
-                    Default::default(),
-                )
-                .map_err(|e| invalid_options(e.to_string()))?,
-            )))
-        }
-        #[cfg(not(feature = "icu"))]
-        {
-            Err(Error::UnsupportedFeature {
-                feature: format!(
-                    "formula collation '{collation}' requires the `formula` feature; use \"C\""
-                ),
-            })
-        }
+        Collator::new(collation)
+            .map(Self)
+            .map_err(|e| invalid_options(e.to_string()))
     }
 
     pub(super) fn compare(&self, left: &str, right: &str) -> Ordering {
-        match self {
-            Self::Bytes => left.cmp(right),
-            #[cfg(feature = "icu")]
-            Self::Collator(collator) => collator.compare(left, right),
-        }
+        self.0.compare(left, right)
     }
 }
 /// Evaluate one expression using the standalone built-in engine. Unknown/custom
@@ -308,12 +277,7 @@ pub fn evaluate_many(
     for expression in expressions {
         validate_expression(expression, 0)?;
     }
-    let collation = if matches!(options.collation.as_str(), "root" | "") {
-        "und"
-    } else {
-        &options.collation
-    };
-    let collator = StringOrder::for_collation(collation)?;
+    let collator = StringOrder::for_collation(&options.collation)?;
     let mut evaluator = Evaluator {
         variables,
         collator,

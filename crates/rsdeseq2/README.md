@@ -77,13 +77,13 @@ Bioconductor object coverage in the [compatibility guide][compatibility].
 
 ## Cargo Features
 
-`cli` and `shrinkage` are enabled by default. `formula` is opt-in because
-the ICU crates it uses are licensed under Unicode-3.0, not MIT.
+`cli` and `shrinkage` are enabled by default. Formula factor levels always
+sort in R's collation (`C` or the Unicode root collation) through
+`rcompat-collate`.
 
 | Feature | Adds |
 | --- | --- |
 | `cli` | The standalone binary and `rsdeseq2::cli` |
-| `formula` | ICU locale collation for formula factor levels (opt-in). Without it, only the `C` collation is supported and it is the default |
 | `shrinkage` | `rsdeseq2::shrinkage` with `ashr`- and `apeglm`-style methods |
 
 To embed the library with no CLI dependencies, disable default features and

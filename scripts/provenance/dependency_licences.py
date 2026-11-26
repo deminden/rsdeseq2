@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CRATES = ["rcompat-numeric", "rcompat-formula", "rcompat-shrinkage", "rsdeseq2"]
+CRATES = ["rcompat-collate", "rcompat-numeric", "rcompat-formula", "rcompat-shrinkage", "rsdeseq2"]
 
 
 def has_mit_option(expr: str) -> bool:
