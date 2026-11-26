@@ -57,6 +57,40 @@ dependencies are all MIT, Unlicense or Zlib.
   taken from OpenBLAS source. `r-host` on Linux now selects `r-binary64`.
   Results on Linux agree with R at the tolerances of the reference tests but
   no longer reproduce Linux R's last bits.
+- The API deprecated in 0.6.0. Each replacement gives the same output:
+  - `local_vst_inverse_size_factor_mean{,_from_normalization_factors}`: use
+    `local_vst_inverse_factor_mean` with `Offsets::PerSample` or
+    `Offsets::PerCell`.
+  - `vst_with_dispersion_trend_and_{size,normalization}_factors`: use
+    `vst_with_dispersion_trend_and_offsets`.
+  - `rlog_with_{size,normalization}_factors`,
+    `rlog_fit_with_{size,normalization}_factors`,
+    `rlog_frozen_with_{size,normalization}_factors` and
+    `rlog_with_estimated_prior_and_{size,normalization}_factors`: use
+    `rlog_transform`, `rlog_fit`, `rlog_frozen` and
+    `rlog_with_estimated_prior` with an `Offsets`.
+  - `fit_fixed_dispersion_irls{,_with_weights,_with_normalization_factors,_with_normalization_factors_and_weights}`:
+    use `fit_fixed_dispersion_glm` with a `GlmInput`. `fit_irls` stays.
+  - `fit_intercept_only_fixed_dispersion{,_with_weights,_with_normalization_factors}`:
+    use `fit_intercept_only_glm` with a `GlmInput`.
+  - The twelve `fit_glms_with_beta_prior_variance*`,
+    `fit_glms_with_estimated_beta_prior_variance*` and
+    `fit_expanded_glms_with_estimated_beta_prior_variance*` variants: use
+    `fit_glms_with_beta_prior`, `fit_glms_with_estimated_beta_prior` and
+    `fit_expanded_glms_with_estimated_beta_prior` with a `GlmInput`
+    (`Offsets` for the size-factor or normalization-factor suffix,
+    `GlmInput::weights` for the weights suffix).
+  - `BetaPriorSizeFactorWeightInput` and
+    `BetaPriorNormalizationFactorWeightInput`, which only carried arguments
+    to the removed `_and_weights` variants.
+  - The twelve `fit_dispersion_{line_search,grid}{,_with_prior,_with_prior_and_weights}`
+    and `_no_cr` variants: use `line_search_dispersion` or
+    `grid_search_dispersion` with a `DispersionFitInput` (no design for
+    `_no_cr`).
+  - `WeightedDispersionFitInput`, which only carried arguments to the
+    removed `_with_prior_and_weights` variants: use
+    `DispersionFitInput::design`, `prior` and `weights`.
+  - `rsdeseq2::math::qr`: use `rsdeseq2::math::rank`.
 
 ## 0.6.2
 

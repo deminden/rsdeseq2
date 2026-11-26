@@ -10,11 +10,6 @@ pub use rcompat_numeric::math::{
     median, median_finite, normal, normal_log_cdf, normal_log_upper_tail, optim, rank, trigamma,
 };
 
-/// Former name of [`rank`], which computes ranks and has no QR factorization.
-#[deprecated(note = "renamed to `rsdeseq2::math::rank`")]
-pub mod qr {
-    pub use super::rank::*;
-}
 pub use rcompat_numeric::math::special;
 
 pub use distributions::{

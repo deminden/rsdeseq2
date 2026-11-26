@@ -92,10 +92,10 @@ fn builder_fast_vst_glm_mu_applies_subset_trend_to_full_counts() {
 
     let output = builder.fast_vst_glm_mu(&counts, &design, 4).unwrap();
     let normalized = normalized_counts(&counts, &output.subset_fit.size_factors).unwrap();
-    let expected = vst_with_dispersion_trend_and_size_factors(
+    let expected = vst_with_dispersion_trend_and_offsets(
         &normalized,
         output.subset_fit.dispersion_trend.as_ref().unwrap(),
-        &output.subset_fit.size_factors,
+        Offsets::PerSample(&output.subset_fit.size_factors),
     )
     .unwrap();
 
@@ -368,10 +368,10 @@ fn fitted_state_can_apply_external_subset_trend_to_full_counts() {
         )
         .unwrap();
     let normalized = full_fit.normalized_counts(&counts).unwrap();
-    let expected = vst_with_dispersion_trend_and_size_factors(
+    let expected = vst_with_dispersion_trend_and_offsets(
         &normalized,
         subset_fit.dispersion_trend.as_ref().unwrap(),
-        &full_fit.size_factors,
+        Offsets::PerSample(&full_fit.size_factors),
     )
     .unwrap();
 
@@ -392,10 +392,10 @@ fn builder_fast_vst_glm_mu_preserves_normalization_factors() {
 
     let output = builder.fast_vst_glm_mu(&counts, &design, 4).unwrap();
     let normalized = normalized_counts_with_factors(&counts, &normalization_factors).unwrap();
-    let expected = vst_with_dispersion_trend_and_normalization_factors(
+    let expected = vst_with_dispersion_trend_and_offsets(
         &normalized,
         output.subset_fit.dispersion_trend.as_ref().unwrap(),
-        &normalization_factors,
+        Offsets::PerCell(&normalization_factors),
     )
     .unwrap();
 

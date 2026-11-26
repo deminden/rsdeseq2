@@ -18,25 +18,25 @@ fn beta_prior_refit_matches_manual_ridge_options() {
     let beta_prior_variance = vec![1e6, 0.25];
     let ridge = beta_prior_variance_to_ridge_lambda(&beta_prior_variance).unwrap();
 
-    let refit = fit_glms_with_beta_prior_variance(
-        &counts,
+    let refit = fit_glms_with_beta_prior(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0; 4]), &[0.05]),
         &design,
-        &[1.0; 4],
-        &[0.05],
         &beta_prior_variance,
         no_ridge_options(),
     )
     .unwrap();
-    let manual = fit_fixed_dispersion_irls(
-        &counts,
+    let manual = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0; 4]), &[0.05]),
         &design,
-        &[1.0; 4],
-        &[0.05],
         no_ridge_options().ridge_lambda_by_coefficient(ridge),
     )
     .unwrap();
-    let mle = fit_fixed_dispersion_irls(&counts, &design, &[1.0; 4], &[0.05], no_ridge_options())
-        .unwrap();
+    let mle = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0; 4]), &[0.05]),
+        &design,
+        no_ridge_options(),
+    )
+    .unwrap();
 
     assert_eq!(refit, manual);
     assert!(refit.beta.as_slice()[1].abs() < mle.beta.as_slice()[1].abs());
@@ -55,11 +55,13 @@ fn beta_prior_refit_matches_deseq2_reference() {
         .iter()
         .map(|row| parse_required_f64(row, "weighted"))
         .collect::<Vec<_>>();
-    let fit = fit_glms_with_beta_prior_variance(
-        &reference_counts(),
+    let fit = fit_glms_with_beta_prior(
+        GlmInput::new(
+            &reference_counts(),
+            Offsets::PerSample(&size_factors),
+            &fixed_dispersions,
+        ),
         &reference_full_design(),
-        &size_factors,
-        &fixed_dispersions,
         &beta_prior_variance,
         no_ridge_options(),
     )
@@ -147,11 +149,13 @@ fn beta_prior_estimated_refit_matches_deseq2_reference() {
         .iter()
         .map(|row| parse_required_f64(row, "baseMean"))
         .collect::<Vec<_>>();
-    let fit = fit_glms_with_estimated_beta_prior_variance(
-        &reference_counts(),
+    let fit = fit_glms_with_estimated_beta_prior(
+        GlmInput::new(
+            &reference_counts(),
+            Offsets::PerSample(&size_factors),
+            &fixed_dispersions,
+        ),
         &reference_full_design(),
-        &size_factors,
-        &fixed_dispersions,
         &base_mean,
         &fixed_dispersions,
         BetaPriorRefitOptions {
@@ -228,22 +232,16 @@ fn beta_prior_refit_with_weights_matches_normalization_factor_path() {
     let weights = RowMajorMatrix::from_row_major(1, 4, vec![1.0; 4]).unwrap();
     let beta_prior_variance = vec![1e6, 0.25];
 
-    let weighted = fit_glms_with_beta_prior_variance_and_weights(
-        &counts,
+    let weighted = fit_glms_with_beta_prior(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0; 4]), &[0.05]).weights(&weights),
         &design,
-        &[1.0; 4],
-        &[0.05],
-        Some(&weights),
         &beta_prior_variance,
         no_ridge_options(),
     )
     .unwrap();
-    let normalization = fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights(
-        &counts,
+    let normalization = fit_glms_with_beta_prior(
+        GlmInput::new(&counts, Offsets::PerCell(&normalization_factors), &[0.05]).weights(&weights),
         &design,
-        &normalization_factors,
-        &[0.05],
-        Some(&weights),
         &beta_prior_variance,
         no_ridge_options(),
     )
@@ -273,26 +271,24 @@ fn beta_prior_refit_weight_helpers_validate_inputs() {
         RowMajorMatrix::from_row_major(1, 4, vec![1.0, 1.0, f64::NAN, 1.0]).unwrap();
 
     assert!(
-        fit_glms_with_beta_prior_variance_and_weights(
-            &counts,
+        fit_glms_with_beta_prior(
+            GlmInput::new(&counts, Offsets::PerSample(&[1.0; 4]), &[0.05]).weights(&bad_weights),
             &design,
-            &[1.0; 4],
-            &[0.05],
-            Some(&bad_weights),
             &beta_prior_variance,
-            no_ridge_options(),
+            no_ridge_options()
         )
         .is_err()
     );
     assert!(
-        fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights(
-            &counts,
+        fit_glms_with_beta_prior(
+            GlmInput::new(
+                &counts,
+                Offsets::PerCell(&bad_normalization_factors),
+                &[0.05]
+            ),
             &design,
-            &bad_normalization_factors,
-            &[0.05],
-            None,
             &beta_prior_variance,
-            no_ridge_options(),
+            no_ridge_options()
         )
         .is_err()
     );
@@ -322,11 +318,9 @@ fn beta_prior_estimated_refit_runs_mle_then_shrunk_fit() {
         Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
     )
     .unwrap();
-    let fit = fit_glms_with_estimated_beta_prior_variance(
-        &counts,
+    let fit = fit_glms_with_estimated_beta_prior(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0; 4]), &[0.05; 3]),
         &design,
-        &[1.0; 4],
-        &[0.05; 3],
         &[15.0, 50.0, 12.0],
         &[0.1; 3],
         BetaPriorRefitOptions {
@@ -386,53 +380,47 @@ fn beta_prior_estimated_refit_accepts_normalization_factors_and_weights() {
         },
     };
 
-    let size_factor_fit = fit_glms_with_estimated_beta_prior_variance(
-        &counts,
+    let size_factor_fit = fit_glms_with_estimated_beta_prior(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0; 4]), &[0.05; 3]),
         &design,
-        &[1.0; 4],
-        &[0.05; 3],
         &[15.0, 50.0, 12.0],
         &[0.1; 3],
         options.clone(),
     )
     .unwrap();
-    let normalization_fit = fit_glms_with_estimated_beta_prior_variance_and_normalization_factors(
-        &counts,
-        &design,
-        &normalization_factors,
-        &[0.05; 3],
-        &[15.0, 50.0, 12.0],
-        &[0.1; 3],
-        options.clone(),
-    )
-    .unwrap();
-    let weighted_fit = fit_glms_with_estimated_beta_prior_variance_and_weights(
-        &counts,
-        &design,
-        BetaPriorSizeFactorWeightInput {
-            size_factors: &[1.0; 4],
-            weights: Some(&weights),
-        },
-        &[0.05; 3],
-        &[15.0, 50.0, 12.0],
-        &[0.1; 3],
-        options.clone(),
-    )
-    .unwrap();
-    let weighted_normalization_fit =
-        fit_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(
+    let normalization_fit = fit_glms_with_estimated_beta_prior(
+        GlmInput::new(
             &counts,
-            &design,
-            BetaPriorNormalizationFactorWeightInput {
-                normalization_factors: &normalization_factors,
-                weights: Some(&weights),
-            },
+            Offsets::PerCell(&normalization_factors),
             &[0.05; 3],
-            &[15.0, 50.0, 12.0],
-            &[0.1; 3],
-            options,
+        ),
+        &design,
+        &[15.0, 50.0, 12.0],
+        &[0.1; 3],
+        options.clone(),
+    )
+    .unwrap();
+    let weighted_fit = fit_glms_with_estimated_beta_prior(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0; 4]), &[0.05; 3]).weights(&weights),
+        &design,
+        &[15.0, 50.0, 12.0],
+        &[0.1; 3],
+        options.clone(),
+    )
+    .unwrap();
+    let weighted_normalization_fit = fit_glms_with_estimated_beta_prior(
+        GlmInput::new(
+            &counts,
+            Offsets::PerCell(&normalization_factors),
+            &[0.05; 3],
         )
-        .unwrap();
+        .weights(&weights),
+        &design,
+        &[15.0, 50.0, 12.0],
+        &[0.1; 3],
+        options,
+    )
+    .unwrap();
 
     assert_eq!(
         normalization_fit.beta_prior_variance,
@@ -497,24 +485,17 @@ fn beta_prior_estimated_refit_weights_influence_mle_and_prior_fit() {
         },
     };
 
-    let unweighted = fit_glms_with_estimated_beta_prior_variance(
-        &counts,
+    let unweighted = fit_glms_with_estimated_beta_prior(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0; 4]), &[0.05; 3]),
         &design,
-        &[1.0; 4],
-        &[0.05; 3],
         &[15.0, 50.0, 12.0],
         &[0.1; 3],
         options.clone(),
     )
     .unwrap();
-    let weighted = fit_glms_with_estimated_beta_prior_variance_and_weights(
-        &counts,
+    let weighted = fit_glms_with_estimated_beta_prior(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0; 4]), &[0.05; 3]).weights(&weights),
         &design,
-        BetaPriorSizeFactorWeightInput {
-            size_factors: &[1.0; 4],
-            weights: Some(&weights),
-        },
-        &[0.05; 3],
         &[15.0, 50.0, 12.0],
         &[0.1; 3],
         options,
@@ -586,32 +567,26 @@ fn beta_prior_estimated_refit_weight_helpers_validate_inputs() {
     };
 
     assert!(
-        fit_glms_with_estimated_beta_prior_variance_and_weights(
-            &counts,
+        fit_glms_with_estimated_beta_prior(
+            GlmInput::new(&counts, Offsets::PerSample(&[1.0; 4]), &[0.05; 3]).weights(&bad_weights),
             &design,
-            BetaPriorSizeFactorWeightInput {
-                size_factors: &[1.0; 4],
-                weights: Some(&bad_weights),
-            },
-            &[0.05; 3],
             &[15.0, 50.0, 12.0],
             &[0.1; 3],
-            options.clone(),
+            options.clone()
         )
         .is_err()
     );
     assert!(
-        fit_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(
-            &counts,
+        fit_glms_with_estimated_beta_prior(
+            GlmInput::new(
+                &counts,
+                Offsets::PerCell(&bad_normalization_factors),
+                &[0.05; 3]
+            ),
             &design,
-            BetaPriorNormalizationFactorWeightInput {
-                normalization_factors: &bad_normalization_factors,
-                weights: None,
-            },
-            &[0.05; 3],
             &[15.0, 50.0, 12.0],
             &[0.1; 3],
-            options,
+            options
         )
         .is_err()
     );

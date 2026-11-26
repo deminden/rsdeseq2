@@ -50,14 +50,16 @@ fn hard_high_dispersion_fixed_dispersions_match_deseq2_se_covariance() {
     )
     .unwrap();
 
-    let fit = fit_fixed_dispersion_irls_with_normalization_factors(
-        &counts,
+    let fit = fit_fixed_dispersion_glm(
+        GlmInput::new(
+            &counts,
+            Offsets::PerCell(&normalization),
+            &genes
+                .iter()
+                .map(|gene| dispersions[gene])
+                .collect::<Vec<_>>(),
+        ),
         &design,
-        &normalization,
-        &genes
-            .iter()
-            .map(|gene| dispersions[gene])
-            .collect::<Vec<_>>(),
         IrlsOptions {
             use_optim: false,
             solver: IrlsSolver::NormalEquations,

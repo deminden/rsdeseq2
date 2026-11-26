@@ -66,13 +66,13 @@ fn saved_original_locfit_predictions_and_full_vst_preserve_independent_bounds() 
             let nf = RowMajorMatrix::from_row_major(case.genes, case.samples, numbers(nf)).unwrap();
             (
                 normalized_counts_with_factors(&counts, &nf).unwrap(),
-                local_vst_inverse_size_factor_mean_from_normalization_factors(&nf).unwrap(),
+                local_vst_inverse_factor_mean(Offsets::PerCell(&nf)).unwrap(),
             )
         } else {
             let sf = numbers(case.size_factors.as_ref().unwrap());
             (
                 normalized_counts(&counts, &sf).unwrap(),
-                local_vst_inverse_size_factor_mean(&sf).unwrap(),
+                local_vst_inverse_factor_mean(Offsets::PerSample(&sf)).unwrap(),
             )
         };
         let curve = FrozenLocalDispersion::Saved(fit);

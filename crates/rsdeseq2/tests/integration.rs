@@ -6,7 +6,6 @@
 //!
 //! Fixture readers and comparisons are shared through `support`.
 #![allow(clippy::duplicate_mod, clippy::module_inception)]
-#![allow(deprecated)]
 
 mod support;
 

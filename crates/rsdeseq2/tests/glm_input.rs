@@ -1,5 +1,5 @@
-//! The twelve deprecated beta-prior GLM fits (size factors or normalization
-//! factors, with or without weights; supplied, estimated or expanded prior).
+//! The beta-prior, fixed-dispersion, rlog and VST fits with size-factor or
+//! normalization-factor offsets, with or without weights.
 //!
 //! `RSDESEQ2_GLM_INPUT_DUMP=<file>` writes every output so two commits can be
 //! compared bit for bit; the test itself checks that each one succeeds and
@@ -22,7 +22,7 @@ fn record(tag: &str, value: String) {
 }
 
 #[test]
-fn deprecated_beta_prior_fits_all_run() {
+fn offset_and_weight_fits_all_run() {
     let counts = CountMatrix::from_row_major_u32(
         4,
         6,
@@ -79,125 +79,183 @@ fn deprecated_beta_prior_fits_all_run() {
     let prior = [1e6, 0.8];
     let irls = IrlsOptions::default();
     let options = BetaPriorRefitOptions::default();
-    let sw = BetaPriorSizeFactorWeightInput {
-        size_factors: &size_factors,
-        weights: Some(&weights),
-    };
-    let nw = BetaPriorNormalizationFactorWeightInput {
-        normalization_factors: &factors,
-        weights: Some(&weights),
-    };
+    let sf = Offsets::PerSample(&size_factors);
+    let nf = Offsets::PerCell(&factors);
+    let input = |offsets| GlmInput::new(&counts, offsets, &dispersions);
+    let weighted = |offsets| input(offsets).weights(&weights);
     let s = |v| format!("{v:?}");
-    #[allow(deprecated)]
     let outputs = [
-        ("supplied/sf", s(fit_glms_with_beta_prior_variance(&counts, &design, &size_factors, &dispersions, &prior, irls.clone()).map(|f| format!("{f:?}")))),
-        ("supplied/sf+w", s(fit_glms_with_beta_prior_variance_and_weights(&counts, &design, &size_factors, &dispersions, Some(&weights), &prior, irls.clone()).map(|f| format!("{f:?}")))),
-        ("supplied/nf", s(fit_glms_with_beta_prior_variance_and_normalization_factors(&counts, &design, &factors, &dispersions, &prior, irls.clone()).map(|f| format!("{f:?}")))),
-        ("supplied/nf+w", s(fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights(&counts, &design, &factors, &dispersions, Some(&weights), &prior, irls.clone()).map(|f| format!("{f:?}")))),
-        ("estimated/sf", s(fit_glms_with_estimated_beta_prior_variance(&counts, &design, &size_factors, &dispersions, &base_mean, &disp_fit, options.clone()).map(|f| format!("{f:?}")))),
-        ("estimated/sf+w", s(fit_glms_with_estimated_beta_prior_variance_and_weights(&counts, &design, sw, &dispersions, &base_mean, &disp_fit, options.clone()).map(|f| format!("{f:?}")))),
-        ("estimated/nf", s(fit_glms_with_estimated_beta_prior_variance_and_normalization_factors(&counts, &design, &factors, &dispersions, &base_mean, &disp_fit, options.clone()).map(|f| format!("{f:?}")))),
-        ("estimated/nf+w", s(fit_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(&counts, &design, nw, &dispersions, &base_mean, &disp_fit, options.clone()).map(|f| format!("{f:?}")))),
-        ("expanded/sf", s(fit_expanded_glms_with_estimated_beta_prior_variance(&counts, expanded_input, &size_factors, &dispersions, &base_mean, &disp_fit, options.clone()).map(|f| format!("{f:?}")))),
-        ("expanded/sf+w", s(fit_expanded_glms_with_estimated_beta_prior_variance_and_weights(&counts, expanded_input, sw, &dispersions, &base_mean, &disp_fit, options.clone()).map(|f| format!("{f:?}")))),
-        ("expanded/nf", s(fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors(&counts, expanded_input, &factors, &dispersions, &base_mean, &disp_fit, options.clone()).map(|f| format!("{f:?}")))),
-        ("expanded/nf+w", s(fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(&counts, expanded_input, nw, &dispersions, &base_mean, &disp_fit, options.clone()).map(|f| format!("{f:?}")))),
+        (
+            "supplied/sf",
+            s(
+                fit_glms_with_beta_prior(input(sf), &design, &prior, irls.clone())
+                    .map(|f| format!("{f:?}")),
+            ),
+        ),
+        (
+            "supplied/sf+w",
+            s(
+                fit_glms_with_beta_prior(weighted(sf), &design, &prior, irls.clone())
+                    .map(|f| format!("{f:?}")),
+            ),
+        ),
+        (
+            "supplied/nf",
+            s(
+                fit_glms_with_beta_prior(input(nf), &design, &prior, irls.clone())
+                    .map(|f| format!("{f:?}")),
+            ),
+        ),
+        (
+            "supplied/nf+w",
+            s(
+                fit_glms_with_beta_prior(weighted(nf), &design, &prior, irls.clone())
+                    .map(|f| format!("{f:?}")),
+            ),
+        ),
+        (
+            "estimated/sf",
+            s(fit_glms_with_estimated_beta_prior(
+                input(sf),
+                &design,
+                &base_mean,
+                &disp_fit,
+                options.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "estimated/sf+w",
+            s(fit_glms_with_estimated_beta_prior(
+                weighted(sf),
+                &design,
+                &base_mean,
+                &disp_fit,
+                options.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "estimated/nf",
+            s(fit_glms_with_estimated_beta_prior(
+                input(nf),
+                &design,
+                &base_mean,
+                &disp_fit,
+                options.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "estimated/nf+w",
+            s(fit_glms_with_estimated_beta_prior(
+                weighted(nf),
+                &design,
+                &base_mean,
+                &disp_fit,
+                options.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "expanded/sf",
+            s(fit_expanded_glms_with_estimated_beta_prior(
+                input(sf),
+                expanded_input,
+                &base_mean,
+                &disp_fit,
+                options.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "expanded/sf+w",
+            s(fit_expanded_glms_with_estimated_beta_prior(
+                weighted(sf),
+                expanded_input,
+                &base_mean,
+                &disp_fit,
+                options.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "expanded/nf",
+            s(fit_expanded_glms_with_estimated_beta_prior(
+                input(nf),
+                expanded_input,
+                &base_mean,
+                &disp_fit,
+                options.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "expanded/nf+w",
+            s(fit_expanded_glms_with_estimated_beta_prior(
+                weighted(nf),
+                expanded_input,
+                &base_mean,
+                &disp_fit,
+                options.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
     ];
     for (tag, value) in outputs {
         record(tag, value);
     }
     let one_design = DesignMatrix::intercept_only(6).unwrap();
-    #[allow(deprecated)]
-    let fits = [
-        (
-            "irls/sf",
-            s(fit_fixed_dispersion_irls(
-                &counts,
-                &design,
-                &size_factors,
-                &dispersions,
-                irls.clone(),
-            )
-            .map(|f| format!("{f:?}"))),
-        ),
-        (
-            "irls/sf+w",
-            s(fit_fixed_dispersion_irls_with_weights(
-                &counts,
-                &design,
-                &size_factors,
-                &dispersions,
-                Some(&weights),
-                irls.clone(),
-            )
-            .map(|f| format!("{f:?}"))),
-        ),
-        (
-            "irls/nf",
-            s(fit_fixed_dispersion_irls_with_normalization_factors(
-                &counts,
-                &design,
-                &factors,
-                &dispersions,
-                irls.clone(),
-            )
-            .map(|f| format!("{f:?}"))),
-        ),
-        (
-            "irls/nf+w",
-            s(
-                fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
+    let fits =
+        [
+            (
+                "irls/sf",
+                s(fit_fixed_dispersion_glm(input(sf), &design, irls.clone())
+                    .map(|f| format!("{f:?}"))),
+            ),
+            (
+                "irls/sf+w",
+                s(
+                    fit_fixed_dispersion_glm(weighted(sf), &design, irls.clone())
+                        .map(|f| format!("{f:?}")),
+                ),
+            ),
+            (
+                "irls/nf",
+                s(fit_fixed_dispersion_glm(input(nf), &design, irls.clone())
+                    .map(|f| format!("{f:?}"))),
+            ),
+            (
+                "irls/nf+w",
+                s(
+                    fit_fixed_dispersion_glm(weighted(nf), &design, irls.clone())
+                        .map(|f| format!("{f:?}")),
+                ),
+            ),
+            (
+                "irls/intercept-design",
+                s(fit_irls(
                     &counts,
-                    &design,
-                    &factors,
+                    &one_design,
+                    &size_factors,
                     &dispersions,
-                    Some(&weights),
                     irls.clone(),
                 )
-                .map(|f| format!("{f:?}")),
+                .map(|f| format!("{f:?}"))),
             ),
-        ),
-        (
-            "irls/intercept-design",
-            s(fit_irls(
-                &counts,
-                &one_design,
-                &size_factors,
-                &dispersions,
-                irls.clone(),
-            )
-            .map(|f| format!("{f:?}"))),
-        ),
-        (
-            "intercept/sf",
-            s(
-                fit_intercept_only_fixed_dispersion(&counts, &size_factors, &dispersions)
-                    .map(|f| format!("{f:?}")),
+            (
+                "intercept/sf",
+                s(fit_intercept_only_glm(input(sf)).map(|f| format!("{f:?}"))),
             ),
-        ),
-        (
-            "intercept/sf+w",
-            s(fit_intercept_only_fixed_dispersion_with_weights(
-                &counts,
-                &size_factors,
-                &dispersions,
-                Some(&weights),
-            )
-            .map(|f| format!("{f:?}"))),
-        ),
-        (
-            "intercept/nf+w",
-            s(
-                fit_intercept_only_fixed_dispersion_with_normalization_factors(
-                    &counts,
-                    &factors,
-                    &dispersions,
-                    Some(&weights),
-                )
-                .map(|f| format!("{f:?}")),
+            (
+                "intercept/sf+w",
+                s(fit_intercept_only_glm(weighted(sf)).map(|f| format!("{f:?}"))),
             ),
-        ),
-    ];
+            (
+                "intercept/nf+w",
+                s(fit_intercept_only_glm(weighted(nf)).map(|f| format!("{f:?}"))),
+            ),
+        ];
     for (tag, value) in fits {
         record(tag, value);
     }
@@ -215,57 +273,42 @@ fn deprecated_beta_prior_fits_all_run() {
     let rlog_disp = [0.1, 0.2, 0.05];
     let intercept = [4.0, 2.2, 7.1];
     let rlog_irls = IrlsOptions::deseq2_rlog();
-    #[allow(deprecated)]
+    let rsf = Offsets::PerSample(&size_factors);
+    let rnf = Offsets::PerCell(&rlog_factors);
     let rlogs = [
         (
             "rlog/sf",
-            s(rlog_with_size_factors(
-                &rlog_counts,
-                &size_factors,
-                &rlog_disp,
-                0.7,
-                rlog_irls.clone(),
-            )
-            .map(|f| format!("{f:?}"))),
+            s(
+                rlog_transform(&rlog_counts, rsf, &rlog_disp, 0.7, rlog_irls.clone())
+                    .map(|f| format!("{f:?}")),
+            ),
         ),
         (
             "rlog/nf",
-            s(rlog_with_normalization_factors(
-                &rlog_counts,
-                &rlog_factors,
-                &rlog_disp,
-                0.7,
-                rlog_irls.clone(),
-            )
-            .map(|f| format!("{f:?}"))),
+            s(
+                rlog_transform(&rlog_counts, rnf, &rlog_disp, 0.7, rlog_irls.clone())
+                    .map(|f| format!("{f:?}")),
+            ),
         ),
         (
             "rlog_fit/sf",
-            s(rlog_fit_with_size_factors(
-                &rlog_counts,
-                &size_factors,
-                &rlog_disp,
-                0.7,
-                rlog_irls.clone(),
-            )
-            .map(|f| format!("{f:?}"))),
+            s(
+                rlog_fit(&rlog_counts, rsf, &rlog_disp, 0.7, rlog_irls.clone())
+                    .map(|f| format!("{f:?}")),
+            ),
         ),
         (
             "rlog_fit/nf",
-            s(rlog_fit_with_normalization_factors(
-                &rlog_counts,
-                &rlog_factors,
-                &rlog_disp,
-                0.7,
-                rlog_irls.clone(),
-            )
-            .map(|f| format!("{f:?}"))),
+            s(
+                rlog_fit(&rlog_counts, rnf, &rlog_disp, 0.7, rlog_irls.clone())
+                    .map(|f| format!("{f:?}")),
+            ),
         ),
         (
             "rlog_frozen/sf",
-            s(rlog_frozen_with_size_factors(
+            s(rlog_frozen(
                 &rlog_counts,
-                &size_factors,
+                rsf,
                 &rlog_disp,
                 0.7,
                 &intercept,
@@ -275,9 +318,9 @@ fn deprecated_beta_prior_fits_all_run() {
         ),
         (
             "rlog_frozen/nf",
-            s(rlog_frozen_with_normalization_factors(
+            s(rlog_frozen(
                 &rlog_counts,
-                &rlog_factors,
+                rnf,
                 &rlog_disp,
                 0.7,
                 &intercept,
@@ -287,9 +330,9 @@ fn deprecated_beta_prior_fits_all_run() {
         ),
         (
             "rlog_prior/sf",
-            s(rlog_with_estimated_prior_and_size_factors(
+            s(rlog_with_estimated_prior(
                 &rlog_counts,
-                &size_factors,
+                rsf,
                 &base_mean[..3],
                 &disp_fit[..3],
                 &rlog_disp,
@@ -299,9 +342,9 @@ fn deprecated_beta_prior_fits_all_run() {
         ),
         (
             "rlog_prior/nf",
-            s(rlog_with_estimated_prior_and_normalization_factors(
+            s(rlog_with_estimated_prior(
                 &rlog_counts,
-                &rlog_factors,
+                rnf,
                 &base_mean[..3],
                 &disp_fit[..3],
                 &rlog_disp,
@@ -322,34 +365,28 @@ fn deprecated_beta_prior_fits_all_run() {
         )
         .unwrap(),
     );
-    #[allow(deprecated)]
     let vsts = [
         (
             "vst_inverse/sf",
-            s(local_vst_inverse_size_factor_mean(&size_factors).map(|v| format!("{v:?}"))),
+            s(local_vst_inverse_factor_mean(rsf).map(|v| format!("{v:?}"))),
         ),
         (
             "vst_inverse/nf",
-            s(
-                local_vst_inverse_size_factor_mean_from_normalization_factors(&rlog_factors)
-                    .map(|v| format!("{v:?}")),
-            ),
+            s(local_vst_inverse_factor_mean(rnf).map(|v| format!("{v:?}"))),
         ),
         (
             "vst_trend/sf",
             s(
-                vst_with_dispersion_trend_and_size_factors(&normalized, &trend, &size_factors)
+                vst_with_dispersion_trend_and_offsets(&normalized, &trend, rsf)
                     .map(|f| format!("{f:?}")),
             ),
         ),
         (
             "vst_trend/nf",
-            s(vst_with_dispersion_trend_and_normalization_factors(
-                &normalized,
-                &trend,
-                &rlog_factors,
-            )
-            .map(|f| format!("{f:?}"))),
+            s(
+                vst_with_dispersion_trend_and_offsets(&normalized, &trend, rnf)
+                    .map(|f| format!("{f:?}")),
+            ),
         ),
     ];
     for (tag, value) in vsts {

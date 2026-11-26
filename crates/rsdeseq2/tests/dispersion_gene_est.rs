@@ -194,13 +194,13 @@ fn builder_rejects_rank_deficient_linear_mu_design() {
 #[test]
 fn dispersion_grid_prefers_minimum_for_perfect_fit() {
     let options = GeneWiseDispersionOptions::default();
-    let (dispersion, evaluations) = fit_dispersion_grid_no_cr(
+    let (dispersion, evaluations) = grid_search_dispersion(DispersionFitInput::new(
         &[10, 10, 20, 20],
         &[10.0, 10.0, 20.0, 20.0],
         0.1,
         options,
         4,
-    )
+    ))
     .unwrap();
 
     assert_relative_eq!(dispersion, options.min_disp, epsilon = 1e-15);
@@ -645,15 +645,16 @@ fn line_search_with_prior_moves_toward_prior_mean() {
     };
     let prior = DispersionPrior::new(0.02_f64.ln(), 0.05).unwrap();
 
-    let no_prior =
-        fit_dispersion_line_search_no_cr(&counts, &mu, 0.5, options, counts.len()).unwrap();
-    let with_prior = fit_dispersion_line_search_no_cr_with_prior(
+    let no_prior = line_search_dispersion(DispersionFitInput::new(
         &counts,
         &mu,
         0.5,
         options,
         counts.len(),
-        prior,
+    ))
+    .unwrap();
+    let with_prior = line_search_dispersion(
+        DispersionFitInput::new(&counts, &mu, 0.5, options, counts.len()).prior(prior),
     )
     .unwrap();
 
@@ -677,13 +678,9 @@ fn line_search_preserves_high_initial_value_before_final_cap() {
     let initial_dispersion = 5.0_f64;
     let prior = DispersionPrior::new(initial_dispersion.ln(), 0.5).unwrap();
 
-    let output = fit_dispersion_line_search_no_cr_with_prior(
-        &counts,
-        &mu,
-        initial_dispersion,
-        options,
-        counts.len(),
-        prior,
+    let output = line_search_dispersion(
+        DispersionFitInput::new(&counts, &mu, initial_dispersion, options, counts.len())
+            .prior(prior),
     )
     .unwrap();
     let expected_initial = dispersion_log_posterior_with_prior(
@@ -713,28 +710,19 @@ fn weighted_line_search_and_grid_with_prior_return_finite_estimates() {
     let prior = DispersionPrior::new(0.2_f64.ln(), 0.5).unwrap();
     let options = GeneWiseDispersionOptions::default();
 
-    let line_search =
-        fit_dispersion_line_search_with_prior_and_weights(WeightedDispersionFitInput {
-            counts: &counts,
-            mu: &mu,
-            design: &design,
-            initial_dispersion: 0.4,
-            options,
-            n_samples: counts.len(),
-            prior,
-            weights: &weights,
-        })
-        .unwrap();
-    let (grid, _) = fit_dispersion_grid_with_prior_and_weights(WeightedDispersionFitInput {
-        counts: &counts,
-        mu: &mu,
-        design: &design,
-        initial_dispersion: line_search.dispersion,
-        options,
-        n_samples: counts.len(),
-        prior,
-        weights: &weights,
-    })
+    let line_search = line_search_dispersion(
+        DispersionFitInput::new(&counts, &mu, 0.4, options, counts.len())
+            .design(&design)
+            .prior(prior)
+            .weights(&weights),
+    )
+    .unwrap();
+    let (grid, _) = grid_search_dispersion(
+        DispersionFitInput::new(&counts, &mu, line_search.dispersion, options, counts.len())
+            .design(&design)
+            .prior(prior)
+            .weights(&weights),
+    )
     .unwrap();
 
     assert!(line_search.dispersion.is_finite());
@@ -746,13 +734,15 @@ fn weighted_line_search_and_grid_with_prior_return_finite_estimates() {
 #[test]
 fn dispersion_grid_with_cox_reid_returns_bounded_estimate() {
     let options = GeneWiseDispersionOptions::default();
-    let (dispersion, evaluations) = fit_dispersion_grid(
-        &[10, 30, 10, 30],
-        &[20.0, 20.0, 20.0, 20.0],
-        &two_group_design(4, Some("conditionB")),
-        0.1,
-        options,
-        4,
+    let (dispersion, evaluations) = grid_search_dispersion(
+        DispersionFitInput::new(
+            &[10, 30, 10, 30],
+            &[20.0, 20.0, 20.0, 20.0],
+            0.1,
+            options,
+            4,
+        )
+        .design(&two_group_design(4, Some("conditionB"))),
     )
     .unwrap();
 
@@ -768,8 +758,10 @@ fn dispersion_line_search_improves_objective() {
     let design = two_group_design(4, Some("conditionB"));
     let options = GeneWiseDispersionOptions::default();
 
-    let output =
-        fit_dispersion_line_search(&counts, &mu, &design, 0.1, options, counts.len()).unwrap();
+    let output = line_search_dispersion(
+        DispersionFitInput::new(&counts, &mu, 0.1, options, counts.len()).design(&design),
+    )
+    .unwrap();
 
     assert!(output.iter > 0);
     assert!(output.iter <= options.maxit);
@@ -788,9 +780,22 @@ fn dispersion_line_search_no_cr_matches_grid_scale() {
         ..GeneWiseDispersionOptions::default()
     };
 
-    let line_search =
-        fit_dispersion_line_search_no_cr(&counts, &mu, 0.1, options, counts.len()).unwrap();
-    let (grid, _) = fit_dispersion_grid_no_cr(&counts, &mu, 0.1, options, counts.len()).unwrap();
+    let line_search = line_search_dispersion(DispersionFitInput::new(
+        &counts,
+        &mu,
+        0.1,
+        options,
+        counts.len(),
+    ))
+    .unwrap();
+    let (grid, _) = grid_search_dispersion(DispersionFitInput::new(
+        &counts,
+        &mu,
+        0.1,
+        options,
+        counts.len(),
+    ))
+    .unwrap();
 
     assert!(line_search.dispersion >= options.min_disp);
     assert!(line_search.dispersion <= 10.0);

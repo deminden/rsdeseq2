@@ -236,11 +236,13 @@ fn beta_prior_variance_matches_deseq2_reference() {
     let size_factors = read_size_factors("size_factors_ratio.tsv");
     let base_metadata = read_reference_tsv("base_metadata_ratio.tsv");
 
-    let fit = fit_fixed_dispersion_irls(
-        &reference_counts(),
+    let fit = fit_fixed_dispersion_glm(
+        GlmInput::new(
+            &reference_counts(),
+            Offsets::PerSample(&size_factors),
+            &fixed_dispersions,
+        ),
         &reference_full_design(),
-        &size_factors,
-        &fixed_dispersions,
         no_ridge_options(),
     )
     .unwrap();

@@ -617,60 +617,6 @@ pub fn vst_with_dispersion_trend_and_offsets(
     }
 }
 
-/// Deprecated form of [`local_vst_inverse_factor_mean`] with size factors.
-#[deprecated(
-    since = "0.6.0",
-    note = "use local_vst_inverse_factor_mean(Offsets::PerSample(size_factors))"
-)]
-pub fn local_vst_inverse_size_factor_mean(size_factors: &[f64]) -> Result<f64, DeseqError> {
-    local_vst_inverse_factor_mean(Offsets::PerSample(size_factors))
-}
-
-/// Deprecated form of [`local_vst_inverse_factor_mean`] with normalization factors.
-#[deprecated(
-    since = "0.6.0",
-    note = "use local_vst_inverse_factor_mean(Offsets::PerCell(normalization_factors))"
-)]
-pub fn local_vst_inverse_size_factor_mean_from_normalization_factors(
-    normalization_factors: &RowMajorMatrix<f64>,
-) -> Result<f64, DeseqError> {
-    local_vst_inverse_factor_mean(Offsets::PerCell(normalization_factors))
-}
-
-/// Deprecated form of [`vst_with_dispersion_trend_and_offsets`] with size factors.
-#[deprecated(
-    since = "0.6.0",
-    note = "use vst_with_dispersion_trend_and_offsets(.., Offsets::PerSample(size_factors))"
-)]
-pub fn vst_with_dispersion_trend_and_size_factors(
-    normalized_counts: &RowMajorMatrix<f64>,
-    trend_fit: &DispersionTrendFit,
-    size_factors: &[f64],
-) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    vst_with_dispersion_trend_and_offsets(
-        normalized_counts,
-        trend_fit,
-        Offsets::PerSample(size_factors),
-    )
-}
-
-/// Deprecated form of [`vst_with_dispersion_trend_and_offsets`] with normalization factors.
-#[deprecated(
-    since = "0.6.0",
-    note = "use vst_with_dispersion_trend_and_offsets(.., Offsets::PerCell(normalization_factors))"
-)]
-pub fn vst_with_dispersion_trend_and_normalization_factors(
-    normalized_counts: &RowMajorMatrix<f64>,
-    trend_fit: &DispersionTrendFit,
-    normalization_factors: &RowMajorMatrix<f64>,
-) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    vst_with_dispersion_trend_and_offsets(
-        normalized_counts,
-        trend_fit,
-        Offsets::PerCell(normalization_factors),
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

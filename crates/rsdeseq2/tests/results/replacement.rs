@@ -403,20 +403,19 @@ fn fit_expanded_beta_prior_wald_results_accepts_offsets_and_weights() {
             1,
         )
         .unwrap();
-    let direct_fit =
-        fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(
+    let direct_fit = fit_expanded_glms_with_estimated_beta_prior(
+        GlmInput::new(
             &counts,
-            design,
-            BetaPriorNormalizationFactorWeightInput {
-                normalization_factors: &normalization_factors,
-                weights: Some(&weights),
-            },
+            Offsets::PerCell(&normalization_factors),
             &dispersions,
-            &base_mean,
-            &disp_fit,
-            input.options.clone(),
         )
-        .unwrap();
+        .weights(&weights),
+        design,
+        &base_mean,
+        &disp_fit,
+        input.options.clone(),
+    )
+    .unwrap();
     let direct_results = build_wald_results_from_expanded_beta_prior_fit(
         &base_mean,
         &direct_fit,

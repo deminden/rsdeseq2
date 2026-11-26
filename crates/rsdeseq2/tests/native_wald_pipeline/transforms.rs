@@ -47,9 +47,9 @@ fn fitted_trend_state_drives_rlog_transform() {
     .unwrap();
 
     let output = fit.rlog(&counts).unwrap();
-    let expected = rlog_with_estimated_prior_and_size_factors(
+    let expected = rlog_with_estimated_prior(
         &counts,
-        &fit.size_factors,
+        Offsets::PerSample(&fit.size_factors),
         &fit.base_mean,
         fit.disp_fit.as_ref().unwrap(),
         fit.disp_fit.as_ref().unwrap(),
@@ -105,9 +105,9 @@ fn fitted_trend_state_drives_rlog_transform_with_normalization_factors() {
     .unwrap();
 
     let output = fit.rlog(&counts).unwrap();
-    let expected = rlog_with_estimated_prior_and_normalization_factors(
+    let expected = rlog_with_estimated_prior(
         &counts,
-        fit.normalization_factors.as_ref().unwrap(),
+        Offsets::PerCell(fit.normalization_factors.as_ref().unwrap()),
         &fit.base_mean,
         fit.disp_fit.as_ref().unwrap(),
         fit.disp_fit.as_ref().unwrap(),
@@ -153,9 +153,9 @@ fn fitted_trend_state_drives_frozen_rlog_transform() {
     let output = fit
         .frozen_rlog(&counts, &learned.intercept, learned.sample_prior_variance)
         .unwrap();
-    let expected = rsdeseq2::prelude::rlog_frozen_with_size_factors(
+    let expected = rsdeseq2::prelude::rlog_frozen(
         &counts,
-        &fit.size_factors,
+        Offsets::PerSample(&fit.size_factors),
         fit.disp_fit.as_ref().unwrap(),
         learned.sample_prior_variance,
         &learned.intercept,
@@ -202,9 +202,9 @@ fn fitted_trend_state_drives_frozen_rlog_transform_with_normalization_factors() 
     let output = fit
         .frozen_rlog(&counts, &learned.intercept, learned.sample_prior_variance)
         .unwrap();
-    let expected = rsdeseq2::prelude::rlog_frozen_with_normalization_factors(
+    let expected = rsdeseq2::prelude::rlog_frozen(
         &counts,
-        fit.normalization_factors.as_ref().unwrap(),
+        Offsets::PerCell(fit.normalization_factors.as_ref().unwrap()),
         fit.disp_fit.as_ref().unwrap(),
         learned.sample_prior_variance,
         &learned.intercept,

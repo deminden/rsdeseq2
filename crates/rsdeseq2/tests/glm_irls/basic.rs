@@ -11,16 +11,18 @@ fn irls_intercept_only_agrees_with_intercept_shortcut_for_equal_size_factors() {
     )
     .unwrap();
 
-    let irls = fit_fixed_dispersion_irls(
-        &counts,
+    let irls = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.1]),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.1],
         no_ridge_options(),
     )
     .unwrap();
-    let shortcut =
-        fit_intercept_only_fixed_dispersion(&counts, &[1.0, 1.0, 1.0, 1.0], &[0.1]).unwrap();
+    let shortcut = fit_intercept_only_glm(GlmInput::new(
+        &counts,
+        Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]),
+        &[0.1],
+    ))
+    .unwrap();
 
     assert!(irls.beta_converged[0]);
     assert_relative_eq!(
@@ -52,8 +54,12 @@ fn fit_irls_dispatches_intercept_only_shortcut() {
         IrlsOptions::default(),
     )
     .unwrap();
-    let shortcut =
-        fit_intercept_only_fixed_dispersion(&counts, &[1.0, 1.0, 2.0, 2.0], &[0.2]).unwrap();
+    let shortcut = fit_intercept_only_glm(GlmInput::new(
+        &counts,
+        Offsets::PerSample(&[1.0, 1.0, 2.0, 2.0]),
+        &[0.2],
+    ))
+    .unwrap();
 
     assert_eq!(wrapped, shortcut);
 }
@@ -74,11 +80,9 @@ fn irls_two_group_design_recovers_known_log2_fold_change() {
     )
     .unwrap();
 
-    let fit = fit_fixed_dispersion_irls(
-        &counts,
+    let fit = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05]),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05],
         no_ridge_options(),
     )
     .unwrap();
@@ -128,9 +132,12 @@ fn fit_irls_dispatches_general_irls_for_multi_coefficient_design() {
         options.clone(),
     )
     .unwrap();
-    let direct =
-        fit_fixed_dispersion_irls(&counts, &design, &[1.0, 1.0, 1.0, 1.0], &[0.05], options)
-            .unwrap();
+    let direct = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05]),
+        &design,
+        options,
+    )
+    .unwrap();
 
     assert_eq!(wrapped, direct);
 }

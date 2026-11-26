@@ -266,7 +266,8 @@ sample names in the selected raw-count matrix.
 ## Regularized Log
 
 The Rust core includes a low-level regularized-log sample-effect primitive.
-`rlog_with_size_factors()` and `rlog_with_normalization_factors()` build the
+`rlog_transform()`, with size-factor (`Offsets::PerSample`) or
+normalization-factor (`Offsets::PerCell`) offsets, builds the
 DESeq2 learned-intercept design: one unpenalized intercept plus one sample
 indicator coefficient for each sample. The intercept receives a wide
 log2-scale prior variance, while each sample effect receives the shared
@@ -289,16 +290,13 @@ weight_i = 1 / (1 / baseMean_i + dispFit_i)
 
 The flattened log-fold-change values and repeated row weights are matched to a
 zero-centered Normal using DESeq2's default weighted upper-tail quantile rule.
-`rlog_with_estimated_prior_and_size_factors()` and
-`rlog_with_estimated_prior_and_normalization_factors()` compose that
+`rlog_with_estimated_prior()` composes that
 prior-estimation step with the sample-effect fit when the caller already has
 `baseMean`, `dispFit`, and gene-wise dispersions from earlier stages.
-`rlog_fit_with_size_factors()` and `rlog_fit_with_normalization_factors()`
-retain the fitted intercept-plus-sample-effect GLM beside the transformed
-matrix, exposing the intermediate beta matrix needed for parity diagnostics
-and frozen-rlog reuse.
-`rlog_frozen_with_size_factors()` and
-`rlog_frozen_with_normalization_factors()` provide the matching low-level
+`rlog_fit()` retains the fitted intercept-plus-sample-effect GLM beside the
+transformed matrix, exposing the intermediate beta matrix needed for parity
+diagnostics and frozen-rlog reuse.
+`rlog_frozen()` provides the matching low-level
 frozen-intercept transform: caller-supplied log2 intercepts are converted to
 gene-specific offsets, only sample-effect coefficients are fit, and the output
 is assembled as the frozen intercept plus the fitted sample effect.
@@ -733,9 +731,10 @@ expressions, orthogonal polynomial bases, and complete R-compatible formula
 semantics are unsupported; the runtime numeric path is pure Rust and expects
 callers or wrappers to provide unsupported design matrices explicitly.
 
-`fit_glms_with_beta_prior_variance()` performs the primitive fixed-dispersion
-refit from a supplied `betaPriorVar` vector. Size-factor, normalization-factor,
-and optional observation-weight entry points share the same conversion. The
+`fit_glms_with_beta_prior()` performs the primitive fixed-dispersion
+refit from a supplied `betaPriorVar` vector. Its `GlmInput` carries
+size-factor or normalization-factor offsets and optional observation weights,
+which share the same conversion. The
 vector is expressed on the log2 beta scale, matching DESeq2, then converted to
 the natural-log ridge used by the Rust IRLS solver:
 
@@ -744,11 +743,12 @@ lambda_log2 = 1 / betaPriorVar
 lambda_natural_log = lambda_log2 / log(2)^2
 ```
 
-`fit_glms_with_estimated_beta_prior_variance()` combines the two primitive
+`fit_glms_with_estimated_beta_prior()` combines the two primitive
 steps for fixed-dispersion matrices: first fit MLE betas, estimate the
 coefficient prior variances, and then refit with the converted per-coefficient
-ridge. Companion helpers cover the same estimated-prior workflow for
-normalization-factor offsets and optional observation weights.
+ridge. The same `GlmInput` covers normalization-factor offsets and optional
+observation weights; `fit_expanded_glms_with_estimated_beta_prior()` runs the
+workflow on an expanded design.
 
 ## Observation-Weight Preprocessing
 

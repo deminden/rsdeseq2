@@ -24,29 +24,15 @@ pub mod wald;
 /// Observation-weight preprocessing (`getAndCheckWeights`).
 pub mod weights;
 
-#[allow(deprecated)]
 pub use beta::{
-    BetaPriorGlmFit, BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions,
-    BetaPriorSizeFactorWeightInput, BetaPriorVarianceMethod, BetaPriorVarianceOptions,
+    BetaPriorGlmFit, BetaPriorRefitOptions, BetaPriorVarianceMethod, BetaPriorVarianceOptions,
     ExpandedModelBetaPriorDesignInput, ExpandedModelBetaPriorGlmFit, GlmInput, NormalShrinkageRows,
     average_expanded_model_coefficients, average_expanded_model_covariances,
     beta_prior_variance_to_ridge_lambda, collapse_expanded_model_fit, estimate_beta,
     estimate_beta_prior_variance, expanded_model_group_contrast,
-    fit_expanded_glms_with_estimated_beta_prior,
-    fit_expanded_glms_with_estimated_beta_prior_variance,
-    fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors,
-    fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights,
-    fit_expanded_glms_with_estimated_beta_prior_variance_and_weights, fit_glms_with_beta_prior,
-    fit_glms_with_beta_prior_variance, fit_glms_with_beta_prior_variance_and_normalization_factors,
-    fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights,
-    fit_glms_with_beta_prior_variance_and_weights, fit_glms_with_estimated_beta_prior,
-    fit_glms_with_estimated_beta_prior_variance,
-    fit_glms_with_estimated_beta_prior_variance_and_normalization_factors,
-    fit_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights,
-    fit_glms_with_estimated_beta_prior_variance_and_weights, fit_intercept_only_fixed_dispersion,
-    fit_intercept_only_fixed_dispersion_with_normalization_factors,
-    fit_intercept_only_fixed_dispersion_with_weights, fit_intercept_only_glm,
-    match_upper_quantile_for_variance, match_weighted_upper_quantile_for_variance,
+    fit_expanded_glms_with_estimated_beta_prior, fit_glms_with_beta_prior,
+    fit_glms_with_estimated_beta_prior, fit_intercept_only_glm, match_upper_quantile_for_variance,
+    match_weighted_upper_quantile_for_variance,
 };
 pub use contrast_projection::{
     ContrastProjection, CovarianceView, InferenceEstimates, wald_test_contrast_from_estimates,
@@ -55,13 +41,7 @@ pub use contrast_view::{ContrastInference, ContrastZeroRule, PreparedContrastVie
 pub use dispersion_fit::fit_with_dispersion;
 pub use fallback::{OptimFallbackRows, optim_fallback_rows};
 pub use inference_primitives::wald_test_from_estimates;
-#[allow(deprecated)]
-pub use irls::{
-    IrlsOptions, IrlsSolver, fit_fixed_dispersion_glm, fit_fixed_dispersion_irls,
-    fit_fixed_dispersion_irls_with_normalization_factors,
-    fit_fixed_dispersion_irls_with_normalization_factors_and_weights,
-    fit_fixed_dispersion_irls_with_weights, fit_irls,
-};
+pub use irls::{IrlsOptions, IrlsSolver, fit_fixed_dispersion_glm, fit_irls};
 pub use lrt::{lrt_pvalues_from_statistics, lrt_test};
 pub use nb::{
     nbinom_log_likelihood, nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted,

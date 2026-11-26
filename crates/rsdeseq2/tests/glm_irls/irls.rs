@@ -25,9 +25,12 @@ fn fit_with_dispersion_wraps_fixed_dispersion_irls() {
         options.clone(),
     )
     .unwrap();
-    let direct =
-        fit_fixed_dispersion_irls(&counts, &design, &[1.0, 1.0, 1.0, 1.0], &[0.05], options)
-            .unwrap();
+    let direct = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05]),
+        &design,
+        options,
+    )
+    .unwrap();
 
     assert_eq!(wrapped, direct);
 }
@@ -48,11 +51,9 @@ fn irls_optim_fallback_refits_nonconverged_rows_by_default_and_can_be_disabled()
     )
     .unwrap();
 
-    let without_optim = fit_fixed_dispersion_irls(
-        &counts,
+    let without_optim = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05]),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05],
         IrlsOptions {
             maxit: 1,
             ridge_lambda: 0.0,
@@ -61,11 +62,9 @@ fn irls_optim_fallback_refits_nonconverged_rows_by_default_and_can_be_disabled()
         },
     )
     .unwrap();
-    let with_optim = fit_fixed_dispersion_irls(
-        &counts,
+    let with_optim = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05]),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05],
         IrlsOptions {
             maxit: 1,
             ridge_lambda: 0.0,
@@ -105,11 +104,9 @@ fn irls_optim_fallback_preserves_pre_optim_hat_diagonal() {
     )
     .unwrap();
 
-    let pre_optim = fit_fixed_dispersion_irls(
-        &counts,
+    let pre_optim = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05]),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05],
         IrlsOptions {
             maxit: 1,
             ridge_lambda: 0.0,
@@ -118,11 +115,9 @@ fn irls_optim_fallback_preserves_pre_optim_hat_diagonal() {
         },
     )
     .unwrap();
-    let with_optim = fit_fixed_dispersion_irls(
-        &counts,
+    let with_optim = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05]),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05],
         IrlsOptions {
             maxit: 1,
             ridge_lambda: 0.0,
@@ -159,11 +154,9 @@ fn irls_optim_fallback_log_likelihood_uses_min_mu_floored_means() {
     )
     .unwrap();
 
-    let fit = fit_fixed_dispersion_irls(
-        &counts,
+    let fit = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05]),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05],
         IrlsOptions {
             maxit: 1,
             ridge_lambda: 0.0,
@@ -201,19 +194,23 @@ fn irls_qr_solver_matches_normal_equations_for_two_group_design() {
     )
     .unwrap();
 
-    let normal = fit_fixed_dispersion_irls(
-        &counts,
+    let normal = fit_fixed_dispersion_glm(
+        GlmInput::new(
+            &counts,
+            Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]),
+            &[0.05, 0.2],
+        ),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05, 0.2],
         no_ridge_options(),
     )
     .unwrap();
-    let qr = fit_fixed_dispersion_irls(
-        &counts,
+    let qr = fit_fixed_dispersion_glm(
+        GlmInput::new(
+            &counts,
+            Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]),
+            &[0.05, 0.2],
+        ),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05, 0.2],
         no_ridge_qr_options(),
     )
     .unwrap();
@@ -245,19 +242,23 @@ fn original_qr_results_match_non_qr_results_on_stable_rows() {
         Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
     )
     .unwrap();
-    let normal = fit_fixed_dispersion_irls(
-        &counts,
+    let normal = fit_fixed_dispersion_glm(
+        GlmInput::new(
+            &counts,
+            Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]),
+            &[0.05, 0.2],
+        ),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05, 0.2],
         no_ridge_options(),
     )
     .unwrap();
-    let qr = fit_fixed_dispersion_irls(
-        &counts,
+    let qr = fit_fixed_dispersion_glm(
+        GlmInput::new(
+            &counts,
+            Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]),
+            &[0.05, 0.2],
+        ),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05, 0.2],
         no_ridge_qr_options(),
     )
     .unwrap();
@@ -313,11 +314,9 @@ fn irls_qr_solver_handles_default_ridge() {
     )
     .unwrap();
 
-    let fit = fit_fixed_dispersion_irls(
-        &counts,
+    let fit = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05]),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05],
         IrlsOptions {
             solver: IrlsSolver::Qr,
             ..IrlsOptions::default()
@@ -351,22 +350,18 @@ fn irls_vector_ridge_matches_scalar_ridge_when_values_match() {
     )
     .unwrap();
 
-    let scalar = fit_fixed_dispersion_irls(
-        &counts,
+    let scalar = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05]),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05],
         IrlsOptions {
             ridge_lambda: 0.25,
             ..IrlsOptions::default()
         },
     )
     .unwrap();
-    let vector = fit_fixed_dispersion_irls(
-        &counts,
+    let vector = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05]),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05],
         IrlsOptions {
             ridge_lambda: 0.0,
             ..IrlsOptions::default()
@@ -406,19 +401,15 @@ fn irls_vector_ridge_can_penalize_one_coefficient() {
     )
     .unwrap();
 
-    let unpenalized = fit_fixed_dispersion_irls(
-        &counts,
+    let unpenalized = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05]),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05],
         no_ridge_options(),
     )
     .unwrap();
-    let penalized = fit_fixed_dispersion_irls(
-        &counts,
+    let penalized = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05]),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05],
         IrlsOptions {
             ridge_lambda: 0.0,
             ..IrlsOptions::default()
@@ -452,11 +443,9 @@ fn irls_qr_solver_matches_normal_equations_with_vector_ridge() {
     )
     .unwrap();
 
-    let normal = fit_fixed_dispersion_irls(
-        &counts,
+    let normal = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05]),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05],
         IrlsOptions {
             ridge_lambda: 0.0,
             ..IrlsOptions::default()
@@ -464,11 +453,9 @@ fn irls_qr_solver_matches_normal_equations_with_vector_ridge() {
         .ridge_lambda_by_coefficient(vec![0.0, 25.0]),
     )
     .unwrap();
-    let qr = fit_fixed_dispersion_irls(
-        &counts,
+    let qr = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05]),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05],
         IrlsOptions {
             ridge_lambda: 0.0,
             solver: IrlsSolver::Qr,
@@ -503,20 +490,24 @@ fn irls_all_one_weights_match_unweighted_fit() {
     .unwrap();
     let weights = RowMajorMatrix::from_row_major(2, 4, vec![1.0; 8]).unwrap();
 
-    let unweighted = fit_fixed_dispersion_irls(
-        &counts,
+    let unweighted = fit_fixed_dispersion_glm(
+        GlmInput::new(
+            &counts,
+            Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]),
+            &[0.05, 0.2],
+        ),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05, 0.2],
         no_ridge_options(),
     )
     .unwrap();
-    let weighted = fit_fixed_dispersion_irls_with_weights(
-        &counts,
+    let weighted = fit_fixed_dispersion_glm(
+        GlmInput::new(
+            &counts,
+            Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]),
+            &[0.05, 0.2],
+        )
+        .weights(&weights),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05, 0.2],
-        Some(&weights),
         no_ridge_options(),
     )
     .unwrap();
@@ -555,12 +546,10 @@ fn irls_zero_weight_sample_does_not_influence_fit() {
     .unwrap();
     let weights = RowMajorMatrix::from_row_major(1, 4, vec![1.0, 0.0, 1.0, 1.0]).unwrap();
 
-    let fit = fit_fixed_dispersion_irls_with_weights(
-        &counts,
+    let fit = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05])
+            .weights(&weights),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05],
-        Some(&weights),
         no_ridge_options(),
     )
     .unwrap();
@@ -588,21 +577,17 @@ fn irls_qr_solver_matches_weighted_normal_equations() {
     .unwrap();
     let weights = RowMajorMatrix::from_row_major(1, 4, vec![1.0, 0.0, 1.0, 1.0]).unwrap();
 
-    let normal = fit_fixed_dispersion_irls_with_weights(
-        &counts,
+    let normal = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05])
+            .weights(&weights),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05],
-        Some(&weights),
         no_ridge_options(),
     )
     .unwrap();
-    let qr = fit_fixed_dispersion_irls_with_weights(
-        &counts,
+    let qr = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0, 1.0]), &[0.05])
+            .weights(&weights),
         &design,
-        &[1.0, 1.0, 1.0, 1.0],
-        &[0.05],
-        Some(&weights),
         no_ridge_qr_options(),
     )
     .unwrap();
@@ -622,20 +607,27 @@ fn irls_validates_inputs() {
     let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
 
     assert!(
-        fit_fixed_dispersion_irls(&counts, &design, &[1.0], &[0.1], no_ridge_options()).is_err()
+        fit_fixed_dispersion_glm(
+            GlmInput::new(&counts, Offsets::PerSample(&[1.0]), &[0.1]),
+            &design,
+            no_ridge_options()
+        )
+        .is_err()
     );
     assert!(
-        fit_fixed_dispersion_irls(&counts, &design, &[1.0, 1.0, 1.0], &[], no_ridge_options())
-            .is_err()
+        fit_fixed_dispersion_glm(
+            GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0]), &[]),
+            &design,
+            no_ridge_options()
+        )
+        .is_err()
     );
 
     let bad_design = DesignMatrix::from_row_major(2, 1, vec![1.0, 1.0], None).unwrap();
     assert!(
-        fit_fixed_dispersion_irls(
-            &counts,
+        fit_fixed_dispersion_glm(
+            GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0]), &[0.1]),
             &bad_design,
-            &[1.0, 1.0, 1.0],
-            &[0.1],
             no_ridge_options()
         )
         .is_err()
@@ -643,33 +635,27 @@ fn irls_validates_inputs() {
 
     let bad_weights = RowMajorMatrix::from_row_major(1, 3, vec![1.0, -1.0, 1.0]).unwrap();
     assert!(
-        fit_fixed_dispersion_irls_with_weights(
-            &counts,
+        fit_fixed_dispersion_glm(
+            GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0]), &[0.1])
+                .weights(&bad_weights),
             &design,
-            &[1.0, 1.0, 1.0],
-            &[0.1],
-            Some(&bad_weights),
             no_ridge_options()
         )
         .is_err()
     );
 
     assert!(
-        fit_fixed_dispersion_irls(
-            &counts,
+        fit_fixed_dispersion_glm(
+            GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0]), &[0.1]),
             &design,
-            &[1.0, 1.0, 1.0],
-            &[0.1],
             no_ridge_options().ridge_lambda_by_coefficient(vec![0.0, 0.0])
         )
         .is_err()
     );
     assert!(
-        fit_fixed_dispersion_irls(
-            &counts,
+        fit_fixed_dispersion_glm(
+            GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0]), &[0.1]),
             &design,
-            &[1.0, 1.0, 1.0],
-            &[0.1],
             no_ridge_options().ridge_lambda_by_coefficient(vec![-1.0])
         )
         .is_err()
@@ -680,11 +666,9 @@ fn irls_validates_inputs() {
 fn irls_rejects_all_zero_rows() {
     let counts = CountMatrix::from_row_major_u32(1, 3, vec![0, 0, 0]).unwrap();
     let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
-    let err = fit_fixed_dispersion_irls(
-        &counts,
+    let err = fit_fixed_dispersion_glm(
+        GlmInput::new(&counts, Offsets::PerSample(&[1.0, 1.0, 1.0]), &[0.1]),
         &design,
-        &[1.0, 1.0, 1.0],
-        &[0.1],
         no_ridge_options(),
     )
     .unwrap_err();
@@ -719,11 +703,9 @@ fn ordered_batches_report_the_lowest_failed_gene_at_one_and_four_workers() {
                 .unwrap();
             let error = pool
                 .install(|| {
-                    rsdeseq2::glm::fit_fixed_dispersion_irls(
-                        &counts,
+                    rsdeseq2::glm::fit_fixed_dispersion_glm(
+                        GlmInput::new(&counts, Offsets::PerSample(&[1.0; 8]), &vec![0.1; 4097]),
                         &design,
-                        &[1.0; 8],
-                        &vec![0.1; 4097],
                         IrlsOptions::default(),
                     )
                 })

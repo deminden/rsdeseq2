@@ -256,15 +256,13 @@ fn expanded_beta_prior_refit_runs_expanded_fit_and_collapses_standard_surface() 
     };
     let groups = [vec![0], vec![1, 2]];
 
-    let wrapped = fit_expanded_glms_with_estimated_beta_prior_variance(
-        &counts,
+    let wrapped = fit_expanded_glms_with_estimated_beta_prior(
+        GlmInput::new(&counts, Offsets::PerSample(&size_factors), &dispersions),
         ExpandedModelBetaPriorDesignInput {
             expanded_design: &expanded_design,
             standard_design: &standard_design,
             coefficient_groups: &groups,
         },
-        &size_factors,
-        &dispersions,
         &base_mean,
         &disp_fit,
         options.clone(),
@@ -287,11 +285,9 @@ fn expanded_beta_prior_refit_runs_expanded_fit_and_collapses_standard_surface() 
         options.variance_options,
     )
     .unwrap();
-    let expanded_prior = fit_glms_with_beta_prior_variance(
-        &counts,
+    let expanded_prior = fit_glms_with_beta_prior(
+        GlmInput::new(&counts, Offsets::PerSample(&size_factors), &dispersions),
         &expanded_design,
-        &size_factors,
-        &dispersions,
         &beta_prior_variance,
         options.fit_options,
     )

@@ -98,24 +98,6 @@ pub struct BetaPriorRefitOptions {
     pub variance_options: BetaPriorVarianceOptions,
 }
 
-/// Size-factor offsets and optional observation weights for beta-prior refits.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct BetaPriorSizeFactorWeightInput<'a> {
-    /// Per-sample size factors.
-    pub size_factors: &'a [f64],
-    /// Optional normalized observation weights.
-    pub weights: Option<&'a RowMajorMatrix<f64>>,
-}
-
-/// Normalization-factor offsets and optional observation weights for beta-prior refits.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct BetaPriorNormalizationFactorWeightInput<'a> {
-    /// Gene x sample normalization-factor matrix.
-    pub normalization_factors: &'a RowMajorMatrix<f64>,
-    /// Optional normalized observation weights.
-    pub weights: Option<&'a RowMajorMatrix<f64>>,
-}
-
 /// Estimate fixed-dispersion beta coefficients with DESeq2-style GLM dispatch.
 ///
 /// This is a public beta-estimation convenience entry point for callers that

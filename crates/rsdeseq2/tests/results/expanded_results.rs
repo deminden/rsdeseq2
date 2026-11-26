@@ -360,11 +360,9 @@ fn fit_expanded_beta_prior_wald_results_runs_fit_and_result_workflow() {
     };
 
     let coefficient_workflow = fit_expanded_beta_prior_wald_results(input.clone(), 1).unwrap();
-    let direct_fit = fit_expanded_glms_with_estimated_beta_prior_variance(
-        &counts,
+    let direct_fit = fit_expanded_glms_with_estimated_beta_prior(
+        GlmInput::new(&counts, Offsets::PerSample(&size_factors), &dispersions),
         design,
-        &size_factors,
-        &dispersions,
         &base_mean,
         &disp_fit,
         input.options.clone(),

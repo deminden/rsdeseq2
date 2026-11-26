@@ -1,22 +1,16 @@
 use approx::assert_relative_eq;
 use rsdeseq2::prelude::{
     CountMatrix, DeseqError, DispersionTrendFit, IrlsOptions, LocalDispersionTrend,
-    LocalDispersionTrendFit, MeanDispersionTrend, MeanDispersionTrendFit,
+    LocalDispersionTrendFit, MeanDispersionTrend, MeanDispersionTrendFit, Offsets,
     ParametricDispersionTrend, ParametricDispersionTrendFit, RLOG_INTERCEPT_PRIOR_VARIANCE,
     RLOG_PRIOR_UPPER_QUANTILE, RlogOffsetMode, RowMajorMatrix, estimate_rlog_sample_prior_variance,
     estimate_rlog_sample_prior_variance_with_quantile, fast_vst_eligible_count, fast_vst_subset,
     fast_vst_subset_indices, fast_vst_subset_matrix_rows, fast_vst_subset_normalized_counts,
-    local_vst_inverse_size_factor_mean,
-    local_vst_inverse_size_factor_mean_from_normalization_factors, norm_transform,
-    norm_transform_value, rlog_beta_prior_variance, rlog_fit_with_normalization_factors,
-    rlog_fit_with_size_factors, rlog_frozen_with_normalization_factors,
-    rlog_frozen_with_size_factors, rlog_sample_design, rlog_sample_effect_design,
-    rlog_sample_effect_prior_variance, rlog_with_estimated_prior_and_normalization_factors,
-    rlog_with_estimated_prior_and_size_factors, rlog_with_normalization_factors,
-    rlog_with_size_factors, vst, vst_local, vst_mean, vst_mean_value, vst_parametric,
-    vst_parametric_value, vst_with_dispersion_trend,
-    vst_with_dispersion_trend_and_normalization_factors,
-    vst_with_dispersion_trend_and_size_factors,
+    local_vst_inverse_factor_mean, norm_transform, norm_transform_value, rlog_beta_prior_variance,
+    rlog_fit, rlog_frozen, rlog_sample_design, rlog_sample_effect_design,
+    rlog_sample_effect_prior_variance, rlog_transform, rlog_with_estimated_prior, vst, vst_local,
+    vst_mean, vst_mean_value, vst_parametric, vst_parametric_value, vst_with_dispersion_trend,
+    vst_with_dispersion_trend_and_offsets,
 };
 
 #[test]
@@ -183,9 +177,9 @@ fn rlog_with_size_factors_returns_finite_sample_effect_transform() {
     let size_factors = [1.0, 2.0, 4.0];
     let dispersions = [0.1, 0.2];
 
-    let transformed = rlog_with_size_factors(
+    let transformed = rlog_transform(
         &counts,
-        &size_factors,
+        Offsets::PerSample(&size_factors),
         &dispersions,
         4.0,
         IrlsOptions::default(),
@@ -215,17 +209,17 @@ fn rlog_normalization_factor_path_matches_equivalent_size_factors() {
     let normalization_factors =
         RowMajorMatrix::from_row_major(2, 3, vec![1.0, 2.0, 4.0, 1.0, 2.0, 4.0]).unwrap();
 
-    let size_factor_path = rlog_with_size_factors(
+    let size_factor_path = rlog_transform(
         &counts,
-        &size_factors,
+        Offsets::PerSample(&size_factors),
         &dispersions,
         4.0,
         IrlsOptions::default(),
     )
     .unwrap();
-    let normalization_factor_path = rlog_with_normalization_factors(
+    let normalization_factor_path = rlog_transform(
         &counts,
-        &normalization_factors,
+        Offsets::PerCell(&normalization_factors),
         &dispersions,
         4.0,
         IrlsOptions::default(),
@@ -247,18 +241,18 @@ fn frozen_rlog_size_factor_path_matches_equivalent_normalization_factors() {
     let dispersions = [0.1, 0.2];
     let frozen_intercept = [3.25, 2.5];
 
-    let size_factor_path = rlog_frozen_with_size_factors(
+    let size_factor_path = rlog_frozen(
         &counts,
-        &size_factors,
+        Offsets::PerSample(&size_factors),
         &dispersions,
         4.0,
         &frozen_intercept,
         IrlsOptions::default(),
     )
     .unwrap();
-    let normalization_factor_path = rlog_frozen_with_normalization_factors(
+    let normalization_factor_path = rlog_frozen(
         &counts,
-        &normalization_factors,
+        Offsets::PerCell(&normalization_factors),
         &dispersions,
         4.0,
         &frozen_intercept,
@@ -289,46 +283,46 @@ fn frozen_rlog_validates_offsets_and_intercepts() {
         RowMajorMatrix::from_row_major(2, 3, vec![1.0, 2.0, 4.0, 1.0, 2.0, 4.0]).unwrap();
 
     assert!(
-        rlog_frozen_with_size_factors(
+        rlog_frozen(
             &counts,
-            &size_factors,
+            Offsets::PerSample(&size_factors),
             &dispersions,
             4.0,
             &[3.0],
-            IrlsOptions::default(),
+            IrlsOptions::default()
         )
         .is_err()
     );
     assert!(
-        rlog_frozen_with_size_factors(
+        rlog_frozen(
             &counts,
-            &[1.0, f64::NAN, 4.0],
+            Offsets::PerSample(&[1.0, f64::NAN, 4.0]),
             &dispersions,
             4.0,
             &[3.0, 2.0],
-            IrlsOptions::default(),
+            IrlsOptions::default()
         )
         .is_err()
     );
     assert!(
-        rlog_frozen_with_normalization_factors(
+        rlog_frozen(
             &counts,
-            &normalization_factors,
+            Offsets::PerCell(&normalization_factors),
             &dispersions,
             0.0,
             &[3.0, 2.0],
-            IrlsOptions::default(),
+            IrlsOptions::default()
         )
         .is_err()
     );
     assert!(
-        rlog_frozen_with_normalization_factors(
+        rlog_frozen(
             &counts,
-            &normalization_factors,
+            Offsets::PerCell(&normalization_factors),
             &dispersions,
             4.0,
             &[f64::NAN, 2.0],
-            IrlsOptions::default(),
+            IrlsOptions::default()
         )
         .is_err()
     );
@@ -342,9 +336,9 @@ fn rlog_estimated_prior_size_factor_path_matches_manual_two_step_path() {
     let disp_fit = [0.1, 0.2];
     let dispersions = [0.12, 0.25];
 
-    let output = rlog_with_estimated_prior_and_size_factors(
+    let output = rlog_with_estimated_prior(
         &counts,
-        &size_factors,
+        Offsets::PerSample(&size_factors),
         &base_mean,
         &disp_fit,
         &dispersions,
@@ -361,17 +355,17 @@ fn rlog_estimated_prior_size_factor_path_matches_manual_two_step_path() {
     let normalized = rsdeseq2::prelude::normalized_counts(&counts, &size_factors).unwrap();
     let expected_prior =
         estimate_rlog_sample_prior_variance(&normalized, &base_mean, &disp_fit).unwrap();
-    let expected = rlog_with_size_factors(
+    let expected = rlog_transform(
         &counts,
-        &size_factors,
+        Offsets::PerSample(&size_factors),
         &dispersions,
         expected_prior,
         IrlsOptions::default(),
     )
     .unwrap();
-    let fit_output = rlog_fit_with_size_factors(
+    let fit_output = rlog_fit(
         &counts,
-        &size_factors,
+        Offsets::PerSample(&size_factors),
         &dispersions,
         expected_prior,
         IrlsOptions::default(),
@@ -400,9 +394,9 @@ fn rlog_estimated_prior_normalization_factor_path_matches_manual_two_step_path()
     let disp_fit = [0.1, 0.2];
     let dispersions = [0.12, 0.25];
 
-    let output = rlog_with_estimated_prior_and_normalization_factors(
+    let output = rlog_with_estimated_prior(
         &counts,
-        &normalization_factors,
+        Offsets::PerCell(&normalization_factors),
         &base_mean,
         &disp_fit,
         &dispersions,
@@ -414,17 +408,17 @@ fn rlog_estimated_prior_normalization_factor_path_matches_manual_two_step_path()
         rsdeseq2::prelude::normalized_counts_with_factors(&counts, &normalization_factors).unwrap();
     let expected_prior =
         estimate_rlog_sample_prior_variance(&normalized, &base_mean, &disp_fit).unwrap();
-    let expected = rlog_with_normalization_factors(
+    let expected = rlog_transform(
         &counts,
-        &normalization_factors,
+        Offsets::PerCell(&normalization_factors),
         &dispersions,
         expected_prior,
         IrlsOptions::default(),
     )
     .unwrap();
-    let fit_output = rlog_fit_with_normalization_factors(
+    let fit_output = rlog_fit(
         &counts,
-        &normalization_factors,
+        Offsets::PerCell(&normalization_factors),
         &dispersions,
         expected_prior,
         IrlsOptions::default(),
@@ -760,7 +754,7 @@ fn vst_local_applies_numerical_integration_and_log2_scaling() {
 
 #[test]
 fn local_vst_size_factor_summary_matches_mean_inverse_size_factor() {
-    let observed = local_vst_inverse_size_factor_mean(&[1.0, 2.0, 4.0]).unwrap();
+    let observed = local_vst_inverse_factor_mean(Offsets::PerSample(&[1.0, 2.0, 4.0])).unwrap();
 
     assert_relative_eq!(observed, (1.0 + 0.5 + 0.25) / 3.0, epsilon = 1e-12);
 }
@@ -770,9 +764,7 @@ fn local_vst_normalization_factor_summary_uses_column_geometric_means() {
     let normalization_factors =
         RowMajorMatrix::from_row_major(2, 3, vec![1.0, 2.0, 4.0, 4.0, 8.0, 16.0]).unwrap();
 
-    let observed =
-        local_vst_inverse_size_factor_mean_from_normalization_factors(&normalization_factors)
-            .unwrap();
+    let observed = local_vst_inverse_factor_mean(Offsets::PerCell(&normalization_factors)).unwrap();
 
     let sf0 = (1.0_f64 * 4.0).sqrt();
     let sf1 = (2.0_f64 * 8.0).sqrt();
@@ -786,21 +778,21 @@ fn local_vst_normalization_factor_summary_uses_column_geometric_means() {
 
 #[test]
 fn local_vst_size_factor_summaries_reject_invalid_values() {
-    assert!(local_vst_inverse_size_factor_mean(&[]).is_err());
-    assert!(local_vst_inverse_size_factor_mean(&[1.0, 0.0]).is_err());
+    assert!(local_vst_inverse_factor_mean(Offsets::PerSample(&[])).is_err());
+    assert!(local_vst_inverse_factor_mean(Offsets::PerSample(&[1.0, 0.0])).is_err());
 
     let bad_factors = RowMajorMatrix::from_row_major(1, 2, vec![1.0, f64::NAN]).unwrap();
-    assert!(local_vst_inverse_size_factor_mean_from_normalization_factors(&bad_factors).is_err());
+    assert!(local_vst_inverse_factor_mean(Offsets::PerCell(&bad_factors)).is_err());
 }
 
 #[test]
 fn local_vst_size_factor_summaries_keep_large_finite_means() {
-    let observed = local_vst_inverse_size_factor_mean(&[
+    let observed = local_vst_inverse_factor_mean(Offsets::PerSample(&[
         f64::MIN_POSITIVE,
         f64::MIN_POSITIVE,
         f64::MIN_POSITIVE,
         f64::MIN_POSITIVE,
-    ])
+    ]))
     .unwrap();
     assert_relative_eq!(observed, f64::MIN_POSITIVE.recip(), max_relative = 1e-12);
 
@@ -816,7 +808,7 @@ fn local_vst_size_factor_summaries_keep_large_finite_means() {
         ],
     )
     .unwrap();
-    let observed = local_vst_inverse_size_factor_mean_from_normalization_factors(&factors).unwrap();
+    let observed = local_vst_inverse_factor_mean(Offsets::PerCell(&factors)).unwrap();
     assert_relative_eq!(observed, f64::MIN_POSITIVE.recip(), max_relative = 1e-12);
 }
 
@@ -895,10 +887,16 @@ fn vst_with_dispersion_trend_and_size_factors_computes_local_variance_term() {
         used_min_disp_floor: true,
     });
     let size_factors = [1.0, 2.0, 4.0];
-    let inverse_size_factor_mean = local_vst_inverse_size_factor_mean(&size_factors).unwrap();
+    let inverse_size_factor_mean =
+        local_vst_inverse_factor_mean(Offsets::PerSample(&size_factors)).unwrap();
 
     assert_eq!(
-        vst_with_dispersion_trend_and_size_factors(&normalized, &local, &size_factors).unwrap(),
+        vst_with_dispersion_trend_and_offsets(
+            &normalized,
+            &local,
+            Offsets::PerSample(&size_factors)
+        )
+        .unwrap(),
         vst_local(&normalized, &local_trend, inverse_size_factor_mean).unwrap()
     );
 }
@@ -930,14 +928,13 @@ fn vst_with_dispersion_trend_and_normalization_factors_computes_local_variance_t
         used_min_disp_floor: true,
     });
     let inverse_size_factor_mean =
-        local_vst_inverse_size_factor_mean_from_normalization_factors(&normalization_factors)
-            .unwrap();
+        local_vst_inverse_factor_mean(Offsets::PerCell(&normalization_factors)).unwrap();
 
     assert_eq!(
-        vst_with_dispersion_trend_and_normalization_factors(
+        vst_with_dispersion_trend_and_offsets(
             &normalized,
             &local,
-            &normalization_factors,
+            Offsets::PerCell(&normalization_factors)
         )
         .unwrap(),
         vst_local(&normalized, &local_trend, inverse_size_factor_mean).unwrap()
@@ -957,12 +954,18 @@ fn vst_with_dispersion_trend_factor_helpers_reject_bad_factor_inputs() {
         genes_used_for_mean: normalized.n_rows(),
     });
 
-    assert!(vst_with_dispersion_trend_and_size_factors(&normalized, &mean, &[1.0, 2.0]).is_err());
-    assert!(vst_with_dispersion_trend_and_size_factors(&normalized, &mean, &[1.0, 0.0]).is_err());
+    assert!(
+        vst_with_dispersion_trend_and_offsets(&normalized, &mean, Offsets::PerSample(&[1.0, 2.0]))
+            .is_err()
+    );
+    assert!(
+        vst_with_dispersion_trend_and_offsets(&normalized, &mean, Offsets::PerSample(&[1.0, 0.0]))
+            .is_err()
+    );
 
     let wrong_shape = RowMajorMatrix::from_row_major(1, 3, vec![1.0, 2.0, 4.0]).unwrap();
     assert!(
-        vst_with_dispersion_trend_and_normalization_factors(&normalized, &mean, &wrong_shape)
+        vst_with_dispersion_trend_and_offsets(&normalized, &mean, Offsets::PerCell(&wrong_shape))
             .is_err()
     );
 }
