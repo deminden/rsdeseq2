@@ -1,18 +1,22 @@
 //! The tailorings, as rules read off R's order for each locale
-//! (`scripts/provenance/probe_collation_tailorings.R`; the derivation is
-//! described in `docs/provenance/specs/collation.md`).
+//! (`scripts/provenance/probe_collation_tailorings.R`, checked against every
+//! code point and the expansions with `probe_collation_supported.R`; the
+//! derivation is described in `docs/provenance/specs/collation.md`).
 //!
 //! `&[before 1] ǀ` is the end of the Latin letters: the first letter after
-//! them in the root order is Greek alpha.
+//! them in the root order is Greek alpha. Danish sorts uppercase first,
+//! Canadian French compares accents from the end of the string, and Greek
+//! puts combining marks in canonical order and its script before Latin.
 
 use super::Definition;
 
 /// First Cyrillic letter, first letter after the Cyrillic group (Glagolitic),
-/// first Greek letter (the first letter after the Latin group) and the first
-/// Latin letter.
+/// first Greek letter (the first letter after the Latin group), first letter
+/// after the Greek group (Coptic alfa) and the first Latin letter.
 const CYRILLIC: u32 = 0x0430;
 const AFTER_CYRILLIC: u32 = 0x2C30;
 const GREEK: u32 = 0x03B1;
+const AFTER_GREEK: u32 = 0x2C81;
 const LATIN: u32 = 0x0061;
 
 const fn plain(name: &'static str, rules: &'static str) -> Definition {
@@ -21,6 +25,9 @@ const fn plain(name: &'static str, rules: &'static str) -> Definition {
         rules,
         reorder: &[],
         suppress: &[],
+        upper_first: false,
+        backwards: false,
+        normalize: false,
     }
 }
 
@@ -37,6 +44,9 @@ const fn with(
         rules,
         reorder,
         suppress: &[],
+        upper_first: false,
+        backwards: false,
+        normalize: false,
     }
 }
 
@@ -45,21 +55,21 @@ const TURKISH: &str = "&C < ç <<< Ç &G < ğ <<< Ğ &[before 1] i < ı <<< I &i
 const CROATIAN: &str = "&C < č <<< Č < ć <<< Ć &D < dž <<< ǆ <<< Dž <<< ǅ <<< DŽ <<< Ǆ < đ <<< Đ \
                         &L < lj <<< ǉ <<< Lj <<< ǈ <<< LJ <<< Ǉ &N < nj <<< ǌ <<< Nj <<< ǋ <<< NJ <<< Ǌ \
                         &S < š <<< Š &Z < ž <<< Ž";
-const NORWEGIAN: &str = "&[before 2] a\\u0301 << ª &D << đ <<< Đ << ð <<< Ð &t <<< þ/h &T <<< Þ/h &y << ü <<< Ü << ű <<< Ű \
+const NORWEGIAN: &str = "&D << đ <<< Đ << ð <<< Ð &t <<< þ/h &T <<< Þ/h &y << ü <<< Ü << ű <<< Ű \
                          &[before 1] ǀ < æ <<< Æ << ä <<< Ä << ę <<< Ę < ø <<< Ø << ö <<< Ö << ő <<< Ő \
                          << œ <<< Œ < å <<< Å << aa <<< Aa <<< AA";
 
 /// All tailorings, by ICU name.
-pub(crate) static DEFINITIONS: [Definition; 25] = [
+pub(crate) static DEFINITIONS: [Definition; 29] = [
     plain(
         "sv",
-        "&D << đ <<< Đ &t <<< þ/h &T <<< Þ/h &y << ü <<< Ü << ű <<< Ű \
+        "&D << đ <<< Đ << ð <<< Ð &t <<< þ/h &T <<< Þ/h &y << ü <<< Ü << ű <<< Ű \
          &[before 1] ǀ < å <<< Å < ä <<< Ä << æ <<< Æ << ę <<< Ę < ö <<< Ö << ø <<< Ø << ő <<< Ő \
          << œ <<< Œ << ô <<< Ô",
     ),
     plain(
         "fi",
-        "&n\\u0304 << ŋ <<< Ŋ &t\\u0304 << ŧ <<< Ŧ &ḡ << ǥ <<< Ǥ &Y << ü <<< Ü &z\\u0304 << ʒ <<< Ʒ \
+        "&n\\u0335 << ŋ <<< Ŋ &t\\u0335 << ŧ <<< Ŧ &g\\u0335 << ǥ <<< Ǥ &Y << ü <<< Ü &z\\u0335 << ʒ <<< Ʒ \
          &[before 1] ǀ < å <<< Å < ä <<< Ä << æ <<< Æ < ö <<< Ö << ø <<< Ø",
     ),
     plain("no", NORWEGIAN),
@@ -113,7 +123,7 @@ pub(crate) static DEFINITIONS: [Definition; 25] = [
     ),
     plain(
         "et",
-        "&[before 1] t < š <<< Š < z <<< Z < ž <<< Ž &W < õ <<< Õ < ä <<< Ä < ö <<< Ö < ü <<< Ü",
+        "&[before 1] t < š <<< Š < z <<< Z < ž <<< Ž &[before 1] x < õ <<< Õ < ä <<< Ä < ö <<< Ö < ü <<< Ü",
     ),
     plain("tr", TURKISH),
     with(
@@ -123,7 +133,7 @@ pub(crate) static DEFINITIONS: [Definition; 25] = [
         CYRILLIC_AFTER_LATIN,
     ),
     with("ru", "", CYRILLIC_FIRST),
-    with("uk", "&г < ґ <<< Ґ &і < ї <<< Ї", CYRILLIC_FIRST),
+    with("uk", "&г < ґ <<< Ґ &ꙇ < ї <<< ꙶ <<< Ї", CYRILLIC_FIRST),
     with("be", "&е < ё <<< Ё &у < ў <<< Ў", CYRILLIC_FIRST),
     with("bg", "", CYRILLIC_FIRST),
     Definition {
@@ -131,15 +141,56 @@ pub(crate) static DEFINITIONS: [Definition; 25] = [
         rules: "",
         reorder: CYRILLIC_FIRST,
         suppress: &[0x0419, 0x0439],
+        upper_first: false,
+        backwards: false,
+        normalize: false,
     },
     Definition {
         name: "mk",
         rules: "&ԃ < ѓ <<< Ѓ &[before 1] у < ќ <<< Ќ",
         reorder: CYRILLIC_FIRST,
         suppress: &[0x0419, 0x0439],
+        upper_first: false,
+        backwards: false,
+        normalize: false,
     },
     plain(
         "de@collation=phonebook",
         "&AE << ä <<< Ä &OE << ö <<< Ö &UE << ü <<< Ü",
     ),
+    Definition {
+        name: "da",
+        rules: "&D << đ <<< Đ << ð <<< Ð &oe << œ <<< Œ &t <<< þ/h &T <<< Þ/h &y << ü <<< Ü << ű <<< Ű \
+                &[before 1] ǀ < æ <<< Æ << ä <<< Ä < ø <<< Ø << ö <<< Ö << ő <<< Ő \
+                < å <<< Å <<< aa <<< Aa <<< AA",
+        reorder: &[],
+        suppress: &[],
+        upper_first: true,
+        backwards: false,
+        normalize: false,
+    },
+    plain(
+        "is",
+        "&[before 1] b < á <<< Á &d << đ <<< Đ < ð <<< Ð &[before 1] f < é <<< É &[before 1] j < í <<< Í \
+         &[before 1] p < ó <<< Ó &[before 1] v < ú <<< Ú &[before 1] z < ý <<< Ý \
+         &[before 1] ǀ < æ <<< Æ << ä <<< Ä < ö <<< Ö << ø <<< Ø < å <<< Å",
+    ),
+    Definition {
+        name: "el",
+        rules: "",
+        reorder: &[(GREEK, AFTER_GREEK, LATIN)],
+        suppress: &[],
+        upper_first: false,
+        backwards: false,
+        normalize: true,
+    },
+    Definition {
+        name: "fr_CA",
+        rules: "",
+        reorder: &[],
+        suppress: &[],
+        upper_first: false,
+        backwards: true,
+        normalize: false,
+    },
 ];

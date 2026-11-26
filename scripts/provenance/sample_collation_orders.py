@@ -2,10 +2,11 @@
 """Write the small committed samples of R's collation orders and the oracle
 summary.
 
-Inputs (default /tmp/rcollate): root_single.tsv, root_strings.tsv and
-tailoring_<locale>.tsv, written by the probe scripts in this directory. The
-full oracles are not committed (about 30 MB); their SHA-256, sizes and the
-verification counts go to
+Inputs (default /tmp/rcollate): root_single.tsv, root_strings.tsv,
+tailoring_<locale>.tsv, <locale>_single.tsv and expansion_<locale>.tsv,
+written by the probe scripts in this directory. The oracles are not
+committed (about 450 MB); their SHA-256, sizes and the verification counts go
+to
 docs/provenance/observations/collation_r462_macos/oracle_summary.tsv, and a
 fixed-seed sample of each tailoring order goes to
 crates/rcompat-collate/tests/data/sorted_tailorings.tsv for the crate's tests.
@@ -28,6 +29,7 @@ SAMPLE = ROOT / "crates/rcompat-collate/tests/data/sorted_tailorings.tsv"
 LOCALES = [
     "sv", "fi", "nb", "nn", "es", "gl", "pl", "cs", "sk", "hu", "hr", "bs", "sl", "ro", "lt", "lv",
     "et", "tr", "az", "ru", "uk", "be", "bg", "sr", "mk", "de_collation_phonebook",
+    "da", "is", "el", "fr_CA",
 ]
 
 
@@ -55,7 +57,9 @@ def main() -> int:
     parser.add_argument("--input", type=Path, default=Path("/tmp/rcollate"))
     parser.add_argument("--per-locale", type=int, default=150)
     args = parser.parse_args()
-    files = ["root_single.tsv", "root_strings.tsv"] + [f"tailoring_{l}.tsv" for l in ["root"] + LOCALES]
+    files = ["root_single.tsv", "root_strings.tsv", "expansion_root.tsv", "tailoring_root.tsv"]
+    for loc in LOCALES:
+        files += [f"tailoring_{loc}.tsv", f"{loc}_single.tsv", f"expansion_{loc}.tsv"]
     summary = ["# oracle file\tstrings\tadjacent pairs\tties\tSHA-256 (regenerate with the probe scripts)"]
     for name in files:
         path = args.input / name

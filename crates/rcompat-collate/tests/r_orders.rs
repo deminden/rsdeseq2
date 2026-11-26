@@ -105,5 +105,82 @@ fn tailorings_follow_r() {
         }
         sections += 1;
     }
-    assert_eq!(sections, 26);
+    assert_eq!(sections, 30);
+}
+
+/// Orders R 4.6.2 (ICU 78.3) gives for the options and rules of the Danish,
+/// Icelandic, Greek and Canadian French tailorings
+/// (`scripts/provenance/probe_collation_full.R` and interactive runs of
+/// `probe_collation_oracle.R`): strings in R's order, `=` marking a tie
+/// with the next one.
+#[test]
+fn tailoring_options_follow_r() {
+    let cases: [(&str, &[&str]); 9] = [
+        // Uppercase first, including the "aa" contraction (mixed case "Aa").
+        (
+            "da",
+            &["A", "\u{1d2c}", "a", "\u{1d43}", "=", "\u{aa}", "\u{2090}"],
+        ),
+        ("da", &["\u{c5}", "AA", "Aa", "\u{e5}", "aa"]),
+        ("da", &["TH", "Th", "\u{de}", "th", "\u{fe}"]),
+        ("da", &["PA", "Pa", "\u{1f18c}", "\u{33a9}", "pa"]),
+        // Normal-size kana and halfwidth forms are uppercase, small kana lowercase.
+        (
+            "da",
+            &[
+                "\u{3042}", "\u{30a2}", "\u{ff71}", "\u{3041}", "\u{30a1}", "\u{ff67}",
+            ],
+        ),
+        // Letters of their own: a-acute after a with any accent, eth after d.
+        (
+            "is",
+            &[
+                "\u{101}", "\u{100}", "\u{e1}", "\u{c1}", "b", "d\u{361}", "\u{111}", "d\u{36f}",
+                "\u{f0}",
+            ],
+        ),
+        // Greek before Latin; combining marks in canonical order.
+        (
+            "el",
+            &[
+                "1",
+                "\u{3b1}",
+                "\u{3c9}",
+                "a",
+                "a\u{301}\u{325}",
+                "=",
+                "a\u{325}\u{301}",
+            ],
+        ),
+        // Accents compared from the end of the string.
+        (
+            "fr_CA",
+            &["cote", "c\u{f4}te", "cot\u{e9}", "c\u{f4}t\u{e9}"],
+        ),
+        (
+            "fr_CA",
+            &[
+                "\u{142}", "\u{141}", "\u{1e3b}", "\u{1e3a}", "\u{140}", "\u{13f}",
+            ],
+        ),
+    ];
+    for (locale, items) in cases {
+        let collator = Collator::new(locale).unwrap();
+        let mut rows: Vec<(&str, Ordering)> = Vec::new();
+        for item in items {
+            match (*item, rows.last_mut()) {
+                ("=", Some(last)) => last.1 = Ordering::Equal,
+                _ => rows.push((item, Ordering::Less)),
+            }
+        }
+        for pair in rows.windows(2) {
+            let ((a, expected), (b, _)) = (pair[0], pair[1]);
+            assert_eq!(collator.compare(a, b), expected, "{locale}: {a:?} vs {b:?}");
+            assert_eq!(
+                collator.sort_key(a).cmp(&collator.sort_key(b)),
+                expected,
+                "{locale}: {a:?} vs {b:?}"
+            );
+        }
+    }
 }

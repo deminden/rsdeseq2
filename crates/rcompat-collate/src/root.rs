@@ -43,12 +43,20 @@ pub(crate) const UPPER: u16 = tables::UPPER * MINOR_STEP;
 /// in code point order, then U+FFFD and U+FFFF.
 const TAIL: u32 = (tables::ATOM_COUNT + 1) * PRIMARY_STEP;
 
+/// Case of an element, used only by collations that sort uppercase first:
+/// lowercase or uncased, mixed (a tailored contraction such as Danish `Aa`)
+/// or uppercase.
+pub(crate) const LOWER: u8 = 0;
+pub(crate) const MIXED: u8 = 1;
+pub(crate) const UPPERCASE: u8 = 2;
+
 /// One collation element. A weight of zero means "no weight at this level".
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Element {
     pub(crate) primary: u32,
     pub(crate) secondary: u16,
     pub(crate) tertiary: u16,
+    pub(crate) case: u8,
 }
 
 impl Element {
@@ -57,8 +65,102 @@ impl Element {
             primary,
             secondary,
             tertiary,
+            case: LOWER,
         }
     }
+
+    pub(crate) const fn with_case(self, case: u8) -> Self {
+        Self { case, ..self }
+    }
+}
+
+/// Case of a character for the elements it maps to directly: uppercase when
+/// it is an uppercase letter or has a lowercase form.
+pub(crate) fn char_case(c: u32) -> u8 {
+    let upper = char::from_u32(c).is_some_and(char::is_uppercase) || lowercase(c).is_some();
+    if upper { UPPERCASE } else { LOWER }
+}
+
+/// Symbols of capital letters that R's uppercase-first order shows to be
+/// uppercase (the peseta sign "Pts", U+214D "A/S" and the squared words of
+/// capitals U+1F18A..1F19A and U+1F1A6..1F1AD, which have no decomposition)
+/// or lowercase (the superscript signs SM, TM, MC, MD and MR, whose
+/// decompositions are capitals).
+const UPPERCASE_SYMBOLS: [(u32, u32); 4] = [
+    (0x20A7, 0x20A7),
+    (0x214D, 0x214D),
+    (0x1F18A, 0x1F19A),
+    (0x1F1A6, 0x1F1AD),
+];
+const LOWERCASE_SYMBOLS: [(u32, u32); 3] = [(0x2120, 0x2120), (0x2122, 0x2122), (0x1F16A, 0x1F16C)];
+
+/// Small kana: lowercase under uppercase-first collations, where the other
+/// kana and the halfwidth forms are uppercase.
+const SMALL_KANA: [(u32, u32); 28] = [
+    (0x3041, 0x3041),
+    (0x3043, 0x3043),
+    (0x3045, 0x3045),
+    (0x3047, 0x3047),
+    (0x3049, 0x3049),
+    (0x3063, 0x3063),
+    (0x3083, 0x3083),
+    (0x3085, 0x3085),
+    (0x3087, 0x3087),
+    (0x308E, 0x308E),
+    (0x3095, 0x3096),
+    (0x30A1, 0x30A1),
+    (0x30A3, 0x30A3),
+    (0x30A5, 0x30A5),
+    (0x30A7, 0x30A7),
+    (0x30A9, 0x30A9),
+    (0x30C3, 0x30C3),
+    (0x30E3, 0x30E3),
+    (0x30E5, 0x30E5),
+    (0x30E7, 0x30E7),
+    (0x30EE, 0x30EE),
+    (0x30F5, 0x30F6),
+    (0x31F0, 0x31FF),
+    (0xFF67, 0xFF6F),
+    (0x1B132, 0x1B132),
+    (0x1B150, 0x1B152),
+    (0x1B155, 0x1B155),
+    (0x1B164, 0x1B167),
+];
+
+/// Kana and halfwidth forms whose case R's uppercase-first order shows to be
+/// uppercase without a lowercase form.
+const CASED_FORMS: [(u32, u32); 7] = [
+    (0x3041, 0x3096),
+    (0x30A1, 0x30FA),
+    (0x31F0, 0x31FF),
+    (0xFF61, 0xFF9F),
+    (0xFFA0, 0xFFDC),
+    (0xFFE8, 0xFFEE),
+    (0x1B000, 0x1B16F),
+];
+
+/// Case of every element of a kana, a halfwidth form or a symbol listed
+/// above, which the rules of [`char_case`] and of the decompositions do not
+/// give.
+fn form_case(c: u32) -> Option<u8> {
+    // Every listed code point is at or after the peseta sign.
+    if c < 0x20A7 {
+        return None;
+    }
+    if in_ranges(&UPPERCASE_SYMBOLS, c) {
+        return Some(UPPERCASE);
+    }
+    if in_ranges(&LOWERCASE_SYMBOLS, c) {
+        return Some(LOWER);
+    }
+    if !in_ranges(&CASED_FORMS, c) {
+        return None;
+    }
+    Some(if in_ranges(&SMALL_KANA, c) {
+        LOWER
+    } else {
+        UPPERCASE
+    })
 }
 
 /// Lookup structures built once from the tables.
@@ -67,6 +169,8 @@ pub(crate) struct Root {
     atoms: Vec<(u32, u32, u32)>,
     /// (code point, secondary, tertiary), by code point.
     marks: Vec<(u32, u16, u16)>,
+    /// The secondary weight above every mark.
+    top: u16,
     /// Contractions: (sequence, character), by sequence.
     contractions: Vec<(Vec<u32>, u32)>,
     longest_contraction: usize,
@@ -153,6 +257,7 @@ impl Root {
             marks.push((entry >> 8, secondary, tertiary));
         }
         marks.sort_unstable_by_key(|m| m.0);
+        let top = secondary + MINOR_STEP;
         let mut contractions: Vec<(Vec<u32>, u32)> = tables::CONTRACTING
             .iter()
             .filter_map(|&c| {
@@ -170,6 +275,7 @@ impl Root {
         let mut root = Self {
             atoms,
             marks,
+            top,
             contractions,
             longest_contraction,
             ascii: [None; 128],
@@ -194,7 +300,8 @@ impl Root {
     }
 
     /// Element of an encoded table entry: `reference << 11 | secondary << 6 |
-    /// tertiary`.
+    /// tertiary`; reference 0 stands for the secondary weight above every
+    /// mark.
     fn decode(&self, value: u32) -> Element {
         let reference = value >> 11;
         // Both fields are masked to fit.
@@ -202,6 +309,7 @@ impl Root {
         let tertiary = (value & 0x3F) as u16 * MINOR_STEP;
         match self.atom_primary(reference) {
             Some(primary) => Element::new(primary, (1 + secondary) * MINOR_STEP, tertiary),
+            None if reference == 0 => Element::new(0, self.top, tertiary),
             None => {
                 let (s, _) = self.mark(reference).unwrap_or((COMMON, PLAIN));
                 Element::new(0, s, tertiary)
@@ -214,14 +322,23 @@ impl Root {
         if i > 0 && i < tables::EXPLICIT.len() && tables::EXPLICIT[i - 1].0 == c {
             let start = usize::from(tables::EXPLICIT[i - 1].1);
             let end = usize::from(tables::EXPLICIT[i].1);
-            out.extend(tables::ELEMENTS[start..end].iter().map(|&v| self.decode(v)));
+            let case = char_case(c);
+            out.extend(tables::ELEMENTS[start..end].iter().map(|&v| {
+                let e = self.decode(v);
+                if e.primary != 0 { e.with_case(case) } else { e }
+            }));
             return true;
         }
         let i = tables::VARIANTS.partition_point(|v| v.0 >> 11 <= c);
         if let Some(&(run, element)) = i.checked_sub(1).and_then(|i| tables::VARIANTS.get(i)) {
             let offset = c - (run >> 11);
             if offset <= run & 0x7FF {
-                out.push(self.decode(element + (offset << 11)));
+                let e = self.decode(element + (offset << 11));
+                out.push(if e.primary != 0 {
+                    e.with_case(char_case(c))
+                } else {
+                    e
+                });
                 return true;
             }
         }
@@ -230,6 +347,16 @@ impl Root {
 
     /// Push the elements of one code point of a decomposed string.
     pub(crate) fn push_char(&self, c: u32, out: &mut Vec<Element>) {
+        let start = out.len();
+        self.push_char_elements(c, out);
+        if let Some(case) = form_case(c) {
+            for e in &mut out[start..] {
+                e.case = case;
+            }
+        }
+    }
+
+    fn push_char_elements(&self, c: u32, out: &mut Vec<Element>) {
         if c < 128
             && let Some(e) = self.ascii.get(c as usize).copied().flatten()
         {
@@ -240,7 +367,7 @@ impl Root {
             out.push(tail(c));
         } else if self.stored(c, out) {
         } else if let Some(primary) = self.atom_primary(c) {
-            out.push(Element::new(primary, COMMON, PLAIN));
+            out.push(Element::new(primary, COMMON, PLAIN).with_case(char_case(c)));
         } else if let Some((s, t)) = self.mark(c) {
             out.push(Element::new(0, s, t));
         } else if in_ranges(&tables::IGNORABLE, c) {
@@ -263,8 +390,11 @@ impl Root {
             let start = out.len();
             self.push_char(lower, out);
             for e in &mut out[start..] {
-                if e.primary != 0 && e.tertiary == PLAIN {
-                    e.tertiary = UPPER;
+                if e.primary != 0 {
+                    e.case = UPPERCASE;
+                    if e.tertiary == PLAIN {
+                        e.tertiary = UPPER;
+                    }
                 }
             }
         } else {
@@ -380,4 +510,10 @@ pub(crate) fn decompose(text: &str) -> Vec<u32> {
         decompose_canonical(ch, |x| out.push(u32::from(x)));
     }
     out
+}
+
+/// The canonical decomposition of `text` with combining marks in canonical
+/// order (NFD), for collations that normalize.
+pub(crate) fn decompose_ordered(text: &str) -> Vec<u32> {
+    text.nfd().map(u32::from).collect()
 }

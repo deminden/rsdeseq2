@@ -21,20 +21,25 @@ const ROOT_LANGUAGES: [&str; 12] = [
 
 /// Locale names with a tailoring of their own that [`crate::Collator::new`]
 /// accepts (a region may be added, as in `"sv_SE"`; `nb` and `nn` are the
-/// tailoring ICU calls `no`).
-pub const SUPPORTED_LOCALES: [&str; 27] = [
+/// tailoring ICU calls `no`; `fr_CA` is Canadian French, while `fr` with any
+/// other region uses the root collation).
+pub const SUPPORTED_LOCALES: [&str; 31] = [
     "az",
     "be",
     "bg",
     "bs",
     "cs",
+    "da",
     "de@collation=phonebook",
+    "el",
     "es",
     "et",
     "fi",
+    "fr_CA",
     "gl",
     "hr",
     "hu",
+    "is",
     "lt",
     "lv",
     "mk",
@@ -75,7 +80,7 @@ pub(crate) fn classify(name: &str) -> Option<Collation> {
             Tailoring::find("de@collation=phonebook").map(Collation::Tailored)
         }
         (_, _, Some(_)) => None,
-        ("fr", Some("ca"), None) => None,
+        ("fr", Some("ca"), None) => Tailoring::find("fr_CA").map(Collation::Tailored),
         ("nb" | "nn" | "no", _, None) => Tailoring::find("no").map(Collation::Tailored),
         (language, _, None) if ROOT_LANGUAGES.contains(&language) => Some(Collation::Root),
         (language, _, None) => Tailoring::find(language).map(Collation::Tailored),

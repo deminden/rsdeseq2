@@ -9,8 +9,9 @@
 //! - `"root"`, `"und"`, `""` and the locales that ICU maps to the root
 //!   collation compare with three levels: base letters and symbols first,
 //!   then accents, then case and letter variants.
-//! - Swedish, Spanish, Polish, Russian, Turkish and the other locales listed
-//!   in [`SUPPORTED_LOCALES`] apply their rules on top of the root collation.
+//! - Swedish, Danish, Spanish, Polish, Russian, Greek, Canadian French and
+//!   the other locales listed in [`SUPPORTED_LOCALES`] apply their rules and
+//!   options on top of the root collation.
 //!
 //! The root collation is a set of rules (canonical and compatibility
 //! decomposition, case, code point ranges) plus about 100 kB of data for
@@ -114,8 +115,9 @@ impl Collator {
     ///
     /// - `"C"` and `"POSIX"`: byte order;
     /// - `"root"`, `"und"` and `""`: the root collation;
-    /// - languages for which ICU uses the root collation: `en`, `de`, `fr`,
-    ///   `it`, `nl`, `pt`, `ca`, `eu`, `ga`, `id`, `ms` and `sw`;
+    /// - languages for which ICU uses the root collation: `en`, `de`, `fr`
+    ///   (except `fr_CA`), `it`, `nl`, `pt`, `ca`, `eu`, `ga`, `id`, `ms` and
+    ///   `sw`;
     /// - languages with rules of their own, listed in [`SUPPORTED_LOCALES`].
     ///
     /// Any other name returns [`Error::UnsupportedLocale`] rather than a
@@ -178,7 +180,7 @@ impl Collator {
         }
         let a = elements(tailoring, left);
         let b = elements(tailoring, right);
-        compare_elements(&a, &b, strength)
+        compare_elements(&a, &b, strength, Options::of(tailoring))
     }
 
     /// Key whose order equals [`Collator::compare`], for sorting many strings.
@@ -188,14 +190,19 @@ impl Collator {
             Kind::Rules(t) => t,
         };
         let e = elements(tailoring, text);
+        let options = Options::of(tailoring);
         let mut key = Vec::with_capacity(3 * e.len() + 2);
         key.extend(e.iter().map(|e| e.primary).filter(|w| *w != 0));
         // Weights are positive, so the separator ends the shorter sequence
         // first.
         key.push(0);
-        key.extend(secondaries(&e).map(u32::from));
+        if options.backwards {
+            key.extend(secondaries(&e).rev().map(u32::from));
+        } else {
+            key.extend(secondaries(&e).map(u32::from));
+        }
         key.push(0);
-        key.extend(tertiaries(&e).map(u32::from));
+        key.extend(tertiaries(&e, options.upper_first));
         SortKey(key)
     }
 }
@@ -208,7 +215,11 @@ impl Default for Collator {
 }
 
 fn elements(tailoring: Option<Tailoring>, text: &str) -> Vec<Element> {
-    let seq = root::decompose(text);
+    let seq = if tailoring.is_some_and(Tailoring::normalize) {
+        root::decompose_ordered(text)
+    } else {
+        root::decompose(text)
+    };
     let mut out = Vec::with_capacity(seq.len());
     match tailoring {
         None => root().push_decomposed(&seq, &mut out),
@@ -217,28 +228,64 @@ fn elements(tailoring: Option<Tailoring>, text: &str) -> Vec<Element> {
     out
 }
 
+/// Collator options of a tailoring.
+#[derive(Clone, Copy, Default)]
+struct Options {
+    /// Secondary weights compared from the end of the string.
+    backwards: bool,
+    /// Uppercase before mixed before lowercase at the tertiary level.
+    upper_first: bool,
+}
+
+impl Options {
+    fn of(tailoring: Option<Tailoring>) -> Self {
+        tailoring.map_or_else(Self::default, |t| Self {
+            backwards: t.backwards(),
+            upper_first: t.upper_first(),
+        })
+    }
+}
+
 fn primaries(e: &[Element]) -> impl Iterator<Item = u32> + '_ {
     e.iter().map(|e| e.primary).filter(|w| *w != 0)
 }
 
-fn secondaries(e: &[Element]) -> impl Iterator<Item = u16> + '_ {
+fn secondaries(e: &[Element]) -> impl DoubleEndedIterator<Item = u16> + '_ {
     e.iter().map(|e| e.secondary).filter(|w| *w != 0)
 }
 
-fn tertiaries(e: &[Element]) -> impl Iterator<Item = u16> + '_ {
-    e.iter().map(|e| e.tertiary).filter(|w| *w != 0)
+/// Tertiary weights; with `upper_first` the case of each element comes
+/// before its weight, uppercase first.
+fn tertiaries(e: &[Element], upper_first: bool) -> impl Iterator<Item = u32> + '_ {
+    e.iter().filter(|e| e.tertiary != 0).map(move |e| {
+        let t = u32::from(e.tertiary);
+        if upper_first {
+            (u32::from(root::UPPERCASE - e.case.min(root::UPPERCASE)) << 16) | t
+        } else {
+            t
+        }
+    })
 }
 
-fn compare_elements(a: &[Element], b: &[Element], strength: Strength) -> Ordering {
+fn compare_elements(
+    a: &[Element],
+    b: &[Element],
+    strength: Strength,
+    options: Options,
+) -> Ordering {
     let order = primaries(a).cmp(primaries(b));
     if order != Ordering::Equal || strength == Strength::Primary {
         return order;
     }
-    let order = secondaries(a).cmp(secondaries(b));
+    let order = if options.backwards {
+        secondaries(a).rev().cmp(secondaries(b).rev())
+    } else {
+        secondaries(a).cmp(secondaries(b))
+    };
     if order != Ordering::Equal || strength == Strength::Secondary {
         return order;
     }
-    tertiaries(a).cmp(tertiaries(b))
+    tertiaries(a, options.upper_first).cmp(tertiaries(b, options.upper_first))
 }
 
 /// Comparison of two ASCII strings without allocating. Every ASCII character

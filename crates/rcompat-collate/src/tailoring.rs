@@ -6,17 +6,23 @@
 //! `&[before 1]x < y` puts `y` right before `x`. A rule item of several
 //! characters is a contraction (Czech `ch`), and `x/y` sorts `x` as if `y`
 //! followed it. `&[before 2]x << y` puts `y` right before the accent of
-//! `x`. A tailoring can also move a script to another place (`reorder`) and
-//! switch off root contractions (`suppress`). Each tailoring's rules were
-//! read off R's order for that locale; see
-//! `docs/provenance/specs/collation.md`.
+//! `x`. A tailoring can also move a script to another place (`reorder`),
+//! switch off root contractions (`suppress`), sort uppercase before lowercase
+//! (`upper_first`, Danish), compare accents from the end of the string
+//! (`backwards`, Canadian French) and put combining marks in canonical order
+//! first (`normalize`, Greek). A tailored item takes the case of its
+//! characters: uppercase, lowercase or, for a contraction like Danish `Aa`,
+//! mixed. Each tailoring's rules and options were read off R's order for
+//! that locale; see `docs/provenance/specs/collation.md`.
 
 mod rules;
 
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
-use crate::root::{COMMON, Element, PLAIN, PRIMARY_STEP, decompose, root};
+use crate::root::{
+    COMMON, Element, LOWER, MIXED, PLAIN, PRIMARY_STEP, UPPERCASE, char_case, decompose, root,
+};
 
 pub(crate) use rules::DEFINITIONS;
 
@@ -31,6 +37,12 @@ pub(crate) struct Definition {
     pub(crate) reorder: &'static [(u32, u32, u32)],
     /// Root contractions not used (by the character they stand for).
     pub(crate) suppress: &'static [u32],
+    /// Uppercase sorts before lowercase at the tertiary level.
+    pub(crate) upper_first: bool,
+    /// Secondary weights are compared from the end of the string.
+    pub(crate) backwards: bool,
+    /// Combining marks are put in canonical order before collation.
+    pub(crate) normalize: bool,
 }
 
 /// A tailored collation: an index into [`DEFINITIONS`].
@@ -65,6 +77,18 @@ impl Tailoring {
 
     pub(crate) fn name(self) -> &'static str {
         self.definition().name
+    }
+
+    pub(crate) fn upper_first(self) -> bool {
+        self.definition().upper_first
+    }
+
+    pub(crate) fn backwards(self) -> bool {
+        self.definition().backwards
+    }
+
+    pub(crate) fn normalize(self) -> bool {
+        self.definition().normalize
     }
 
     /// Whether the tailoring changes how some ASCII string sorts against
@@ -258,6 +282,7 @@ fn compile(def: &Definition) -> Compiled {
         let mut before = before;
         for (relation, item, extension) in items {
             let mut new = current.clone();
+            let case = item_case(&item);
             let last = new.iter().rposition(|e| e.primary != 0 || e.secondary != 0);
             match (relation, last) {
                 (Relation::Equal, _) | (_, None) => {}
@@ -273,7 +298,7 @@ fn compile(def: &Definition) -> Compiled {
                         PROVISIONAL,
                     );
                     new.truncate(k + 1);
-                    new[k] = Element::new(PROVISIONAL + id as u32, COMMON, PLAIN);
+                    new[k] = Element::new(PROVISIONAL + id as u32, COMMON, PLAIN).with_case(case);
                 }
                 (Relation::Secondary, Some(k)) => {
                     let e = new[k];
@@ -287,7 +312,7 @@ fn compile(def: &Definition) -> Compiled {
                     } else {
                         e.secondary + *n
                     };
-                    new[k] = Element::new(e.primary, s, PLAIN);
+                    new[k] = Element::new(e.primary, s, PLAIN).with_case(case);
                 }
                 (Relation::Tertiary, Some(k)) => {
                     let e = new[k];
@@ -296,7 +321,7 @@ fn compile(def: &Definition) -> Compiled {
                         .or_insert(0);
                     *n += 1;
                     new.truncate(k + 1);
-                    new[k] = Element::new(e.primary, e.secondary, e.tertiary + *n);
+                    new[k] = Element::new(e.primary, e.secondary, e.tertiary + *n).with_case(case);
                 }
             }
             // The next item is placed relative to this one without its
@@ -330,7 +355,8 @@ fn compile(def: &Definition) -> Compiled {
     }
     // Only a mapping of an ASCII-only sequence can change how two ASCII
     // strings compare; moving a script does not.
-    let touches_ascii = mappings.keys().any(|k| k.iter().all(|&c| c < 128));
+    let touches_ascii =
+        def.upper_first || def.backwards || mappings.keys().any(|k| k.iter().all(|&c| c < 128));
     let root = root();
     let mut moves = Vec::new();
     for &(first, end, target) in def.reorder {
@@ -352,6 +378,21 @@ fn compile(def: &Definition) -> Compiled {
         longest,
         touches_ascii,
         moves,
+    }
+}
+
+/// Case of a rule item: uppercase or lowercase when all its cased characters
+/// are, mixed otherwise.
+fn item_case(item: &[u32]) -> u8 {
+    let upper = item.iter().filter(|&&c| char_case(c) == UPPERCASE).count();
+    let lower = item
+        .iter()
+        .filter(|&&c| char::from_u32(c).is_some_and(char::is_lowercase))
+        .count();
+    match (upper, lower) {
+        (0, _) => LOWER,
+        (_, 0) => UPPERCASE,
+        _ => MIXED,
     }
 }
 

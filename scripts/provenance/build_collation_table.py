@@ -243,6 +243,8 @@ class Model:
 
     def finish(self):
         self.marks = {c: (s, self.mark_tertiary[c]) for c, (s, _) in self.mark_weights().items()}
+        # The secondary weight above every mark.
+        self.top = max(s for s, _ in self.marks.values()) + 1
         # Primary-ignorable compatibility characters that decompose to
         # several marks sort as those marks.
         for c in self.mark_set:
@@ -282,7 +284,7 @@ class Model:
                     else:
                         out.append((p, s, t))
                 return out
-            return e
+            return [(p, self.top if s == "top" else s, t) for p, s, t in e]
         if c in self.st.atom_index:
             return [(self.primary(c), self.COMMON, self.tl)]
         if c in self.marks:
@@ -567,13 +569,49 @@ def secondaries(obs: Observations, st: Structure, m: Model):
                     if x in m.stored:
                         m.templates[x] = (("like", atoms[:1] + [hit[0]] + atoms[1:]), atoms)
     answers = oracle([([c], atoms) for c, atoms in questions])
+    retry = []
     for (c, atoms), rel in zip(questions, answers):
         if rel in ("<<<", ">>>", "="):
             m.templates[c] = (("common", None), atoms)
         elif rel in ("<<", ">>"):
             m.templates[c] = (("own", 1), atoms)
+            retry.append((c, atoms))
         else:
             raise RuntimeError(f"{c:04X} is not primary-equal to its atoms")
+    # An expansion that is not secondary-equal to its atoms may be to its
+    # compatibility decomposition (a squared katakana word with voiced sound
+    # marks inside) or to its atoms with one mark after one of them: ask R.
+    m.inner_mark = {}
+    spelled = [(c, m.nfd(obs.nfkd[c])) for c, _ in retry if c in obs.nfkd]
+    spelled = [(c, seq) for c, seq in spelled if any(x in m.mark_set for x in seq)]
+    for (c, seq), rel in zip(spelled, oracle([([c], seq) for c, seq in spelled])):
+        if rel in ("=", "<<<", ">>>"):
+            m.templates[c] = (("like", seq), m.templates[c][1])
+            m.inner_mark[c] = seq
+    retry = [(c, atoms) for c, atoms in retry if c not in m.inner_mark]
+    pairs = [([c], atoms[:j] + [mk] + atoms[j:]) for c, atoms in retry for j in range(1, len(atoms) + 1) for mk in marks]
+    answers = oracle(pairs)
+    pos = 0
+    for c, atoms in retry:
+        n = len(atoms) * len(marks)
+        rels = answers[pos : pos + n]
+        pos += n
+        for want in (("=",), ("<<<", ">>>")):
+            hit = [i for i, rel in enumerate(rels) if rel in want]
+            if hit:
+                j, mk = divmod(hit[0], len(marks))
+                m.templates[c] = (("like", atoms[: j + 1] + [marks[mk]] + atoms[j + 1 :]), atoms)
+                m.inner_mark[c] = atoms[: j + 1] + [marks[mk]] + atoms[j + 1 :]
+                break
+    # A weight of its own sorts after its letter with any mark. R's order
+    # under the backwards secondary level of fr_CA tells a single weight
+    # below the marks (as for U+00F0) from the letter followed by a weight
+    # above every mark (U+0140, l with a middle dot): only the second sorts
+    # after the letter with the last mark there.
+    owns = [(c, atoms) for c, (kind, atoms) in sorted(m.templates.items()) if kind[0] == "own" and len(atoms) == 1]
+    for (c, atoms), rel in zip(owns, oracle([([c], atoms + [marks[-1]]) for c, atoms in owns], "fr_CA")):
+        if rel.startswith(">"):
+            m.templates[c] = (("top", None), atoms)
     m.max_own = max([k[1] for k, _ in m.templates.values() if k[0] == "own"], default=0)
 
 
@@ -630,7 +668,12 @@ def fit_expansions(obs: Observations, st: Structure, m: Model, label):
         lab = label(c)[0]
         if not (lab.startswith("K") or lab.startswith("V")):
             continue
-        spelled = m.nfd(obs.nfkd[c]) if c in obs.nfkd and c not in m.stored else list(st.atom_seq[st.group_of[c]])
+        if c in m.inner_mark:
+            spelled = list(m.inner_mark[c])
+        elif c in obs.nfkd and c not in m.stored:
+            spelled = m.nfd(obs.nfkd[c])
+        else:
+            spelled = list(st.atom_seq[st.group_of[c]])
         bases = [i for i, x in enumerate(spelled) if x not in m.mark_set and x not in m.ignorable]
         if len(bases) < 2:
             continue
@@ -768,6 +811,8 @@ def assemble(obs: Observations, st: Structure, m: Model):
         t = m.val(m.label(c)[0])
         if kind[0] == "like":
             m.explicit[c] = ("like", kind[1], t)
+        elif kind[0] == "top":
+            m.explicit[c] = [(m.primary(atoms[0]), m.COMMON, t), (0, "top", m.tl)]
         else:
             s0 = m.COMMON + (kind[1] if kind[0] == "own" else 0)
             m.explicit[c] = [(m.primary(a), s0 if i == 0 else m.COMMON, t) for i, a in enumerate(atoms)]
@@ -794,7 +839,19 @@ def assemble(obs: Observations, st: Structure, m: Model):
                     break
             known[c].setdefault(slot, m.tu if slot == "U" else m.tl)
     m.compat = {c: (v["L"], v["U"]) for c, v in known.items()}
+    # The root order cannot tell which element of a stored expansion carries
+    # its tertiary difference; R's uppercase-first (Danish) order can.
+    for c, like in SAME_FIRST_TERTIARY.items():
+        p, s, _ = m.explicit[c][0]
+        m.explicit[c][0] = (p, s, m.compat[like][1])
     m.finish()
+
+
+# Stored expansions whose first letter has the tertiary weight of the
+# uppercase first letter of a compatibility character: under Danish R sorts
+# U+1F18C (squared "PA") before U+33A9 (squared "Pa") and the root order puts
+# it after, so the first letters tie and the second letters decide.
+SAME_FIRST_TERTIARY = {0x1F18C: 0x33A9}
 
 
 def longest_increasing(seq):
@@ -940,6 +997,8 @@ def emit(obs: Observations, st: Structure, m: Model) -> tuple[str, dict]:
         p, s, t = e
         if p:
             ref, sec = atom_of_primary[p], s - m.COMMON
+        elif s == m.top:
+            ref, sec = 0, 0
         else:
             ref, sec = mark_of_secondary[s], 0
         if not (0 <= sec < 32 and 0 < t < 64):
@@ -974,7 +1033,7 @@ def emit(obs: Observations, st: Structure, m: Model) -> tuple[str, dict]:
     parts.append(rust_array("EXPLICIT", "(u32, u16)", offsets,
         "Other stored characters: (code point, index of the first element in `ELEMENTS`); a\nfinal entry closes the list.", 6))
     parts.append(rust_array("ELEMENTS", "u32", elements,
-        "Collation elements of stored characters: `reference << 11 | secondary << 6 | tertiary`.\nThe reference is an atom (primary weight; secondary 0 is the common weight, others are\nweights of its own) or a mark (secondary weight of the mark)."))
+        "Collation elements of stored characters: `reference << 11 | secondary << 6 | tertiary`.\nThe reference is an atom (primary weight; secondary 0 is the common weight, others are\nweights of its own), a mark (secondary weight of the mark) or 0 (the secondary weight\nabove every mark)."))
     sizes["STORED"] = 8 * len(variant_runs) + 8 * len(offsets) + 4 * len(elements)
     # Compatibility tertiary weights as runs over code points.
     comp = []

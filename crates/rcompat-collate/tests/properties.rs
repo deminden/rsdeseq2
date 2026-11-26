@@ -87,14 +87,19 @@ fn locale_names() {
         Collator::new("de_DE@collation=phonebook").unwrap().name(),
         "de@collation=phonebook"
     );
+    assert_eq!(Collator::new("da_DK").unwrap().name(), "da");
+    assert_eq!(Collator::new("is").unwrap().name(), "is");
+    assert_eq!(Collator::new("el-GR").unwrap().name(), "el");
+    assert_eq!(Collator::new("fr-CA").unwrap().name(), "fr_CA");
+    assert!(Collator::new("fr_FR").unwrap() == Collator::root());
     for name in rcompat_collate::SUPPORTED_LOCALES {
         assert!(Collator::new(name).is_ok(), "{name}");
     }
     for name in [
-        "da",
-        "is",
-        "el",
-        "fr_CA",
+        "cy",
+        "eo",
+        "vi",
+        "es@collation=traditional",
         "en_US_POSIX",
         "sr_Latn",
         "zh",
