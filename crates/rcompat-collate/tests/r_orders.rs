@@ -71,26 +71,39 @@ fn near_duplicates_and_combining_marks_follow_r() {
     check("variants", include_str!("data/sorted_variants.tsv"));
 }
 
-/// Other scripts follow R except where a CJK ideograph decides the order:
-/// ideographs are outside the probed ranges and take the code point
-/// fallback, while R orders them differently.
 #[test]
-fn other_scripts_follow_r_apart_from_ideographs() {
-    let root = Collator::root();
-    let rows = parse(include_str!("data/sorted_other_scripts.tsv"));
-    let ideograph = |s: &str| s.chars().any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c));
-    let mut differ = 0;
-    for pair in rows.windows(2) {
-        let ((a, relation), (b, _)) = (&pair[0], &pair[1]);
-        let expected = if relation == "=" {
-            Ordering::Equal
-        } else {
-            Ordering::Less
-        };
-        if root.compare(a, b) != expected {
-            differ += 1;
-            assert!(ideograph(a) && ideograph(b), "{a:?} vs {b:?}");
+fn other_scripts_and_ideographs_follow_r() {
+    check(
+        "other scripts",
+        include_str!("data/sorted_other_scripts.tsv"),
+    );
+}
+
+/// Samples of R's order under each supported tailoring
+/// (`scripts/provenance/sample_collation_orders.py`).
+#[test]
+fn tailorings_follow_r() {
+    let text = include_str!("data/sorted_tailorings.tsv");
+    let mut sections = 0;
+    for section in text.split("\n@ ").skip(1) {
+        let (locale, body) = section.split_once('\n').unwrap();
+        let collator = Collator::new(locale).unwrap();
+        let rows = parse(body);
+        for pair in rows.windows(2) {
+            let ((a, relation), (b, _)) = (&pair[0], &pair[1]);
+            let expected = if relation == "=" {
+                Ordering::Equal
+            } else {
+                Ordering::Less
+            };
+            assert_eq!(collator.compare(a, b), expected, "{locale}: {a:?} vs {b:?}");
+            assert_eq!(
+                collator.sort_key(a).cmp(&collator.sort_key(b)),
+                expected,
+                "{locale}"
+            );
         }
+        sections += 1;
     }
-    assert!(differ < rows.len() / 100, "{differ} pairs differ");
+    assert_eq!(sections, 26);
 }

@@ -15,5 +15,8 @@ exclude = [".DS_Store", "**/.DS_Store"]
 [lints]
 workspace = true
 
+[dependencies]
+unicode-normalization.workspace = true
+
 [dev-dependencies]
 proptest.workspace = true

@@ -3,8 +3,9 @@
 Compare and sort strings in the order R uses. R sorts character vectors and
 factor levels by byte order in the `C` locale and, on builds with ICU, by
 the Unicode root collation in English and most western European locales.
-This crate reproduces both in pure Rust, with no data files or native
-libraries.
+Locales with rules of their own, such as Swedish or Polish, tailor that
+order. This crate reproduces these in pure Rust, with no data files or
+native libraries.
 
 ## Install
 
@@ -40,19 +41,26 @@ fn main() -> Result<(), rcompat_collate::Error> {
 ## What it provides
 
 - `Collator::new` for the names R reports: `"C"`/`"POSIX"` (byte order),
-  `"root"`, and locales that use the root collation (`en`, `de`, `fr`, `it`,
-  `nl`, `pt` and others, with any region). Locales with their own rules, such
-  as Swedish or Spanish, return an error instead of a wrong order.
-- `compare`, with R's ties: strings that differ only in ignorable characters
-  or in how an accent is encoded compare equal.
+  `"root"`, the locales that use the root collation (`en`, `de`, `fr`, `it`,
+  `nl`, `pt` and others, with any region), and 25 tailorings listed in
+  `SUPPORTED_LOCALES`: `sv`, `fi`, `nb`/`nn`/`no`, `es`, `gl`, `pl`, `cs`,
+  `sk`, `hu`, `hr`, `bs`, `sl`, `ro`, `lt`, `lv`, `et`, `tr`, `az`, `ru`,
+  `uk`, `be`, `bg`, `sr`, `mk` and `de@collation=phonebook`. Other locales
+  with rules of their own (Danish, Icelandic, Greek, `fr_CA`, ...) return an
+  error instead of a wrong order.
+- `compare` and `compare_with_strength`, with R's ties: strings that differ
+  only in ignorable characters or in how an accent is encoded compare equal.
 - `sort_key`, for sorting many strings with precomputed keys.
 
-The weights were derived from black-box runs of R 4.6.2 with ICU 78.3 and
-checked against R's order of about 32,000 strings. They cover Latin, Greek,
-Cyrillic, Hebrew, Arabic, Devanagari, Hangul, kana, punctuation, symbols and
-emoji; other code points sort after these in code point order. The method
-and its limits are documented in the repository under
-`docs/provenance/specs/collation.md`.
+The root collation is a set of rules (canonical and compatibility
+decomposition, case, code point ranges, prevowels) plus about 100 kB of
+data for what the rules cannot produce, two thirds of it the
+radical-and-stroke order of the ideographs. Everything was derived from
+black-box runs of R 4.6.2 with ICU 78.3 and checked against R: the order of
+every one of the 1,112,063 code points, 200,778 random strings, and 115,727
+strings per tailoring, with no difference. Comparing two short ASCII
+strings takes about 15 ns. The method and its limits are documented in the
+repository under `docs/provenance/specs/collation.md`.
 
 [API documentation](https://docs.rs/rcompat-collate) ·
 [MIT license](LICENSE)

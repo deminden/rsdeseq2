@@ -4,11 +4,14 @@
 //! `root` after `icuSetCollate(locale = ...)` in R 4.6.2 with ICU 78.3
 //! (`docs/provenance/observations/collation_r462_macos/locales.tsv`).
 
+use crate::tailoring::Tailoring;
+
 /// What a collation name selects.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Collation {
     Bytes,
     Root,
+    Tailored(Tailoring),
 }
 
 /// Languages whose collation ICU reported as the root collation.
@@ -16,8 +19,38 @@ const ROOT_LANGUAGES: [&str; 12] = [
     "ca", "de", "en", "eu", "fr", "ga", "id", "it", "ms", "nl", "pt", "sw",
 ];
 
-/// Language-region pairs of those languages that ICU reported as tailored.
-const TAILORED: [(&str, &str); 1] = [("fr", "ca")];
+/// Locale names with a tailoring of their own that [`crate::Collator::new`]
+/// accepts (a region may be added, as in `"sv_SE"`; `nb` and `nn` are the
+/// tailoring ICU calls `no`).
+pub const SUPPORTED_LOCALES: [&str; 27] = [
+    "az",
+    "be",
+    "bg",
+    "bs",
+    "cs",
+    "de@collation=phonebook",
+    "es",
+    "et",
+    "fi",
+    "gl",
+    "hr",
+    "hu",
+    "lt",
+    "lv",
+    "mk",
+    "nb",
+    "nn",
+    "no",
+    "pl",
+    "ro",
+    "ru",
+    "sk",
+    "sl",
+    "sr",
+    "sv",
+    "tr",
+    "uk",
+];
 
 pub(crate) fn classify(name: &str) -> Option<Collation> {
     if name == "C" || name == "POSIX" {
@@ -27,55 +60,29 @@ pub(crate) fn classify(name: &str) -> Option<Collation> {
     if matches!(lower.as_str(), "" | "root" | "und") {
         return Some(Collation::Root);
     }
-    let mut subtags = lower.split(['-', '_']);
+    let (tag, keyword) = match lower.split_once('@') {
+        Some((tag, keyword)) => (tag, Some(keyword)),
+        None => (lower.as_str(), None),
+    };
+    let mut subtags = tag.split(['-', '_']);
     let language = subtags.next()?;
     let region = subtags.next();
-    if subtags.next().is_some() || !ROOT_LANGUAGES.contains(&language) {
+    if subtags.next().is_some() || region.is_some_and(|r| !is_region(r)) {
         return None;
     }
-    match region {
-        None => Some(Collation::Root),
-        Some(region) if is_region(region) && !TAILORED.contains(&(language, region)) => {
-            Some(Collation::Root)
+    match (language, region, keyword) {
+        ("de", _, Some("collation=phonebook")) => {
+            Tailoring::find("de@collation=phonebook").map(Collation::Tailored)
         }
-        Some(_) => None,
+        (_, _, Some(_)) => None,
+        ("fr", Some("ca"), None) => None,
+        ("nb" | "nn" | "no", _, None) => Tailoring::find("no").map(Collation::Tailored),
+        (language, _, None) if ROOT_LANGUAGES.contains(&language) => Some(Collation::Root),
+        (language, _, None) => Tailoring::find(language).map(Collation::Tailored),
     }
 }
 
 fn is_region(subtag: &str) -> bool {
     (subtag.len() == 2 && subtag.bytes().all(|b| b.is_ascii_alphabetic()))
         || (subtag.len() == 3 && subtag.bytes().all(|b| b.is_ascii_digit()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn names_from_the_locale_probe() {
-        for name in [
-            "root", "", "und", "en", "en_US", "en-GB", "EN_us", "de_AT", "fr_BE", "pt_BR",
-        ] {
-            assert_eq!(classify(name), Some(Collation::Root), "{name}");
-        }
-        for name in ["C", "POSIX"] {
-            assert_eq!(classify(name), Some(Collation::Bytes), "{name}");
-        }
-        for name in [
-            "fr_CA",
-            "en_US_POSIX",
-            "sv",
-            "da",
-            "es",
-            "ru",
-            "tr",
-            "zh",
-            "c",
-            "de@collation=phonebook",
-            "en-u-co-phonebk",
-            "english",
-        ] {
-            assert_eq!(classify(name), None, "{name}");
-        }
-    }
 }

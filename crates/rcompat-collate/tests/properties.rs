@@ -78,7 +78,86 @@ fn c_and_root_orders_differ_as_in_r() {
 #[test]
 fn locale_names() {
     assert!(Collator::new("en_US").unwrap() == Collator::root());
+    assert!(Collator::new("ca").unwrap() == Collator::root());
     assert!(Collator::new("POSIX").unwrap().is_bytewise());
-    let error = Collator::new("sv_SE").unwrap_err();
-    assert!(error.to_string().contains("sv_SE"));
+    assert_eq!(Collator::new("sv_SE").unwrap().name(), "sv");
+    assert_eq!(Collator::new("nb-NO").unwrap().name(), "no");
+    assert_eq!(Collator::new("nn").unwrap(), Collator::new("no").unwrap());
+    assert_eq!(
+        Collator::new("de_DE@collation=phonebook").unwrap().name(),
+        "de@collation=phonebook"
+    );
+    for name in rcompat_collate::SUPPORTED_LOCALES {
+        assert!(Collator::new(name).is_ok(), "{name}");
+    }
+    for name in [
+        "da",
+        "is",
+        "el",
+        "fr_CA",
+        "en_US_POSIX",
+        "sr_Latn",
+        "zh",
+        "ja",
+        "c",
+        "english",
+    ] {
+        let error = Collator::new(name).unwrap_err();
+        assert!(error.to_string().contains(name), "{name}");
+    }
+}
+
+fn sorted<'a>(locale: &str, words: &[&'a str]) -> Vec<&'a str> {
+    let collator = Collator::new(locale).unwrap();
+    let mut out = words.to_vec();
+    out.sort_by(|a, b| collator.compare(a, b));
+    out
+}
+
+#[test]
+fn tailorings_as_in_r() {
+    let w = ["\u{f6}rn", "zebra", "\u{e5}sa", "anna", "\u{e4}ng"];
+    assert_eq!(
+        sorted("sv", &w),
+        ["anna", "zebra", "\u{e5}sa", "\u{e4}ng", "\u{f6}rn"]
+    );
+    assert_eq!(
+        sorted("root", &w),
+        ["\u{e4}ng", "anna", "\u{e5}sa", "\u{f6}rn", "zebra"]
+    );
+    assert_eq!(
+        sorted("cs", &["chata", "hrad", "cesta", "ia"]),
+        ["cesta", "hrad", "chata", "ia"]
+    );
+    assert_eq!(
+        sorted("es", &["\u{f1}u", "nz", "o"]),
+        ["nz", "\u{f1}u", "o"]
+    );
+    assert_eq!(
+        sorted("tr", &["ia", "\u{131}z", "h"]),
+        ["h", "\u{131}z", "ia"]
+    );
+    assert_eq!(sorted("ru", &["b", "\u{431}"]), ["\u{431}", "b"]);
+    assert_eq!(sorted("root", &["b", "\u{431}"]), ["b", "\u{431}"]);
+    assert_eq!(
+        sorted("de@collation=phonebook", &["af", "\u{e4}", "ae"]),
+        ["ae", "\u{e4}", "af"]
+    );
+    assert_eq!(sorted("hu", &["csa", "cz", "da"]), ["cz", "csa", "da"]);
+}
+
+#[test]
+fn whole_unicode_range_is_ordered() {
+    // Ideographs in radical-and-stroke order, unassigned code points last.
+    let root = Collator::root();
+    assert_eq!(root.compare("\u{4e00}", "\u{20000}"), Ordering::Less);
+    assert_eq!(root.compare("\u{9fa5}", "\u{20000}"), Ordering::Greater);
+    assert_eq!(root.compare("\u{ff5e}", "\u{4e00}"), Ordering::Less);
+    assert_eq!(root.compare("\u{4e00}", "\u{e000}"), Ordering::Less);
+    assert_eq!(root.compare("\u{10ffff}", "\u{fffd}"), Ordering::Less);
+    // A Hangul syllable ties with its jamo.
+    assert_eq!(
+        root.compare("\u{ac00}", "\u{1100}\u{1161}"),
+        Ordering::Equal
+    );
 }
