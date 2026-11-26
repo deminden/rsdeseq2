@@ -5,11 +5,12 @@
 
 # Exact formula references were recorded with R 4.6.2 on macOS; other hosts
 # have no recorded reference.
+# Tests that compare expected values skip on other hosts; validation scripts
+# that only take inputs from these files, and compare the Rust interfaces with
+# each other, use them everywhere.
 .formula_reference_path <- function(directory, name) {
-  if (Sys.info()[["sysname"]] != "Darwin") {
-    message <- "exact formula references are recorded for macOS R only"
-    if (identical(Sys.getenv("TESTTHAT"), "true")) testthat::skip(message)
-    stop(message, call. = FALSE)
+  if (Sys.info()[["sysname"]] != "Darwin" && identical(Sys.getenv("TESTTHAT"), "true")) {
+    testthat::skip("exact formula references are recorded for macOS R only")
   }
   file.path(directory, name)
 }

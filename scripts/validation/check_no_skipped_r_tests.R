@@ -27,6 +27,19 @@ results <- as.data.frame(
   )
 )
 skipped <- results[results$skipped, c("file", "test"), drop = FALSE]
+# Exact formula references were recorded with R on macOS; on other hosts these
+# three tests skip by design (r-pkg/rsdeseq2/tests/testthat/helper-reference-values.R).
+if (Sys.info()[["sysname"]] != "Darwin") {
+  platform <- paste(skipped$file, skipped$test) %in% c(
+    "test-factor-classes.R factor matrices and frames match independent original R references",
+    "test-formula-frame.R formula transport retains every frozen independent primitive value",
+    "test-model-matrix.R shared model-matrix assembly preserves independently frozen values and order"
+  )
+  if (any(platform)) {
+    cat(sprintf("%d test(s) skipped by design on this host: macOS-only formula references\n", sum(platform)))
+  }
+  skipped <- skipped[!platform, , drop = FALSE]
+}
 failed <- results[results$failed > 0 | results$error, c("file", "test"), drop = FALSE]
 cat(sprintf(
   "\n%d tests, %d expectations, %d skipped, %d failed\n",
