@@ -35,7 +35,8 @@ test_that("built-in formula metadata is unchanged by the call guard", {
   d <- data.frame(x=seq(.5,4,length.out=8), group=factor(rep(c("A","B"),4)))
   for (formula in list(~group*x,~group/x,~(group+x)^2,~0+group+offset(log(x)),
       ~I(x^2)+scale(x),~stats::poly(x,2),~relevel(group,"B"),~.,x~group)) {
-    expect_identical(rsdeseq2:::.rsdeseq2_model_frame(formula,d), stats::model.frame(formula,d))
+    .expect_same_frame(rsdeseq2:::.rsdeseq2_model_frame(formula,d), stats::model.frame(formula,d),
+      formula, info=deparse(formula))
   }
 })
 

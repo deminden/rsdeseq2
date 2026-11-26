@@ -13,3 +13,17 @@
   }
   file.path(directory, name)
 }
+
+# R's poly() reduces with the BLAS R links. rsdeseq2 reproduces the order of the
+# recorded macOS R build exactly; on other hosts poly() results agree with live R
+# to rounding only, so formulas containing poly() are compared numerically there.
+.expect_same_frame <- function(actual, expected, formula, info = NULL) {
+  exact <- Sys.info()[["sysname"]] == "Darwin" ||
+    !grepl("poly(", paste(deparse(formula), collapse = ""), fixed = TRUE)
+  if (exact) {
+    testthat::expect_true(identical(actual, expected, num.eq = FALSE, single.NA = FALSE),
+      info = info)
+  } else {
+    testthat::expect_equal(actual, expected, tolerance = 1e-12, info = info)
+  }
+}

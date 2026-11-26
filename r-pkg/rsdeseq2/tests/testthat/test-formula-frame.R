@@ -43,7 +43,7 @@ test_that("shared expression frames and offsets match live original R values and
         expect_error(rsdeseq2:::.rsdeseq2_model_frame(formula,d),"missing|model variable")
       } else {
         actual <- rsdeseq2:::.rsdeseq2_model_frame(formula,d)
-        expect_true(identical(actual,expected,num.eq=FALSE,single.NA=FALSE),info=paste(action,deparse(formula)))
+        .expect_same_frame(actual,expected,formula,info=paste(action,deparse(formula)))
         expect_true(identical(rsdeseq2:::.rsdeseq2_model_offsets(actual),stats::model.offset(expected),num.eq=FALSE,single.NA=FALSE),info=deparse(formula))
       }
     }
