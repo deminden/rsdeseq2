@@ -7,6 +7,12 @@
 * Special functions, the apeglm-style L-BFGS, the ashr-compatible SQP policy
   and the dense linear algebra were reimplemented; results move in the last
   digits (see the package changelog).
+* Formula factor levels sort with the bundled `rcompat-collate` crate instead
+  of ICU4X. It follows R's ICU collation for every code point under the root
+  collation and for 29 language tailorings; other tailored locales give an
+  error.
+* The low-level Rust functions deprecated in 0.6.0 are removed; the R
+  functions are unchanged.
 
 # rsdeseq2 0.6.2
 

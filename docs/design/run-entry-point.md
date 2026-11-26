@@ -26,7 +26,7 @@ to supply the reduced design as part of the request.
 ## Preferred public API
 
 These are the preferred public paths for complete analyses, fitted-model
-queries and individual DESeq2 stages in 0.6.2.
+queries and individual DESeq2 stages in 0.7.0.
 
 | Area | Public paths |
 | --- | --- |

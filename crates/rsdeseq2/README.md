@@ -78,8 +78,9 @@ Bioconductor object coverage in the [compatibility guide][compatibility].
 ## Cargo Features
 
 `cli` and `shrinkage` are enabled by default. Formula factor levels always
-sort in R's collation (`C` or the Unicode root collation) through
-`rcompat-collate`.
+sort in R's collation through `rcompat-collate`: `C`, the Unicode root
+collation, or one of 29 language tailorings (see the
+[compatibility guide][compatibility]).
 
 | Feature | Adds |
 | --- | --- |
