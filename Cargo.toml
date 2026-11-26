@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/rcompat-collate",
     "crates/rcompat-formula",
     "crates/rcompat-numeric",
     "crates/rcompat-shrinkage",
@@ -36,6 +37,7 @@ lto = false
 missing_docs = "deny"
 
 [workspace.dependencies]
+rcompat-collate = { path = "crates/rcompat-collate", version = "0.1.0" }
 rcompat-formula = { path = "crates/rcompat-formula", version = "0.2.0" }
 rcompat-numeric = { path = "crates/rcompat-numeric", version = "0.2.0" }
 rcompat-shrinkage = { path = "crates/rcompat-shrinkage", version = "0.2.0" }

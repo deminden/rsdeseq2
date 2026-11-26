@@ -911,6 +911,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rcompat-collate"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+]
+
+[[package]]
 name = "rcompat-formula"
 version = "0.2.0"
 dependencies = [
