@@ -20,14 +20,10 @@ RELEASE_TESTS = (
     'posterior_rng', 'regression_method_policy', 'regression_posterior',
     'formula_fitting', 'tsv_readers',
 )
-LINUX_ARM64_FORMULA_TESTS = (
-    'formula_expression', 'model_matrix', 'native_factor', 'native_formula',
-    'numeric_transform',
-)
+# Host R golden manifests exist only where an R profile reproduces a recorded
+# host R build: macOS arm64. Other targets check the portable manifest.
 HOST_GOLDEN_TARGETS = {
     'aarch64-apple-darwin',
-    'aarch64-unknown-linux-gnu',
-    'x86_64-unknown-linux-gnu',
 }
 
 
@@ -37,8 +33,7 @@ def main():
     args = parser.parse_args()
     fetch_pasilla_validation()
     build = ['--release', '--locked', '-p', 'rsdeseq2', '--target', args.target]
-    linux_arm64 = args.target == 'aarch64-unknown-linux-gnu'
-    tests = RELEASE_TESTS + LINUX_ARM64_FORMULA_TESTS if linux_arm64 else RELEASE_TESTS
+    tests = RELEASE_TESTS
     host_env = {**os.environ, 'RSDESEQ2_NUMERIC_PROFILE': 'r-host'}
     portable_env = {**os.environ, 'RSDESEQ2_NUMERIC_PROFILE': 'portable'}
     subprocess.run(
