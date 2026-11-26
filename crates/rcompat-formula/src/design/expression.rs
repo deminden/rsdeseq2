@@ -191,7 +191,9 @@ pub struct Argument {
 pub struct EvaluationOptions {
     /// Collation name as R reports it: "C" (or "POSIX") uses byte order;
     /// "root", "und" and "" select the Unicode root collation, as do the
-    /// locales that use it (see [`rcompat_collate::Collator::new`]). Other
+    /// locales that use it; the tailored locales of
+    /// [`rcompat_collate::SUPPORTED_LOCALES`] (Swedish, Polish, Russian, ...)
+    /// apply their rules (see [`rcompat_collate::Collator::new`]). Other
     /// locales are rejected.
     pub collation: String,
 }

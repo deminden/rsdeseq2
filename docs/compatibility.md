@@ -56,12 +56,15 @@ and design context, including first-tied maximum handling.
 Factor levels and string comparisons in formulas sort as R sorts them: by
 bytes under the `C` collation, and with the Unicode root collation when R
 reports `root`, as it does for English and most western European locales.
-The R package passes the collation R reports. Locales with their own
-collation rules (Swedish, Danish, Spanish, Polish, Russian and others) are
-rejected with an error rather than sorted differently from R. Root
-collation covers Latin, Greek, Cyrillic, Hebrew, Arabic, Devanagari,
-Hangul, kana, punctuation, symbols and emoji as R orders them; CJK
-ideographs sort in code point order, which can differ from R
+The R package passes the collation R reports. The root collation follows R
+for every code point (ideographs in R's radical-and-stroke order, unassigned
+code points last). Locales with rules of their own are supported for
+Swedish, Finnish, Norwegian, Spanish, Galician, Polish, Czech, Slovak,
+Hungarian, Croatian, Bosnian, Slovenian, Romanian, Lithuanian, Latvian,
+Estonian, Turkish, Azerbaijani, Russian, Ukrainian, Belarusian, Bulgarian,
+Serbian, Macedonian and German phonebook order; other tailored locales
+(Danish, Icelandic, Greek, Canadian French and the rest) are rejected with an
+error rather than sorted differently from R
 ([specification](provenance/specs/collation.md)).
 
 ## Numerical expectations

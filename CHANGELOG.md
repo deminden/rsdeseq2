@@ -17,11 +17,17 @@ enabled, all normal dependencies are MIT, Unlicense or Zlib.
   observations, with `scripts/validation/check_provenance.py` and
   `scripts/provenance/dependency_licences.py`.
 - `rcompat-collate` 0.1.0: string comparison in R's order, byte order for
-  the `C` collation and the ICU root collation for `"root"` and the locales
-  that use it (`en`, `de`, `fr`, `it`, `nl`, `pt` and others). Its weights
-  were derived from black-box runs of R
+  the `C` collation, the ICU root collation for `"root"` and the locales that
+  use it (`en`, `de`, `fr`, `it`, `nl`, `pt` and others), and 25 tailorings
+  (`SUPPORTED_LOCALES`: Swedish, Finnish, Norwegian, Spanish, Polish, Czech,
+  Hungarian, Turkish, Russian, German phonebook and others) as rule lists on
+  top of root. The root collation is rule-based (canonical and compatibility
+  decomposition, case, code point ranges) with about 100 kB of data, mostly
+  the radical-and-stroke order of the ideographs; it reproduces R's order of
+  every code point and of 200,778 random strings, and each tailoring R's
+  order of 115,727 strings. Everything was derived from black-box runs of R
   ([specification](docs/provenance/specs/collation.md)); `Collator::new`
-  rejects locales with their own rules (Swedish, Spanish, Polish, ...).
+  rejects other tailored locales (Danish, Icelandic, Greek, `fr_CA`, ...).
 - qf references for the Cook's cutoff F quantile (df1 up to 200, df2 up to
   1e5 and beyond 4e5).
 
@@ -52,8 +58,8 @@ enabled, all normal dependencies are MIT, Unlicense or Zlib.
   instead of the ICU4X crates (Unicode-3.0). `EvaluationOptions::default()`
   stays the root collation, and every build supports it.
   `EvaluationOptions::collation` accepts `"C"`, `"POSIX"`, `"root"`, `"und"`,
-  `""` and the locales that use the root collation; other locales, which
-  ICU accepted, are now an error.
+  `""`, the locales that use the root collation and the supported
+  tailorings; other locales, which ICU accepted, are now an error.
 
 ### Removed
 
