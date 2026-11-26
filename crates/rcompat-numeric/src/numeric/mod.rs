@@ -2,6 +2,7 @@
 
 pub mod checked;
 pub mod math;
+pub mod normal_tail;
 pub mod profile;
 pub mod special;
 pub mod validate;

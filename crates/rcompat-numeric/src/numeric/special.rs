@@ -28,7 +28,7 @@
 //! profile gives the same bits on every host.
 
 use crate::numeric::math::ProfileMath;
-use crate::probability::normal_upper_tail;
+use crate::numeric::normal_tail::normal_upper_tail;
 
 const PI: f64 = std::f64::consts::PI;
 const HALF_LN_2PI: f64 = 0.9189385332046728;
