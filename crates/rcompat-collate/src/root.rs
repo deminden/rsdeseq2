@@ -206,30 +206,28 @@ impl Root {
             atoms.push((run >> 11, len, index));
             index += len;
         }
-        // Ideographs: runs continue where their block stopped, skipping the
-        // characters listed in R's order in HAN_MOVED.
-        let mut moved = HashSet::with_capacity(tables::HAN_MOVED.len());
-        let mut next_moved = 0;
-        for entry in tables::HAN_RUNS {
-            if entry & 0x8000 != 0 {
-                let (first, _) = tables::HAN_BLOCKS[usize::from(entry & 0x1F)];
-                moved.insert(first + u32::from(tables::HAN_MOVED[next_moved]));
-                next_moved += 1;
-            }
-        }
+        // Ideographs: entries of `HAN_ORDER` take characters from the main or
+        // the moved sequence of a block; the main sequences skip the moved
+        // characters.
+        let entries = han_entries();
+        let moved: HashSet<u32> = entries
+            .iter()
+            .filter_map(|e| match *e {
+                Han::Moved(first, len) => Some(first..first + len),
+                Han::Main(..) => None,
+            })
+            .flatten()
+            .collect();
         let mut cursor: Vec<u32> = tables::HAN_BLOCKS.iter().map(|b| b.0).collect();
-        next_moved = 0;
-        for entry in tables::HAN_RUNS {
-            let block = usize::from(entry & 0x1F);
-            if entry & 0x8000 != 0 {
-                let c = tables::HAN_BLOCKS[block].0 + u32::from(tables::HAN_MOVED[next_moved]);
-                next_moved += 1;
-                atoms.push((c, 1, index));
-                index += 1;
-                continue;
-            }
-            let block = usize::from(entry >> 10);
-            let mut left = u32::from(entry & 0x3FF) + 1;
+        for entry in entries {
+            let (block, mut left) = match entry {
+                Han::Moved(first, len) => {
+                    atoms.push((first, len, index));
+                    index += len;
+                    continue;
+                }
+                Han::Main(block, len) => (block, len),
+            };
             while left > 0 {
                 while moved.contains(&cursor[block]) {
                     cursor[block] += 1;
@@ -438,6 +436,60 @@ impl Root {
     pub(crate) fn ascii(&self, b: u8) -> Option<Element> {
         self.ascii.get(usize::from(b)).copied().flatten()
     }
+}
+
+/// An entry of `tables::HAN_ORDER`.
+enum Han {
+    /// The next characters of a block's main sequence: (block, count).
+    Main(usize, u32),
+    /// Moved characters: (first code point, count).
+    Moved(u32, u32),
+}
+
+/// The entries of `tables::HAN_ORDER`, with moved runs resolved to code
+/// points.
+fn han_entries() -> Vec<Han> {
+    let data = &tables::HAN_ORDER;
+    let mut moved_cursor: Vec<u32> = tables::HAN_BLOCKS.iter().map(|b| b.0).collect();
+    let mut out = Vec::with_capacity(data.len());
+    let mut bytes = data.iter().copied();
+    while let Some(x) = bytes.next() {
+        let mut byte = || bytes.next().unwrap_or(0);
+        let block = usize::from(x >> 4);
+        let (delta, len) = match x & 0xF {
+            k @ 0..=12 => {
+                out.push(Han::Main(block, u32::from(k) + 1));
+                continue;
+            }
+            13 => {
+                out.push(Han::Main(block, 14 + u32::from(byte())));
+                continue;
+            }
+            14 => (0, 1),
+            _ => {
+                let mut h = 0u32;
+                let mut shift = 0;
+                loop {
+                    let b = byte();
+                    h |= u32::from(b & 0x7F) << shift;
+                    shift += 7;
+                    if b & 0x80 == 0 {
+                        break;
+                    }
+                }
+                let z = i64::from(h >> 1);
+                let delta = if z & 1 == 0 { z >> 1 } else { -(z >> 1) - 1 };
+                let len = if h & 1 == 1 { 2 + u32::from(byte()) } else { 1 };
+                (delta, len)
+            }
+        };
+        let cursor = &mut moved_cursor[block];
+        // The stream only names code points of the block.
+        let first = u32::try_from(i64::from(*cursor) + delta).unwrap_or(*cursor);
+        out.push(Han::Moved(first, len));
+        *cursor = first + len;
+    }
+    out
 }
 
 /// A prevowel followed by one of its consonants sorts after the consonant.

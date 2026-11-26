@@ -921,44 +921,72 @@ def emit(obs: Observations, st: Structure, m: Model) -> tuple[str, dict]:
     if len(blocks) > 31:
         raise RuntimeError("too many ideograph blocks for the encoding")
     # Within each block R's order is mostly code point order: the characters
-    # outside the longest increasing subsequence are listed where they occur
-    # ("moved"); the rest are runs that continue where their block stopped.
+    # outside the longest increasing subsequence ("moved") are mostly
+    # consecutive among themselves. The order is a byte stream of entries
+    # that take characters from a block, from where its main sequence (the
+    # characters not moved) or its moved sequence stopped.
     moved = set()
     for b, (first, n) in enumerate(blocks):
         seq = [c for c in han if block_of[c] == b]
         moved |= set(seq) - set(longest_increasing(seq))
-    han_runs, moved_list = [], []
+    entries = []  # ("main", block, length) or ("moved", block, delta, length)
     cursor = [first for first, _ in blocks]
-    prev_block, length = None, 0
-    def flush():
-        if prev_block is not None and length:
-            han_runs.append(f"0x{prev_block << 10 | (length - 1):04X}")
+    moved_cursor = [first for first, _ in blocks]
     for c in han:
-        if c in moved:
-            flush()
-            prev_block, length = None, 0
-            han_runs.append(f"0x{0x8000 | block_of[c]:04X}")
-            moved_list.append(f"{c - blocks[block_of[c]][0]}")
-            continue
         b = block_of[c]
+        if c in moved:
+            delta = c - moved_cursor[b]
+            last = entries[-1] if entries else None
+            if delta == 0 and last and last[0] == "moved" and last[1] == b and last[3] < 257:
+                last[3] += 1
+            else:
+                entries.append(["moved", b, delta, 1])
+            moved_cursor[b] = c + 1
+            continue
         while cursor[b] in moved:
             cursor[b] += 1
         if cursor[b] != c:
             raise RuntimeError("ideograph order is not a merge of increasing block sequences")
         cursor[b] += 1
-        if b == prev_block and length < 1024:
-            length += 1
+        last = entries[-1] if entries else None
+        if last and last[0] == "main" and last[1] == b and last[2] < 269:
+            last[2] += 1
         else:
-            flush()
-            prev_block, length = b, 1
-    flush()
+            entries.append(["main", b, 1])
+    stream = []
+    for e in entries:
+        b = e[1]
+        if e[0] == "main":
+            n = e[2]
+            if n <= 13:
+                stream.append(b << 4 | (n - 1))
+            else:
+                stream += [b << 4 | 13, n - 14]
+        elif e[2] == 0 and e[3] == 1:
+            stream.append(b << 4 | 14)
+        else:
+            delta, n = e[2], e[3]
+            h = ((delta << 1) if delta >= 0 else ((-delta) << 1) - 1) << 1 | (n > 1)
+            stream.append(b << 4 | 15)
+            while h >= 0x80:
+                stream.append(h & 0x7F | 0x80)
+                h >>= 7
+            stream.append(h)
+            if n > 1:
+                stream.append(n - 2)
     parts.append(rust_array("HAN_BLOCKS", "(u32, u32)", [f"(0x{f:05X}, {n})" for f, n in blocks],
         "Blocks of ideographs that R orders by radical and stroke: (first code point, length).", 4))
-    parts.append(rust_array("HAN_RUNS", "u16", han_runs,
-        "Ideographs in R's primary order after the atoms of `ATOM_RUNS`: an entry takes the next\n`(entry & 0x3FF) + 1` code points of block `entry >> 10` that are not moved; an entry\n`0x8000 | block` takes the next offset of `HAN_MOVED` in that block.", 12))
-    parts.append(rust_array("HAN_MOVED", "u16", moved_list,
-        "Ideographs R does not order by code point within their block, in R's order, as offsets\nfrom the start of their block.", 16))
-    sizes["HAN"] = 8 * len(blocks) + 2 * len(han_runs) + 2 * len(moved_list)
+    parts.append(rust_array("HAN_ORDER", "u8", [f"0x{x:02X}" for x in stream],
+        "Ideographs in R's primary order after the atoms of `ATOM_RUNS`, as a byte stream. Within a\n"
+        "block R's order is code point order except for the moved characters; each block has a main\n"
+        "cursor (over the characters not moved) and a moved cursor (after the last moved character\n"
+        "taken, at first the block's first code point). An entry starts with a byte whose high\n"
+        "nibble is the block and whose low nibble `k` says what to take: `k` <= 12, `k + 1`\n"
+        "characters from the main cursor; 13, `14 + byte` of them; 14, the moved character at the\n"
+        "moved cursor; 15, a LEB128 number `h` follows: the moved characters start\n"
+        "`unzigzag(h >> 1)` code points from the moved cursor, one of them or, when `h & 1`,\n"
+        "`2 + byte` consecutive ones.", 16))
+    sizes["HAN"] = 8 * len(blocks) + len(stream)
     # Marks.
     marks = []
     for i, (c, _) in enumerate(m.mark_list):
