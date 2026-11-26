@@ -14,7 +14,7 @@
 //!   options on top of the root collation.
 //!
 //! The root collation is a set of rules (canonical and compatibility
-//! decomposition, case, code point ranges) plus about 100 kB of data for
+//! decomposition, case, code point ranges) plus about 62 kB of data for
 //! what the rules cannot produce, chiefly the radical-and-stroke order of the
 //! ideographs. Everything was derived from black-box runs of R 4.6.2 with ICU
 //! 78.3; the method, the observations and the verification are documented in

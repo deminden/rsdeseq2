@@ -59,12 +59,14 @@ reports `root`, as it does for English and most western European locales.
 The R package passes the collation R reports. The root collation follows R
 for every code point (ideographs in R's radical-and-stroke order, unassigned
 code points last). Locales with rules of their own are supported for
-Swedish, Finnish, Norwegian, Spanish, Galician, Polish, Czech, Slovak,
-Hungarian, Croatian, Bosnian, Slovenian, Romanian, Lithuanian, Latvian,
-Estonian, Turkish, Azerbaijani, Russian, Ukrainian, Belarusian, Bulgarian,
-Serbian, Macedonian and German phonebook order; other tailored locales
-(Danish, Icelandic, Greek, Canadian French and the rest) are rejected with an
-error rather than sorted differently from R
+Swedish, Danish, Norwegian, Finnish, Icelandic, Spanish, Galician, Polish,
+Czech, Slovak, Hungarian, Croatian, Bosnian, Slovenian, Romanian,
+Lithuanian, Latvian, Estonian, Turkish, Azerbaijani, Russian, Ukrainian,
+Belarusian, Bulgarian, Serbian, Macedonian, Greek, Canadian French and
+German phonebook order, each matching R for every code point; other
+tailored locales, whose rules were not derived (Welsh, Esperanto,
+Vietnamese and the rest), are rejected with an error rather than sorted
+differently from R
 ([specification](provenance/specs/collation.md)).
 
 ## Numerical expectations

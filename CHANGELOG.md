@@ -18,16 +18,22 @@ enabled, all normal dependencies are MIT, Unlicense or Zlib.
   `scripts/provenance/dependency_licences.py`.
 - `rcompat-collate` 0.1.0: string comparison in R's order, byte order for
   the `C` collation, the ICU root collation for `"root"` and the locales that
-  use it (`en`, `de`, `fr`, `it`, `nl`, `pt` and others), and 25 tailorings
-  (`SUPPORTED_LOCALES`: Swedish, Finnish, Norwegian, Spanish, Polish, Czech,
-  Hungarian, Turkish, Russian, German phonebook and others) as rule lists on
-  top of root. The root collation is rule-based (canonical and compatibility
-  decomposition, case, code point ranges) with about 100 kB of data, mostly
-  the radical-and-stroke order of the ideographs; it reproduces R's order of
-  every code point and of 200,778 random strings, and each tailoring R's
-  order of 115,727 strings. Everything was derived from black-box runs of R
-  ([specification](docs/provenance/specs/collation.md)); `Collator::new`
-  rejects other tailored locales (Danish, Icelandic, Greek, `fr_CA`, ...).
+  use it (`en`, `de`, `fr`, `it`, `nl`, `pt` and others), and 29 tailorings
+  (`SUPPORTED_LOCALES`: Swedish, Danish, Norwegian, Finnish, Icelandic,
+  Spanish, Polish, Czech, Hungarian, Turkish, Russian, Greek, Canadian
+  French, German phonebook and others) as rule lists on top of root, with
+  the options some need: uppercase first (Danish), accents compared from the
+  end of the string (Canadian French), combining marks in canonical order
+  and Greek before Latin (Greek). The root collation is rule-based
+  (canonical and compatibility decomposition, case, code point ranges) with
+  about 62 kB of data, 27 kB of it the radical-and-stroke order of the
+  ideographs as a compact byte stream; it reproduces R's order of every code
+  point, of 200,778 random strings and of 25,172 strings with expansions, and
+  each tailoring R's order of every code point, of the expansion strings and
+  of 115,727 strings of accented letters. Everything was derived from
+  black-box runs of R ([specification](docs/provenance/specs/collation.md));
+  `Collator::new` rejects the other tailored locales, whose rules were not
+  derived (Welsh, Esperanto, Vietnamese, traditional Spanish, ...).
 - qf references for the Cook's cutoff F quantile (df1 up to 200, df2 up to
   1e5 and beyond 4e5).
 
