@@ -295,8 +295,10 @@ mod tests {
     }
 
     /// `outer(seq_len(n) - (n + 1) / 2, 0:(n - 1), "^")`, column-major. The
-    /// powers are of integers or half-integers; `powf` gives R's values on the
-    /// reference host (checked against R for n = 11..120).
+    /// powers are of integers or half-integers. R computed them with the macOS
+    /// C library's `pow`, which is not always correctly rounded, so `powf`
+    /// gives R's inputs only on macOS (checked against R for n = 11..120);
+    /// other hosts skip these cases.
     fn contr_poly_input(n: usize) -> Vec<f64> {
         let center = (n as f64 + 1.0) / 2.0;
         (0..n)
@@ -393,6 +395,9 @@ mod tests {
         let cases = cases(DOWNDATE_CASES);
         assert_eq!(cases.len(), 170);
         for case in &cases {
+            if case.name.starts_with("contr_poly_") && !cfg!(target_os = "macos") {
+                continue;
+            }
             check_factorization(case);
         }
     }
