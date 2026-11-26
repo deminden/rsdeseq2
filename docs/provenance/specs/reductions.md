@@ -16,7 +16,7 @@ operations in the same order and with the same rounding as that BLAS.
 the BLAS of the running R (`$(BLAS_LIBS)`, as an R package would) and calls
 the three routines on chosen inputs. Its output for R 4.6.2 on macOS arm64
 with the conda-forge OpenBLAS is in
-`docs/provenance/observations/reductions_r462_macos/`.
+`crates/rcompat-numeric/tests/data/reductions_r462_macos/`.
 
 - `environment.tsv`: R version, platform and BLAS library.
 - `ddot_tree.tsv`: the summation tree of `ddot(x, 1)` for n = 1..80, found

@@ -234,7 +234,7 @@ const RECOMPUTE_BELOW: f64 = 1e-6;
 ///
 /// This variant was selected because it reproduces rank, pivot and every
 /// `qraux` value of both observation files
-/// (`docs/provenance/observations/qr_cases_r462_macos.json` and
+/// (`crates/rcompat-numeric/tests/data/qr_cases_r462_macos.json` and
 /// `qr_downdate_cases_r462_macos.json`). Separately rounded `1 - r * r` and
 /// the factored `(1 - r)(1 + r)` change pivots; triggers on the norm relative
 /// to the original (or last recomputed) norm leave stored norms that differ.
@@ -256,10 +256,8 @@ mod tests {
     use super::HouseholderQr;
     use crate::math::rank::matrix_rank_r_qr;
 
-    const CASES: &str =
-        include_str!("../../../../docs/provenance/observations/qr_cases_r462_macos.json");
-    const DOWNDATE_CASES: &str =
-        include_str!("../../../../docs/provenance/observations/qr_downdate_cases_r462_macos.json");
+    const CASES: &str = include_str!("../../tests/data/qr_cases_r462_macos.json");
+    const DOWNDATE_CASES: &str = include_str!("../../tests/data/qr_downdate_cases_r462_macos.json");
 
     /// One recorded case; matrices are column-major. The larger file stores
     /// neither `qr` nor the basis (left empty here), nor the `contr.poly()`

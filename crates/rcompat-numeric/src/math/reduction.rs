@@ -90,22 +90,15 @@ pub fn axpy(alpha: f64, x: &[f64], y: &mut [f64]) {
 mod tests {
     use super::{axpy, dot, norm};
 
-    const DDOT_RANDOM: &str = include_str!(
-        "../../../../docs/provenance/observations/reductions_r462_macos/ddot_random.tsv"
-    );
-    const DDOT_FMA: &str =
-        include_str!("../../../../docs/provenance/observations/reductions_r462_macos/ddot_fma.tsv");
-    const DDOT_FMA_PAIRS: &str = include_str!(
-        "../../../../docs/provenance/observations/reductions_r462_macos/ddot_fma_pairs.tsv"
-    );
-    const DAXPY_FMA: &str = include_str!(
-        "../../../../docs/provenance/observations/reductions_r462_macos/daxpy_fma.tsv"
-    );
-    const DNRM2: &str =
-        include_str!("../../../../docs/provenance/observations/reductions_r462_macos/dnrm2.tsv");
-    const DNRM2_RANDOM: &str = include_str!(
-        "../../../../docs/provenance/observations/reductions_r462_macos/dnrm2_random.tsv"
-    );
+    const DDOT_RANDOM: &str =
+        include_str!("../../tests/data/reductions_r462_macos/ddot_random.tsv");
+    const DDOT_FMA: &str = include_str!("../../tests/data/reductions_r462_macos/ddot_fma.tsv");
+    const DDOT_FMA_PAIRS: &str =
+        include_str!("../../tests/data/reductions_r462_macos/ddot_fma_pairs.tsv");
+    const DAXPY_FMA: &str = include_str!("../../tests/data/reductions_r462_macos/daxpy_fma.tsv");
+    const DNRM2: &str = include_str!("../../tests/data/reductions_r462_macos/dnrm2.tsv");
+    const DNRM2_RANDOM: &str =
+        include_str!("../../tests/data/reductions_r462_macos/dnrm2_random.tsv");
 
     // Product a * b = 1 - 2^-60 is inexact in binary64 (it rounds to 1).
     const A: f64 = 1.0 + 1.0 / 1_073_741_824.0;

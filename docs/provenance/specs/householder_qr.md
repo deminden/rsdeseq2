@@ -93,7 +93,7 @@ product applied to y = d_j e_j with d_j = x(j,j) of the compact matrix
 ## Observation and acceptance
 
 `--downdate` mode of the same script writes
-`docs/provenance/observations/qr_downdate_cases_r462_macos.json`: 170 larger
+`crates/rcompat-numeric/tests/data/qr_downdate_cases_r462_macos.json`: 170 larger
 cases (`contr.poly` inputs for 11 to 120 levels, centred polynomial bases up
 to degree 20, near-dependent random matrices) with rank, pivot and qraux.
 The `contr_poly_n` inputs are not stored; they are
@@ -101,7 +101,7 @@ The `contr_poly_n` inputs are not stored; they are
 them with R or check that Rust `powi`/`powf` reproduces those bits.
 
 `scripts/provenance/probe_qr_rules.R` writes
-`docs/provenance/observations/qr_cases_r462_macos.json`: for 65 matrices
+`crates/rcompat-numeric/tests/data/qr_cases_r462_macos.json`: for 65 matrices
 (identity, zero columns, all-zero, one row, one column, wide, dependent,
 near-collinear at 1e-5 to 1e-11 in two scalings, other tolerances, mixed
 magnitudes, centred Vandermonde matrices like `poly()` builds, `contr.poly()`
