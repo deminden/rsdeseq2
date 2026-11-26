@@ -119,11 +119,11 @@ jobs:
         env:
           RSDESEQ2_R_SOURCE: ${{ steps.r-source.outputs.archive }}
         run: R CMD check --no-manual --no-build-vignettes "$RSDESEQ2_R_SOURCE"
-      - name: Save earlier Bioconductor check results
-        if: always() && matrix.lane == 'previous-bioc' && hashFiles('rsdeseq2.Rcheck/00check.log') != ''
+      - name: Save package check results
+        if: always() && hashFiles('rsdeseq2.Rcheck/00check.log') != ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: r-previous-bioc-check-${{ github.sha }}
+          name: r-${{ matrix.lane }}-check-${{ github.sha }}
           path: |
             rsdeseq2.Rcheck/00check.log
             rsdeseq2.Rcheck/tests/testthat.Rout*
