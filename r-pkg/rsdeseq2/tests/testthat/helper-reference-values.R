@@ -8,6 +8,10 @@
 # Tests that compare expected values skip on other hosts; validation scripts
 # that only take inputs from these files, and compare the Rust interfaces with
 # each other, use them everywhere.
+# Whether values recorded in the formula references can be compared bit for
+# bit on this host: they were recorded with R on macOS.
+.formula_reference_exact <- function() Sys.info()[["sysname"]] == "Darwin"
+
 .formula_reference_path <- function(directory, name) {
   if (Sys.info()[["sysname"]] != "Darwin" && identical(Sys.getenv("TESTTHAT"), "true")) {
     testthat::skip("exact formula references are recorded for macOS R only")
