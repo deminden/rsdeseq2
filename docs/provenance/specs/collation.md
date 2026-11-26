@@ -1,160 +1,148 @@
-# Specification: R's string collation (C and ICU root)
+# Specification: R's string collation (C, ICU root and tailorings)
 
 Status: written from allowed inputs only: R's help pages (`?Comparison`,
 `?sort`, `?icuSetCollate`), the general description of multi-level collation
-(base letters, then accents, then case and variants), the Unicode Standard's
-arithmetic for spelling Hangul syllables with conjoining jamo (section 3.12),
-and black-box runs of R 4.6.2 with ICU 78.3 on macOS arm64. No collation
-implementation, table or locale data was consulted: no ICU or ICU4X source or
-data, no CLDR files, no DUCET (`allkeys.txt`), no glibc locale files and no R
-source. Every weight in `crates/rcompat-collate/src/table.rs` is derived from
-R's answers by the probe scripts below.
+(base letters, then accents, then case and variants), the public API of the
+`unicode-normalization` crate (canonical and compatibility decomposition,
+combining classes) and of Rust's `char` (case), and black-box runs of R 4.6.2
+with ICU 78.3 on macOS arm64. No collation implementation, table or locale
+data was consulted: no ICU or ICU4X source or data, no CLDR files, no DUCET,
+no `UnicodeData.txt` or Unihan, no glibc locale files and no R source. Every
+fact below is an observation of R on inputs chosen here.
 
 ## Purpose
 
-R orders character data with the collation of the session. Formula
-evaluation needs that order for factor levels (`factor()` sorts the unique
-values) and for string comparisons (`<`, `>`, `<=`, `>=`). R reports the
-collation in use with `icuGetCollate("actual")`; the rsdeseq2 R wrapper passes
-`"C"` when ICU is not in use and the reported ICU locale otherwise. For
-English and most western European locales ICU reports `"root"`.
+R orders character data with the collation of the session; formula
+evaluation needs that order for factor levels and string comparisons. R
+reports the collation with `icuGetCollate("actual")`; the rsdeseq2 R wrapper
+passes `"C"` when ICU is not in use and the reported name otherwise.
 
-## Probes
+## Probes (all outputs default to `/tmp/rcollate`)
 
-- `scripts/provenance/probe_collation.R` derives the weight table.
-- `scripts/provenance/probe_collation_orders.R` records R's sorted order of
-  about 32,000 chosen and random strings, and the collation ICU reports for 77
-  locale identifiers. These orders check the model; they are not used to
-  derive it (the near-duplicate set uses the table only to choose inputs).
-- `scripts/provenance/build_collation_table.py` turns the derived table into
-  `crates/rcompat-collate/src/table.rs` (`--check` verifies it is current).
+| Script | Output | Use |
+|---|---|---|
+| `probe_collation_full.R` | `root_single.tsv`: all 1,112,063 code points (no surrogates) in R's order with the level of each difference | derivation and oracle |
+| `probe_collation_expansions.R` | `root_expansions.tsv`: groups that are several primary weights, and which | derivation |
+| `probe_collation_oracle.R` | answers `compare`/`sort` questions under any locale | derivation questions, oracles |
+| `probe_collation_strings.R` | `root_strings.tsv`: 200,778 random strings in R's order | oracle |
+| `probe_collation_tailorings.R` | `tailoring_<locale>.tsv` (115,727 strings each), `tailoring_locales.tsv` | derivation of tailorings, oracle |
+| `probe_collation_orders.R` | the committed `tests/data/sorted_*.tsv`, `locales.tsv` | crate tests |
+| `probe_collation.R` | the first probe's weight table for 5,364 code points (committed observations); `probe_collation_orders.R` uses it to choose near-duplicates | historical, not used by the model |
 
-Outputs: `docs/provenance/observations/collation_r462_macos/`. The sorted sets
-are copied to `crates/rcompat-collate/tests/data/` for the crate's tests.
+`cargo run -p rcompat-collate --example dump_decompositions` writes
+`decompositions.tsv` (NFD, NFKD, lowercase and case flags from Rust).
+`build_collation_table.py` derives `crates/rcompat-collate/src/tables.rs`;
+`sample_collation_orders.py` writes `oracle_summary.tsv` (counts and SHA-256
+of every oracle, in `observations/collation_r462_macos`) and the committed
+sample `tests/data/sorted_tailorings.tsv`. The oracles (about 30 MB) are not
+committed; the scripts regenerate them.
 
-## Observed facts
+Level tests: with LO = tab (the lowest primary) and HI = line feed, x and y
+have equal primaries exactly when `x+LO+HI > y+LO+LO` and
+`x+LO+LO < y+LO+HI`; with equal primaries, equal secondaries exactly when
+`x+"á" > y+"a"` and `y+"á" > x+"a"`.
 
-Probed code points: U+0001..U+036F (ASCII, Latin-1, Latin Extended-A/B, IPA,
-spacing modifiers, combining diacritics), U+0370..U+052F (Greek, Cyrillic),
-U+0590..U+06FF (Hebrew, Arabic), U+0900..U+097F (Devanagari), U+1100..U+11FF
-(conjoining jamo), U+1E00..U+1EFF (Latin Extended Additional), U+2000..U+22FF
-(punctuation, super- and subscripts, currency, letterlike symbols, number
-forms, arrows, mathematical operators), U+2300..U+23FF, U+2460..U+27BF
-(enclosed alphanumerics, box drawing, shapes, symbols, dingbats),
-U+3040..U+30FF (kana), U+FB00..U+FB06 (Latin ligatures), U+FF01..U+FF5E
-(fullwidth ASCII), U+1F300..U+1F64F (pictographs, emoticons): 5,364 code
-points.
+## Observed facts and the rules derived from them
 
-1. Ties are reported as ties. `x < y` and `y < x` are both `FALSE` for, for
-   example, `"a\u0301"` and `"\u00e1"`, or `"a\u00adb"` and `"ab"`; `order()`
-   with a second key then decides by that key.
-   `icuSetCollate(strength = ...)` has no observable effect in this build,
-   so levels are separated with the string tests below rather than with
-   strength settings.
-2. 162 probed code points are completely ignorable: appending them to `"a"`
-   gives a string that ties with `"a"` (C0 and C1 controls other than
-   tab..carriage return and U+0085, soft hyphen, zero-width and directional
-   format characters, U+034F, and others).
-3. Tab (U+0009) is the lowest non-ignorable character, then the other
-   whitespace controls, then spaces, punctuation, symbols, currency signs,
-   digits and letters. Punctuation and spaces are not ignored: `"a c"` <
-   `"a-d"` < `"ab"`.
-4. Level tests. With `LO` = tab and `HI` = line feed, two strings x and y
-   have equal base (primary) weights exactly when `x+LO+HI > y+LO+LO` and
-   `x+LO+LO < y+LO+HI` (tab is never part of the strings tested). With equal
-   primaries, they also have equal accent (secondary) weights exactly when
-   `x+"a\u0301" > y+"a"` and `y+"a\u0301" > x+"a"`. Checked on `a`/`A`
-   (tertiary), `a`/`á` (secondary) and `a`/`b` (primary).
-5. 184 probed characters carry no primary weight (`"a"+c` is primary-equal
-   to `"a"`): the combining marks and a few others. Their secondary order is
-   their sorted order; all of them sort above the plain secondary of letters.
-6. The remaining characters fall into 3,540 primary groups. 3,368 groups are
-   single primary weights; 172 are expansions, primary-equal to a sequence
-   of other groups found by prefix search (`g <=p c <p g + U+FFFF`): for
-   example `ß` = s s, `æ` = a e, `œ` = o e, `½` = 1 ⁄ 2, `…` = . . .,
-   `ﬃ` = f f i, `ǳ` = d z, `№` = n o, `™` = t m (`decompositions.tsv`).
-7. 816 characters tie with another character, or with another character of
-   their group followed by one combining mark: `á` = `a`+U+0301,
-   `ǖ` = `ü`+U+0304, `ł` = `l`+U+0335, `ø` = `o`+U+0338, `ǆ` = `ǳ`+U+030C;
-   the mark U+0344 ties with U+0308 U+0301 (`ties.tsv`).
-8. Within a group, the characters that do not decompose form classes of
-   equal secondary weight (neighbours in sorted order that pass the
-   secondary test). The first class holds the group's first character and
-   has the plain secondary weight; tertiary levels within a class are the
-   sorted order of its members (`a` < `ａ` < U+0363 < `A` < `Ａ` < `ª` < `ₐ`).
-9. A further class is either secondary-equal to the group's primaries with
-   one combining mark inserted (a skeleton, for example `ǆ` against `dz` +
-   U+030C), or has a secondary weight of its own. The weights of its own
-   (`ð`, `ſ`, `ŀ`, `ß`, `æ`, `œ`, `ґ`, the curly quotes, ...) all sort
-   between the plain secondary and every combining mark: with the lowest
-   mark m0, `"x"+v` < `"x"+m+R` for every mark m, where R spells the
-   primaries of v. The element that carries it is found with m0 inserted
-   after each element in turn. Weights of their own on the same primary are
-   ordered by comparing `v + tail(w)` with `w + tail(v)` (for example
-   `ß` < `ſ`), and a class secondary-equal to another (`ﬅ` and `ſt`) shares
-   its weight.
-10. Contractions: inserting a completely ignorable character between two
-    characters changes the comparison for 11 pairs, each equal to one
-    character: `l·`, `L·` (U+00B7 or U+0387) = `ŀ`, `Ŀ`; `и`+U+0306 = `й`,
-    `И`+U+0306 = `Й`; Arabic alef, waw and yeh with U+0653..U+0655 = the
-    precomposed letters. No other probed pair contracts.
-11. Every Hangul syllable U+AC00..U+D7A3 ties with its leading consonant,
-    vowel and optional trailing consonant from U+1100..U+11FF
-    (`hangul.tsv`: 11,172 of 11,172).
-12. Locales: ICU reports `root` for `""`, `root`, `en` and every probed
-    English region, `de` (DE, AT, CH), `fr` (FR, BE, CH), `it`, `nl`, `pt`
-    (BR, PT), `ca`, `eu`, `ga`, `id`, `ms` and `sw`. It reports a tailoring of
-    its own for `fr_CA`, `en_US_POSIX`, `es`, `gl`, `cy`, `af`, the Nordic,
-    Baltic, Slavic and other languages probed (`locales.tsv`).
+1. 961 code points are completely ignorable (appending them changes
+   nothing); 678 sort before everything with no primary weight (marks).
+2. R does not reorder combining marks: `"a\u301\u325"` and `"a\u325\u301"`
+   differ. Each character is replaced by its canonical decomposition, as the
+   ties of every precomposed character with its decomposition show.
+3. Primary groups (characters that are primary-equal): 150,381. A group is
+   an expansion when an earlier atom is a primary prefix of it
+   (`q <=p c <p q + U+FFFF`); everything between an atom and an expansion
+   starting with it starts with it too, so one pass in sorted order finds all
+   12,126 expansions, and a binary search over the atoms spells each one.
+   The other 138,255 groups are atoms, each one primary weight.
+4. Accents: canonical decompositions reproduce R except for 82 characters
+   whose decomposition R sorts as the single character (й, Arabic letters
+   with hamza or madda, Indic two-part vowels, Tibetan, Balinese and others):
+   these are contractions. R also ties `l`+U+00B7 with ŀ (and `L`).
+5. Compatibility decompositions (ligatures, fullwidth, super- and subscripts,
+   circled, squared, fractions, Arabic presentation forms) reproduce R's
+   primaries except for spacing accents and a few letters, which are stored.
+   Their tertiary weight is a variant weight per character range for the
+   lowercase (or uncased) and uppercase letters they contain, read off each
+   character's place among the variants of its letter; for characters of
+   several letters the first letter is fitted against the variants of that
+   letter (with x_j the first letter replaced by the variant of layer j, R
+   puts the character between x_j and x_(j+1); comparing with the highest
+   variant of the second letter separates "equal to layer j" from "between").
+6. Case: an uppercase letter sorts as its lowercase letter (Rust's
+   `to_lowercase`) with the uppercase tertiary weight, lowercase first.
+7. Variants R ties or ranks with a letter that no rule explains (digits of
+   all scripts with ASCII digits, kana, ð, ł, ø, đ, ſ, æ, ß, œ, ...) are
+   stored: 2,344 characters, mostly as runs. A class of a group that has no
+   rule-explained member is either the atom plus one mark (đ = d + U+0335,
+   found by asking R against every mark) or a secondary weight of its own
+   above the common one (ask R whether the class is secondary-equal to its
+   spelled atoms); tertiary weights are a longest-path layering of the
+   observed order of classes.
+8. Ideographs are not in code point order: R orders them by radical and
+   stroke, with URO, Extension A, the unified compatibility ideographs and
+   Extensions B to J interleaved. Within each block the order is code point
+   order apart from 9,600 characters; the data are runs per block plus those
+   characters (64 kB). Tangut, Khitan and Nüshu are atoms in code point order
+   before the ideographs. Hangul syllables tie with their jamo (canonical
+   decomposition).
+9. Unassigned code points and private use sort after everything in code point
+   order, then U+FFFD and U+FFFF. Code points that the Unicode data of the
+   pinned `unicode-normalization` 0.1.25 or of Rust's `char` know but that
+   are unassigned for this ICU would be listed in `UNASSIGNED`; there are
+   none (with 0.1.26 there were 68, and 0.1.26 also adds the Unicode-3.0
+   licence, so the dependency is pinned).
+10. Prevowels: Thai U+0E40..0E44, Lao U+0EC0..0EC4, Tai Viet and New Tai Lue
+    prevowels followed by one of their consonants tie with the swapped pair
+    (found by the ignorable-insertion test over neighbouring atoms, 2.26 M
+    pairs, which found no other contractions).
 
 ## Model
 
-Each code point maps to a list of collation elements (primary, secondary,
-tertiary); a weight of zero means "no weight at this level".
+Element = (primary, secondary, tertiary); a zero weight is absent at that
+level. Primary of the i-th atom = (i + 1) · 256 (gaps for tailorings);
+secondary 32 = common, then weights of their own, then mark classes in R's
+order; tertiary codes · 32. A code point maps by the first rule that applies:
+unassigned list → stored → atom → mark → ignorable → compatibility
+decomposition with variant tertiary → lowercase with uppercase tertiary →
+code point order after all atoms. Strings compare by primaries, then
+secondaries, then tertiaries (a proper prefix first); the sort key joins the
+three sequences with 0. `C`/`POSIX` compare UTF-8 bytes.
 
-- Primary: 1..3,368, one per single-primary group in sorted order; 0 for
-  marks; expansions list the primaries of their decomposition.
-- Secondary: 1 for the plain weight; then the weights of their own (finding
-  9); then the mark classes in sorted order.
-- Tertiary: 2 × the level within the element's class; odd values lie between
-  levels. For expansions the tertiary of each element is fitted against the
-  classes of its atoms: if the expansion lies between `prefix+x+min(rest)`
-  and `prefix+x+max(rest)` the element takes x's level, otherwise it lies
-  between levels and decides; later elements are then not observable
-  against plain strings and are placed above all levels (or below all when
-  the first lies below all), offset by the expansion's level within its own
-  class so that, for example, `ǋ` < `Ǌ`.
-- Contractions replace the pair by the elements of the equal character.
-  Hangul syllables are replaced by their jamo.
+## Tailorings
 
-Comparison: the sequence of non-zero primaries is compared first
-(lexicographically, a proper prefix sorting first), then the non-zero
-secondaries, then the non-zero tertiaries. Equal at all three levels is a
-tie, as in R. The sort key is the three sequences joined with a 0 separator.
+`icuSetCollate(locale = ...)` changes the order (`tailoring_locales.tsv` lists
+what ICU reports; `ca`, `de`, `en`, `fr`, `it`, `nl`, `pt` report `root`,
+`nb`/`nn` report `no`). Each tailoring is a rule list on top of root
+(`src/tailoring/rules.rs`): `&x < y` (new letter after x), `<<`, `<<<`, `=`,
+`&[before 1]`, `&[before 2]`, contractions (Czech `ch`, Hungarian `cs`, `dzs`,
+...), `x/y` (Hungarian `ccs` = `cs` + `cs`, Norwegian `þ` = `t` + `h`),
+script moves (Cyrillic first for ru, uk, be, bg, sr, mk; Cyrillic after Latin
+for hr, bs, az) and switching off a root contraction (й in sr, mk). They were
+read off the differences between each locale's order and root, and a tailored
+base+mark also matches with marks of lower combining class in between
+(observed: `ç̌` is `č` with a cedilla in Czech). Rules were then corrected
+until R's order of the 115,727 probe strings was reproduced exactly.
 
-`C` and `POSIX` compare UTF-8 bytes (code point order), as R does in the C
-locale.
+## Verification (`cargo run --release -p rcompat-collate --example verify`)
 
-## Fallback and limits
+| Oracle | Adjacent pairs | Differ |
+|---|---|---|
+| every code point (`root_single.tsv`), with levels | 1,111,101 | 0 |
+| random strings (`root_strings.tsv`), with levels | 200,777 | 0 |
+| committed `tests/data/sorted_*.tsv` (old probe) | 32,354 | 0 |
+| each of sv, fi, nb, nn, es, gl, pl, cs, sk, hu, hr, bs, sl, ro, lt, lv, et, tr, az, ru, uk, be, bg, sr, mk, de@collation=phonebook | 115,726 each | 0 |
 
-- Code points outside the probed ranges get one element with primary
-  `3,368 + 1 + code point`, plain secondary and tertiary: after every probed
-  character, in code point order. This matches R for CJK ideographs relative
-  to the probed scripts but not among themselves (R orders ideographs
-  differently from code point order: 5 of 1,289 adjacent pairs in
-  `sorted_other_scripts.tsv`, all between strings with ideographs), and it
-  places scripts that were not probed (Thai, Ethiopic, Georgian, ...) after
-  the probed ones rather than at their ICU position.
-- Contractions of three or more characters, and discontiguous matching of
-  combining marks, were not probed.
-- Tailored locales are rejected with an error rather than approximated.
+Not supported (error): da (31 pairs still differed: uppercase-first details),
+is (secondary order of marks changes), el (34: secondary order of some
+marks), fr_CA (backwards accents and ŀ), and every other tailored locale.
 
-## Verification
+## Limits
 
-`crates/rcompat-collate/tests/r_orders.rs` checks every adjacent pair of the
-recorded orders: ASCII strings (4,947 pairs), random strings over the probed
-characters (5,622), accented Latin, Greek and Cyrillic words with combining
-marks and contractions (5,414), near-duplicates and mark sequences (15,082):
-all agree with R, including the 165 ties. `tests/properties.rs` checks
-antisymmetry, transitivity, agreement of sort keys with `compare`, and the C
-order on random strings.
+- Contractions of root were searched among neighbouring atoms and pairs with
+  marks; contractions between distant characters were not probed.
+- Discontiguous matching was observed and implemented for tailored letters;
+  root contractions match contiguously, which reproduced every oracle.
+- The decomposition and case facts come from `unicode-normalization` and
+  Rust's `char`; a newer Unicode version there can assign code points ICU 78
+  treats as unassigned (rerun the derivation and the verification).
